@@ -1,0 +1,74 @@
+/* LIGHT is default */
+@theme {
+  /* brand */
+  --color-primary:       #4f46e5; /* indigo-600 */
+  --color-primary-600:   #4f46e5;
+  --color-primary-700:   #4338ca;
+
+  /* base surfaces (LIGHT) */
+  --color-bg:            #f8fafc;    /* slate-50 */
+  --color-surface:       #ffffff;    /* card surfaces */
+  --color-surface-2:     #eef2f6;   /* secondary surfaces */
+  --color-elevated:      rgba(255,255,255,0.9);
+
+  /* text (LIGHT) */
+  --color-text:          #0f172a;    /* slate-900 */
+  --color-text-weak:     #475569;    /* slate-600 */
+  --color-invert:        #ffffff;
+
+  /* borders & rings (LIGHT) */
+  --color-border:        rgba(2,6,23,0.14); /* slate-900 at 14% */
+  --color-ring:          rgba(79,70,229,0.35);
+
+  /* status */
+  --success:             #16a34a;    /* green-600 */
+  --warning:             #f59e0b;    /* amber-500/600 */
+  --danger:              #ef4444;    /* red-500/600 */
+
+  /* elevation & radius */
+  --shadow-card:         0 8px 24px -16px rgb(2 6 23 / 0.25);
+  --radius-xl:           1rem;
+
+  /* semantic aliases (Tailwind v4 picks these up) */
+  --color-background:            var(--color-bg);
+  --color-foreground:            var(--color-text);
+  --color-card:                  var(--color-surface);
+  --color-card-foreground:       var(--color-text);
+  --color-muted:                 var(--color-surface-2);
+  --color-muted-foreground:      var(--color-text-weak);
+  --color-popover:               var(--color-elevated);
+  --color-popover-foreground:    var(--color-text);
+  --color-accent:                var(--color-surface-2);
+  --color-accent-foreground:     var(--color-text);
+  --color-secondary:             var(--color-surface-2);
+  --color-secondary-foreground:  var(--color-text);
+  --color-input:                 var(--color-border);
+  --color-success:               var(--success);
+  --color-warning:               var(--warning);
+  --color-destructive:           var(--danger);
+  --color-destructive-foreground:#fff;
+  --color-primary-foreground:    #ffffff;
+}
+
+/* DARK overrides */
+:root.dark {
+  --color-primary:       #8b5cf6;
+  --color-primary-600:   #7c3aed;
+  --color-primary-700:   #6d28d9;
+
+  --color-bg:            #0b1022;               /* deep navy */
+  --color-surface:       rgba(2,6,23,0.9);
+  --color-surface-2:     #0f172a;
+  --color-elevated:      rgba(15,23,42,0.7);
+
+  --color-text:          #e2e8f0;
+  --color-text-weak:     #94a3b8;
+  --color-invert:        #0b1022;
+
+  --color-border:        rgba(255,255,255,0.12);
+  --color-ring:          rgba(139,92,246,0.35);
+
+  --success:             #22c55e;
+  --warning:             #fbbf24;
+  --danger:              #f87171;
+}

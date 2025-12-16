@@ -1,0 +1,19 @@
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+
+# Python / backend
+__pycache__/
+*.pyc
+.venv/
+
+# Env / secrets
+.env
+.env.*
+*.sqlite
+*.db
+
+# OS
+.DS_Store

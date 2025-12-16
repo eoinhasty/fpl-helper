@@ -1,0 +1,46 @@
+/* src/styles/ui.css */
+@layer components {
+  /* Surfaces */
+  .ds-surface {
+    @apply rounded-2xl border border-border shadow-card bg-[--color-elevated] text-foreground;
+  }
+  .ds-surface-plain { @apply bg-card text-card-foreground; }
+  .ds-border { @apply border-border; }
+  .ds-text { @apply text-foreground; }
+  .ds-text-weak { @apply text-muted-foreground; }
+
+  /* Button */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg border border-input
+           px-3 py-1.5 text-sm font-medium
+           bg-card text-card-foreground
+           transition
+           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+  }
+  .btn:hover { @apply bg-accent text-accent-foreground; }
+
+  .btn-primary {
+    @apply border-0 bg-primary text-primary-foreground
+           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+  }
+  .btn-primary:hover { @apply bg-primary-700; }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center rounded-full border border-border
+           px-2 py-0.5 text-xs
+           bg-card text-muted-foreground;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full rounded-lg border border-input px-2 py-1 text-sm
+           bg-card text-foreground
+           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+  }
+
+  /* Status pills */
+  .pill-good { @apply bg-success/12 text-success; }
+  .pill-warn { @apply bg-warning/12 text-warning; }
+  .pill-bad  { @apply bg-destructive/12 text-destructive; }
+}

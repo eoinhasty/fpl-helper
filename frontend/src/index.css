@@ -1,0 +1,12 @@
+/* src/index.css */
+@import "tailwindcss";
+
+/* then your layers */
+@import "./styles/theme.css";
+@import "./styles/ui.css";
+
+/* tiny base tweaks */
+:root { color-scheme: light; }
+html, body { height: 100%; }
+body { margin: 0; }
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }

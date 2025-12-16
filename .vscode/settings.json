@@ -1,0 +1,11 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/.vite": true,
+    "**/__pycache__": true,
+    "frontend/tsconfig.app.json": true,
+    "frontend/tsconfig.node.json": true
+  }
+}

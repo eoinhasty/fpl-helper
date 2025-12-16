@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "FPL X-Api-Authorization Sniffer",
+  "version": "1.0.1",
+  "description": "Copies the X-Api-Authorization header from fantasy.premierleague.com to your clipboard.",
+  "permissions": ["webRequest", "scripting", "activeTab", "tabs", "storage"],
+  "host_permissions": ["https://fantasy.premierleague.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Copy last FPL token" },
+  "content_scripts": [
+    {
+      "matches": ["https://fantasy.premierleague.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
