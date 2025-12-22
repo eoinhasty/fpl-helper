@@ -2,18 +2,16 @@ import type { Player } from "../../lib/types";
 import { fmtPrice } from "../../lib/format";
 import StartMeter from "./StartMeter";
 import FixturePill from "./FixturePill";
-import PlayerDetailModal from "./PlayerDetailModal";
-import * as React from "react";
 
 export default function PlayerCard({
   p,
   benchBadge,
+  onOpen,
 }: {
   p: Player;
   benchBadge?: string | null;
+  onOpen: () => void;
 }) {
-  const [open, setOpen] = React.useState(false);
-
   const cap = p.is_captain ? (
     <span className="text-[11px] px-2 py-0.5 rounded-full bg-success/15 text-success border border-success/30">
       C
@@ -31,7 +29,7 @@ export default function PlayerCard({
   return (
     <>
       <div
-        onClick={() => setOpen(true)}
+        onClick={onOpen}
         className="rounded-xl p-3 cursor-pointer transition bg-card border border-border hover:shadow-card"
         title="Click for details"
       >
@@ -68,8 +66,6 @@ export default function PlayerCard({
           </div>
         ) : null}
       </div>
-
-      <PlayerDetailModal open={open} onClose={() => setOpen(false)} player={p} />
     </>
   );
 }

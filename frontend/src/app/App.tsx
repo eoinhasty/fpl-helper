@@ -1,4 +1,3 @@
-// import SquadPage from "../pages/SquadPage";
 import SquadDashboard from "../pages/SquadDashboard";
 
 export default function App() {

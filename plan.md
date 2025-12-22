@@ -24,23 +24,20 @@
 
 * **FastAPI** + `httpx` (async calls)
 * Pydantic models for responses
-* **SQLite** (optional for caching; start with in-memory/disk JSON cache)
-* **APScheduler** for jobs (daily bootstrap; pre-deadline refresh)
+* Caching
+* Cron Jobs to fetch data periodically
 
 **Frontend**
 
-* **React + Tailwind** (or Next.js + Tailwind if you want routing/SSR)
-* Component kit: PlayerCard, StartMeter, FixturePill, PlayerSheet, Heatmap
-* Dark + light theme tokens (keep it airy; progressive disclosure)
-
-**Why Python now?** You’ll reuse data skills (and it’s perfect if you later add expected-minutes/points). You can always bolt on a tiny Node/WebSocket layer later for matchday push if you want breadth.
+* **React + Tailwind**
+* Dark + light theme
 
 # Fetching & caching etiquette
 
 * **bootstrap-static**: cache 6–12h; refresh once more within 2–4h pre-deadline.
 * **picks**: fetch on demand (when you open the app).
 * **fixtures (gw)**: fetch when the GW changes (or on demand).
-* Add a 500–1000 ms delay if you ever loop per-player endpoints (not required for MVP).
+* Add a 500–1000 ms delay if it ever loops per-player endpoints (not required for MVP).
 
 # Starter-likelihood heuristic (v0)
 
@@ -58,10 +55,3 @@
 * One **warning** if any XI player < 0.60 start%.
 * Player detail sheet opens with news + next 3 fixtures.
 * README has **setup, screenshots, and why it helps you**.
-
-# Suggested dev order (2–3 short sessions)
-
-1. **Data**: get `next_gw` from `events`, fetch picks, join with players, compute start%.
-2. **UI**: Squad list → Player sheet → add FDR pill.
-3. **Planner**: simple 3–4 GW heatmap for your squad.
-4. **Polish**: light theme, cache bootstrap, pre-deadline refresh, one alert line.

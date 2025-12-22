@@ -15,11 +15,13 @@ export default function XIList({
   loading,
   error,
   entryMissing,
+  onPlayerClick,
 }: {
   players: Player[] | undefined;
   loading: boolean;
   error: string | null;
   entryMissing: boolean;
+  onPlayerClick?: (p: Player) => void;
 }) {
   const xi = useMemo(
     () =>
@@ -46,14 +48,14 @@ export default function XIList({
         <div className="text-sm text-foreground font-semibold mb-2">Starting XI</div>
       )}
       {xi.map((p) => (
-        <PlayerCard key={p.element} p={p} />
+        <PlayerCard key={p.element} p={p} onOpen={() => onPlayerClick?.(p)} />
       ))}
 
       {bench.length > 0 && (
         <>
           <div className="text-sm text-foreground font-semibold mt-4 mb-2">Bench</div>
           {bench.map((p) => (
-            <PlayerCard key={p.element} p={p} benchBadge={benchLabel(p)} />
+            <PlayerCard key={p.element} p={p} benchBadge={benchLabel(p)} onOpen={() => onPlayerClick?.(p)} />
           ))}
         </>
       )}

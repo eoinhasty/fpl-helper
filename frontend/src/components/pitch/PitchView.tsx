@@ -5,7 +5,12 @@ import PlayerChip from "./PlayerChip";
 import type { Player } from "../../lib/types";
 import { ROW_Y, type RowId, spreadXsSymmetric } from "../../lib/pitchLayout"; // <—
 
-type Props = { players: Player[] | undefined; brand?: string; className?: string };
+type Props = {
+  players: Player[] | undefined;
+  brand?: string;
+  className?: string;
+  onPlayerClick?: (p: Player) => void;
+};
 
 // SVG viewBox
 const VB_W = 1417;
@@ -15,7 +20,7 @@ const VB_H = 788;
 const CHIP_W_PX = 128;
 const CHIP_MARGIN_PX = 14;
 
-export default function PitchView({ players, brand = "YOUR BRAND", className }: Props) {
+export default function PitchView({ players, brand = "YOUR BRAND", className, onPlayerClick }: Props) {
   const xi = (players ?? []).filter((p) => (p.slot ?? 99) <= 11);
   const gk  = xi.filter((p) => p.position === 1);
   const def = xi.filter((p) => p.position === 2);
@@ -51,7 +56,7 @@ export default function PitchView({ players, brand = "YOUR BRAND", className }: 
       <div className="-mx-6 sm:-mx-8">
         <div className="relative w-full" style={{ aspectRatio: "1417 / 1200" }}>
           <div className="absolute inset-0"><PitchSVG brandLeft={brand} brandRight={brand} /></div>
-          <div ref={boxRef} className="pointer-events-none absolute inset-0">
+          <div ref={boxRef} className="absolute inset-0">
             {rows.map(({ id, y, list }, rIdx) => {
               const xs = spreadXsSymmetric(list.length, id, VB_W, { chipGapVB, gutterVB }); // <—
               return list.map((p, i) => {
@@ -65,7 +70,7 @@ export default function PitchView({ players, brand = "YOUR BRAND", className }: 
                     style={{ left: `${leftPct}%`, top: `${topPct}%` }}
                   >
                     <div className="pointer-events-auto">
-                      <PlayerChip p={p} />
+                      <PlayerChip p={p} onClick={() => onPlayerClick?.(p)} />
                     </div>
                   </div>
                 );

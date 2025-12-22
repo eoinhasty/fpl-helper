@@ -7,7 +7,7 @@ type Item = { id: number; name: string; team: string | null; position: number; n
 type Resp = { items: Item[] };
 
 export default function HotNewsCard() {
-  const { data, loading, error } = useFetch<Resp>("/api/news/hot?days=7&limit=10");
+  const { data, loading, error } = useFetch<Resp>("/api/news/hot?days=7&limit=5");
 
   return (
     <DataCard title="Hot News 🔥" loading={loading} error={error} empty={!data || data.items.length === 0}>

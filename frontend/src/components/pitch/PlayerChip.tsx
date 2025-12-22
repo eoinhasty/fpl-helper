@@ -2,21 +2,25 @@
 import type { Player } from "../../lib/types";
 import { CHIP } from "../../lib/constants";
 
-const C_NEON = "#00FF87";
-const PURPLE  = "#38003C";
-const AMBER   = "#F59E0B";
-const RED     = "#E11D48";
+const PURPLE = "#38003C";
+const AMBER = "#F59E0B";
+const RED = "#E11D48";
+
+const ROLE_TEXT = "#fcfcfc";  // light text for contrast on PURPLE
 
 function CaptainBadge({ c, v }: { c?: boolean; v?: boolean }) {
   if (!c && !v) return null;
+
+  const label = c ? "C" : "V";
+
   return (
     <div
-      className={`absolute -top-2 -left-2 h-6 w-6 grid place-items-center rounded-full ring-1 ring-black/10 shadow
-                  text-[12px] font-bold ${c ? "bg-[--c]" : "bg-white text-[#666]"}`}
-      style={{ ["--c" as any]: C_NEON, color: c ? "#074" : undefined }}
+      className="absolute -top-2 -left-2 h-5 w-5 grid place-items-center
+                 rounded-full shadow ring-1 ring-black/15 text-[11px] font-bold"
+      style={{ backgroundColor: PURPLE, color: ROLE_TEXT }}
       title={c ? "Captain" : "Vice-captain"}
     >
-      {c ? "C" : "V"}
+      {label}
     </div>
   );
 }
@@ -59,21 +63,29 @@ function Points({ n }: { n?: number }) {
   );
 }
 
-export default function PlayerChip({ p }: { p: Player }) {
+export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => void }) {
   const cop = (p as any).chance_of_playing_next_round as number | undefined;
 
   return (
-    <div className="relative select-none" title={`${p.name} (${p.team})`} style={{ pointerEvents: "auto", width: CHIP.WIDTH }}>
-      <div className="transition-transform duration-150 hover:-translate-y-0.5">
-        <div className="relative rounded-xl bg-white/90 shadow-[0_6px_16px_rgba(0,0,0,0.25)] ring-1 ring-black/5">
-          <Shirt url={p.shirt_url} />
-          <Points n={(p as any).points} />
-          <CaptainBadge c={p.is_captain} v={p.is_vice_captain} />
-          <StatusTriangle cop={cop} />
-          <div className="rounded-b-xl grid place-items-center text-white" style={{ backgroundColor: PURPLE, height: CHIP.BANNER_H }}>
-            <div className="px-2 w-full flex items-center justify-center gap-1">
-              <span className="truncate font-semibold leading-none" style={{ fontSize: CHIP.NAME_FS }}>{p.name}</span>
-              {p.team && <span className="opacity-80 tracking-wide" style={{ fontSize: CHIP.TEAM_FS }}>{p.team}</span>}
+    <div
+      className="cursor-pointer"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+    >
+      <div className="relative select-none" title={`${p.name} (${p.team})`} style={{ pointerEvents: "auto", width: CHIP.WIDTH }}>
+        <div className="transition-transform duration-150 hover:-translate-y-0.5">
+          <div className="relative rounded-xl bg-white/90 shadow-[0_6px_16px_rgba(0,0,0,0.25)] ring-1 ring-black/5">
+            <Shirt url={p.shirt_url} />
+            <Points n={(p as any).points} />
+            <CaptainBadge c={p.is_captain} v={p.is_vice_captain} />
+            <StatusTriangle cop={cop} />
+            <div className="rounded-b-xl grid place-items-center text-white" style={{ backgroundColor: PURPLE, height: CHIP.BANNER_H }}>
+              <div className="px-2 w-full flex items-center justify-center gap-1">
+                <span className="font-semibold leading-none" style={{ fontSize: CHIP.NAME_FS }}>{p.name}</span>
+                {p.team && <span className="opacity-80 tracking-wide" style={{ fontSize: CHIP.TEAM_FS }}>{p.team}</span>}
+              </div>
             </div>
           </div>
         </div>

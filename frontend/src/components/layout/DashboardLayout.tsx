@@ -33,21 +33,46 @@ export default function DashboardLayout({
   stickyOffsetPx = 64, // ~ top-16
   hideLeft = false,
   hideRight = false,
-  sidebarBreakpoint = "xl",
+  sidebarBreakpoint = "lg",
   className = "",
   containerClassName = "",
   contentClassName = "",
   TopNavComponent = TopNav,
   footer,
 }: Props) {
-  // build responsive classes without pulling in extra deps
-  const bp = sidebarBreakpoint; // "lg" | "xl"
-  const leftCol = `${bp}:col-span-3`;
-  const rightCol = `${bp}:col-span-3`;
-  const mainCol = `col-span-12 ${bp}:col-span-6`;
-  const leftHide = `hidden ${bp}:block`;
-  const rightHide = `hidden ${bp}:block`;
-  const gapClass = `gap-${gap}`;
+    // build responsive classes without pulling in extra deps
+    const BP = {
+      lg: {
+        leftCol: "lg:col-span-3",
+        rightCol: "lg:col-span-3",
+        mainCol: "col-span-12 lg:col-span-6",
+        hide: "hidden lg:block",
+      },
+      xl: {
+        leftCol: "xl:col-span-3",
+        rightCol: "xl:col-span-3",
+        mainCol: "col-span-12 xl:col-span-6",
+        hide: "hidden xl:block",
+      },
+    } as const;
+
+    const GAP: Record<number, string> = {
+      0: "gap-0",
+      1: "gap-1",
+      2: "gap-2",
+      3: "gap-3",
+      4: "gap-4",
+      5: "gap-5",
+      6: "gap-6",
+      7: "gap-7",
+      8: "gap-8",
+      9: "gap-9",
+      10: "gap-10",
+    };
+
+    const { leftCol, rightCol, mainCol, hide } = BP[sidebarBreakpoint];
+    const gapClass = GAP[gap] ?? "gap-5";
+
 
   return (
     <div className={`min-h-screen bg-background text-foreground ${className}`}>
@@ -70,7 +95,7 @@ export default function DashboardLayout({
 
         {!hideLeft && (
           <aside
-            className={`${leftHide} ${leftCol} space-y-4 self-start`}
+            className={`${hide} ${leftCol} space-y-4 self-start`}
             style={{ position: "sticky", top: stickyOffsetPx }}
             aria-label="Left sidebar"
           >
@@ -88,7 +113,7 @@ export default function DashboardLayout({
 
         {!hideRight && (
           <aside
-            className={`${rightHide} ${rightCol} space-y-4 self-start`}
+            className={`${hide} ${rightCol} space-y-4 self-start`}
             style={{ position: "sticky", top: stickyOffsetPx }}
             aria-label="Right sidebar"
           >
