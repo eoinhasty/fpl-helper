@@ -25,9 +25,10 @@ function CaptainBadge({ c, v }: { c?: boolean; v?: boolean }) {
   );
 }
 
-function StatusTriangle({ cop }: { cop?: number }) {
-  if (typeof cop !== "number" || cop === 100) return null;
-  const fill = cop === 0 ? RED : AMBER;
+function StatusTriangle({ status }: { status?: string }) {
+  if (!status || status === "a") return null;
+
+  const fill = status === "d" ? AMBER : RED; // d=knock-ish, i/s/n = red
   return (
     <div className="absolute -bottom-1 -right-1">
       <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
@@ -54,17 +55,74 @@ function Shirt({ url }: { url?: string | null }) {
   );
 }
 
-function Points({ n }: { n?: number }) {
+function Points({
+  n,
+  variant = "xi",
+  isCaptain = false,
+  title,
+}: {
+  n?: number;
+  variant?: "xi" | "bench";
+  isCaptain?: boolean;
+  title?: string;
+}) {
   if (typeof n !== "number") return null;
+
+  const base =
+    "absolute top-1 right-1 px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums rounded-md";
+
+  const styles =
+    variant === "bench"
+      ? "bg-[#F4F4F4] text-[#555] opacity-70"
+      : isCaptain
+        ? "bg-[#FFF7ED] text-[#9A3412] ring-1 ring-[#F59E0B] shadow-sm"
+        : "bg-[#EDEDED] text-[#222] shadow-sm";
+
   return (
-    <div className="absolute top-1 right-1 rounded-md bg-[#EDEDED] px-1.5 py-0.5 text-[11px] font-semibold text-[#222]">
+    <div className={`${base} ${styles}`} title={title}>
       {n}
     </div>
   );
 }
 
+function BenchOrderBadge({ label }: { label: string }) {
+  return (
+    <div
+      className="absolute left-1/2 -translate-x-1/2 -bottom-5
+                 text-[10px] font-semibold px-2 py-0.5 rounded-full
+                 bg-slate-100 text-slate-700 ring-1 ring-black/5"
+    >
+      {label}
+    </div>
+  );
+}
+
+
 export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => void }) {
-  const cop = (p as any).chance_of_playing_next_round as number | undefined;
+  const isBench = (p.slot ?? 99) >= 12 || (p.multiplier ?? 1) === 0;
+
+  const benchLabel =
+    (p.slot ?? 0) === 12 ? "GKP"
+      : (p.slot ?? 0) === 13 ? "1"
+        : (p.slot ?? 0) === 14 ? "2"
+          : (p.slot ?? 0) === 15 ? "3"
+            : undefined;
+
+  const displayPoints =
+    p.gw_points == null
+      ? undefined
+      : isBench
+        ? p.gw_points
+        : p.gw_points * (p.multiplier ?? 1);
+
+  const tooltip =
+    p.gw_points == null
+      ? undefined
+      : isBench
+        ? `Bench: ${p.gw_points} points (not counted)`
+        : p.is_captain
+          ? `Captain: ${p.gw_points} × 2 = ${displayPoints}`
+          : `GW points: ${displayPoints}`;
 
   return (
     <div
@@ -78,9 +136,17 @@ export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => 
         <div className="transition-transform duration-150 hover:-translate-y-0.5">
           <div className="relative rounded-xl bg-white/90 shadow-[0_6px_16px_rgba(0,0,0,0.25)] ring-1 ring-black/5">
             <Shirt url={p.shirt_url} />
-            <Points n={(p as any).points} />
+            <Points
+              n={displayPoints}
+              variant={isBench ? "bench" : "xi"}
+              isCaptain={!!p.is_captain}
+              title={tooltip}
+            />
             <CaptainBadge c={p.is_captain} v={p.is_vice_captain} />
-            <StatusTriangle cop={cop} />
+            <StatusTriangle status={p.status} />
+
+            {isBench && benchLabel && <BenchOrderBadge label={benchLabel} />}
+            
             <div className="rounded-b-xl grid place-items-center text-white" style={{ backgroundColor: PURPLE, height: CHIP.BANNER_H }}>
               <div className="px-2 w-full flex items-center justify-center gap-1">
                 <span className="font-semibold leading-none" style={{ fontSize: CHIP.NAME_FS }}>{p.name}</span>

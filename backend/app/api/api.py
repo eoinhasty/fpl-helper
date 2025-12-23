@@ -75,6 +75,8 @@ async def squad(
         )
         # reflect cache from the actual used gw
         _, pick_status, pick_age = await svc.picks(entry_id, used_gw)
+        
+    live_data, _, _ = await svc.live_event(used_gw)
 
     # fixtures (cached)
     fixtures_data, _, _ = await svc.fixtures(used_gw)
@@ -102,7 +104,7 @@ async def squad(
             fav_team = t.get("short_name")
 
     # shape for UI
-    enriched, team_value, team_bank = svc.enrich_picks(picks_data, boot, fixtures_data)
+    enriched, team_value, team_bank = svc.enrich_picks(picks_data, boot, fixtures_data, live_data)
     used_event = next(e for e in events if e["id"] == used_gw)
 
     set_cache_headers(response, pick_status, pick_age, TTL_PICKS)
@@ -121,6 +123,7 @@ async def squad(
         "team_value": team_value,
         "team_bank": team_bank,
         "players": enriched,
+        "debug_version": "squad-live-wired-1"
     }
 
 
@@ -139,8 +142,13 @@ async def live(request: Request, response: Response, entry_id: int, noCache: int
     live_data, mt_status, mt_age = await svc.my_team(entry_id, no_cache=bool(noCache))
 
     fixtures_data, _, _ = await svc.fixtures(used_gw)
+    event_live, _, _ = await svc.live_event(used_gw)
+
     enriched, _, _ = svc.enrich_picks(
-        {"picks": live_data.get("picks", [])}, boot, fixtures_data
+        {"picks": live_data.get("picks", [])},
+        boot,
+        fixtures_data,
+        event_live,
     )
 
     entry_data, _, _ = await svc.entry(entry_id)

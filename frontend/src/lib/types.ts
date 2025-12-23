@@ -18,6 +18,7 @@ export type Player = {
     influence?: string; creativity?: string; threat?: string;
     selected_by_percent?: string;
     start_probability: number;
+    gw_points?: number;
     is_captain?: boolean; is_vice_captain?: boolean;
     fixture?: FixtureLite | null;
     slot?: number; multiplier?: number;

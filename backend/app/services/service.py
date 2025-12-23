@@ -139,9 +139,6 @@ class FPLService:
         key = f"entryhist:{entry_id}"
         fetch = lambda: self._get_json(f"/entry/{entry_id}/history/")
         return await self.cache.get_or_set(key, fetch, TTL_ENTRY_HIST, SWR_ENTRY_HIST)
-    
-    def _iso(dt: str | None) -> str | None:
-        return dt
 
     async def next_match_and_gw(self) -> tuple[dict, list[dict], int]:
         # pick next event (else current), then earliest kickoff fixture
@@ -223,6 +220,16 @@ class FPLService:
                 {"pos":3,"team":"Liverpool","played":18,"w":12,"d":5,"l":1,"gf":41,"ga":17,"pts":41},
             ],
         }
+        
+    async def live_event(self, gw: int) -> Tuple[dict, str, float]:
+        key = f"live:{gw}"
+        return await self.cache.get_or_set(
+            key,
+            lambda: self._get_json(f"/event/{gw}/live/"),
+            TTL_PICKS,
+            SWR_PICKS,
+        )
+
 
     # ----------------- utilities for shaping data -----------------
     @staticmethod
@@ -242,8 +249,14 @@ class FPLService:
 
     @staticmethod
     def enrich_picks(
-        picks: dict, boot: dict, fixtures: list
+        picks: dict, boot: dict, fixtures: list, live: dict
     ) -> Tuple[List[dict], Optional[int], Optional[int]]:
+
+        live_points = {
+            e["id"]: (e.get("stats") or {}).get("total_points", 0)
+            for e in (live.get("elements") or [])
+        }
+        
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
 
@@ -288,6 +301,7 @@ class FPLService:
                     "status": p.get("status"),                          # "a", "d", "i", "s", "n"
                     "news": p.get("news"),                              # injury news (e.g. "" or "Knee Injury - Expected back 01 Jan")
                     "total_points": p.get("total_points"),              # total points this season
+                    "gw_points": live_points.get(el),                   # points this GW (live)
                     "selected_by_percent": p.get("selected_by_percent"),# e.g. "28.5"
                     "start_probability": FPLService.start_prob_from(p), # estimated start probability
                     "is_captain": pick.get("is_captain"),               # is captain this GW? (e.g. True/False)
