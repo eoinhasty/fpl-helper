@@ -66,49 +66,54 @@ export default function SquadDashboard() {
     </>
   );
 
+  const navMiddle = (
+    <SquadStatusBar
+      gw={data?.used_gw}
+      deadlineISO={data?.deadline}
+      teamValue={data?.team_value}
+      teamBank={data?.team_bank}
+      activeChip={data?.active_chip ?? null}
+      cache={cache ?? { status: null, ageSeconds: null }}
+    />
+  );
+
+  const navActions = (
+    <div className="flex items-center gap-2">
+      <Segmented<Mode>
+        value={mode}
+        onChange={setMode}
+        options={[
+          { label: "Squad", value: "squad" },
+          { label: "Live", value: "live" },
+        ]}
+      />
+      <select
+        className="bg-card border border-border rounded-xl px-3 py-1.5 text-sm disabled:opacity-60"
+        value={gw ?? data?.used_gw ?? ""}
+        onChange={(e) => setGw(Number(e.target.value))}
+        disabled={mode === "live"}
+      >
+        {gwOptions.map((g) => (
+          <option key={g} value={g}>GW {g}</option>
+        ))}
+      </select>
+      <button
+        className="btn"
+        onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
+        title="Force fresh fetch"
+      >
+        Refresh
+      </button>
+    </div>
+  );
+
   return (
     <>
       <DashboardLayout
         left={left}
         right={right}
-        top={
-          <div className="flex items-center justify-between">
-            <SquadStatusBar
-              gw={data?.used_gw}
-              deadlineISO={data?.deadline}
-              teamValue={data?.team_value}
-              teamBank={data?.team_bank}
-              activeChip={data?.active_chip ?? null}
-              cache={cache ?? { status: null, ageSeconds: null }}
-              onRefresh={() =>
-                mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })
-              }
-            />
-            <div className="flex items-center gap-3">
-              <Segmented<Mode>
-                value={mode}
-                onChange={setMode}
-                options={[
-                  { label: "Squad", value: "squad" },
-                  { label: "Live", value: "live" },
-                ]}
-              />
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">Gameweek</label>
-                <select
-                  className="bg-card border border-border rounded-xl px-3 py-1.5 text-sm disabled:opacity-60"
-                  value={gw ?? data?.used_gw ?? ""}
-                  onChange={(e) => setGw(Number(e.target.value))}
-                  disabled={mode === "live"}
-                >
-                  {gwOptions.map((g) => (
-                    <option key={g} value={g}>GW {g}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        }
+        navMiddle={navMiddle}
+        navActions={navActions}
       >
         {prefs.squadLayout === "pitch" ? (
           <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} />

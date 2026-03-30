@@ -85,6 +85,22 @@ function Points({
   );
 }
 
+function StartProbBar({ probability }: { probability?: number | null }) {
+  if (probability == null) return null;
+  const pct = Math.round(probability * 100);
+  const fill = probability >= 0.7 ? "#22c55e" : probability >= 0.4 ? "#f59e0b" : "#ef4444";
+  return (
+    <div className="flex items-center justify-center gap-1 mt-1">
+      <div className="w-9 h-[3px] rounded-full overflow-hidden bg-black/10">
+        <div style={{ width: `${pct}%`, height: "100%", background: fill, borderRadius: 2 }} />
+      </div>
+      <span style={{ fontSize: 9, color: "rgba(0,0,0,0.4)", fontVariantNumeric: "tabular-nums" }}>
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
 function BenchOrderBadge({ label }: { label: string }) {
   return (
     <div
@@ -146,7 +162,7 @@ export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => 
             <StatusTriangle status={p.status} />
 
             {isBench && benchLabel && <BenchOrderBadge label={benchLabel} />}
-            
+
             <div className="rounded-b-xl grid place-items-center text-white" style={{ backgroundColor: PURPLE, height: CHIP.BANNER_H }}>
               <div className="px-2 w-full flex items-center justify-center gap-1">
                 <span className="font-semibold leading-none" style={{ fontSize: CHIP.NAME_FS }}>{p.name}</span>
@@ -154,6 +170,7 @@ export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => 
               </div>
             </div>
           </div>
+          {!isBench && <StartProbBar probability={p.start_probability} />}
         </div>
       </div>
     </div>

@@ -10,8 +10,8 @@ type Props = {
   maxWidthPx?: number;
   /** Optional custom nav content (center area) */
   nav?: React.ReactNode;
-  /** Right-side custom actions (rendered before the settings button) */
-  actionsLeft?: React.ReactNode;
+  /** Custom actions rendered on the right, before the settings button */
+  actions?: React.ReactNode;
   /** Hide the search button if you don’t use it */
   hideSearch?: boolean;
   /** Callback for search button (optional) */
@@ -24,7 +24,7 @@ export default function TopNav({
   title = "FF Helper",
   maxWidthPx = 1400,
   nav,
-  actionsLeft,
+  actions,
   hideSearch = false,
   onSearch,
   className = "",
@@ -66,7 +66,7 @@ export default function TopNav({
 
           {/* Right actions */}
           <div className="ml-auto flex items-center gap-2">
-            {actionsLeft}
+            {actions}
             {!hideSearch && (
               <IconBtn
                 label="Search"
