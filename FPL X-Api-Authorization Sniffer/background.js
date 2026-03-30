@@ -1,5 +1,18 @@
 const TARGET_HEADER = 'x-api-authorization';
+const APP_ORIGIN = 'http://localhost:8000';
 let lastToken = null;
+
+async function pushTokenToApp(token) {
+  try {
+    await fetch(`${APP_ORIGIN}/api/admin/set-token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+  } catch {
+    // app not running, ignore
+  }
+}
 
 // Utility: ensure content.js is present in a tab, then send a message
 async function sendToTab(tabId, msg) {
@@ -36,6 +49,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 
     lastToken = token;
     await chrome.storage.local.set({ lastToken: token, lastSeenUrl: details.url, lastAt: Date.now() });
+    pushTokenToApp(token);
 
     // Visual badge ping
     if (chrome.action?.setBadgeText) {
