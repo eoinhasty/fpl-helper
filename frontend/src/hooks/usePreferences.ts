@@ -41,15 +41,14 @@ export function usePreferences() {
     }
   });
 
-  // Persist + theme + broadcast to other hook instances
+  // save, apply theme, tell other instances on this tab
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(prefs));
     applyTheme(prefs.theme);
-    // NEW: notify other hook users in the same tab
     window.dispatchEvent(new CustomEvent(EVT, { detail: prefs }));
   }, [prefs]);
 
-  // React to system theme changes (already there)
+  // follow system dark/light if theme is "system"
   useEffect(() => {
     const mm = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => { if (prefs.theme === "system") applyTheme("system"); };
@@ -57,32 +56,35 @@ export function usePreferences() {
     return () => mm.removeEventListener("change", onChange);
   }, [prefs.theme]);
 
-  // NEW: listen for updates from other components (same tab)
+  // pick up changes fired by other usePreferences instances on this tab
   useEffect(() => {
     const onPrefs = (e: Event) => {
       const next = (e as CustomEvent<Preferences>).detail;
-      // Avoid loops if identical
-      if (JSON.stringify(next) !== JSON.stringify(prefs)) {
-        setPrefs(next);
-      }
+      setPrefs((current) => {
+        if (JSON.stringify(next) !== JSON.stringify(current)) return next;
+        return current;
+      });
     };
-    window.addEventListener(EVT, onPrefs as EventListener);
-    return () => window.removeEventListener(EVT, onPrefs as EventListener);
-  }, [prefs]);
+    window.addEventListener(EVT, onPrefs);
+    return () => window.removeEventListener(EVT, onPrefs);
+  }, []);
 
-  // Optional: multi-tab sync
+  // pick up changes from other tabs
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === KEY && e.newValue) {
         try {
           const parsed = { ...DEFAULTS, ...JSON.parse(e.newValue) } as Preferences;
-          if (JSON.stringify(parsed) !== JSON.stringify(prefs)) setPrefs(parsed);
+          setPrefs((current) => {
+            if (JSON.stringify(parsed) !== JSON.stringify(current)) return parsed;
+            return current;
+          });
         } catch { }
       }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [prefs]);
+  }, []);
 
   return {
     prefs,

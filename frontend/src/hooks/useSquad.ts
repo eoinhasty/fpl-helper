@@ -1,5 +1,5 @@
 // hooks/useSquad.ts
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SquadResponse } from "../lib/types";
 import { getSquad, getLive, type CacheMeta } from "../lib/api";
 
@@ -14,7 +14,7 @@ export function useSquad(entry: number | "") {
   // avoid race conditions when switching fast
   const reqId = useRef(0);
 
-  async function loadSquad(opts: LoadSquadOpts = {}) {
+  const loadSquad = useCallback(async (opts: LoadSquadOpts = {}) => {
     if (!entry) return;
     const id = ++reqId.current;
     const { gw, forceRefresh } = opts;
@@ -27,9 +27,9 @@ export function useSquad(entry: number | "") {
       if (id !== reqId.current) return;
       setError("Failed to load squad");
     } finally { if (id === reqId.current) setLoading(false); }
-  }
+  }, [entry]);
 
-  async function loadLive(forceRefresh = false) {
+  const loadLive = useCallback(async (forceRefresh = false) => {
     if (!entry) return;
     const id = ++reqId.current;
     try {
@@ -41,9 +41,9 @@ export function useSquad(entry: number | "") {
       if (id !== reqId.current) return;
       setError("Failed to load live squad");
     } finally { if (id === reqId.current) setLoading(false); }
-  }
+  }, [entry]);
 
-  useEffect(() => { if (entry !== "") loadSquad(); }, [entry]);
+  useEffect(() => { if (entry !== "") loadSquad(); }, [entry, loadSquad]);
 
   return { data, loading, error, cache, loadSquad, loadLive };
 }

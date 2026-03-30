@@ -31,12 +31,12 @@ export default function SquadDashboard() {
   const openPlayer = (p: Player) => setSelectedPlayer(p);
   const closePlayer = () => setSelectedPlayer(null);
 
-  // Keep Segmented in sync if Default View is changed elsewhere (Settings)
+  // Keep Segmented in sync if Default View is changed in Settings.
+  // mode is intentionally excluded — including it would reset the toggle on every click.
   useEffect(() => {
-    if (mode !== prefs.defaultView) {
-      setMode(prefs.defaultView as Mode);
-    }
-  }, [prefs.defaultView]); // eslint-disable-line react-hooks/exhaustive-deps
+    setMode(prefs.defaultView as Mode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefs.defaultView]);
 
   useEffect(() => {
     if (!entry) return;
@@ -46,8 +46,7 @@ export default function SquadDashboard() {
     } else {
       loadSquad({ gw });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, gw, entry]);
+  }, [mode, gw, entry, loadSquad, loadLive]);
 
   // create GW options up to whichever GW we’ve seen
   const cap = data?.current_gw ?? 1;
@@ -112,10 +111,8 @@ export default function SquadDashboard() {
         }
       >
         {prefs.squadLayout === "pitch" ? (
-          // ✅ pass click handler to pitch
           <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} />
         ) : (
-          // ✅ pass click handler to list
           <XIList
             players={data?.players}
             loading={loading}

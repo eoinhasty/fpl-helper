@@ -4,16 +4,17 @@ import type { Player } from "../../lib/types";
 
 type SlideKey = "captaincy" | "health" | "market";
 
+const SLIDES: SlideKey[] = ["captaincy", "health", "market"];
+
 export default function InsightsCarousel({ players }: { players?: Player[] | null }) {
-  const slides: SlideKey[] = ["captaincy", "health", "market"];
   const [idx, setIdx] = React.useState(0);
-  const key = slides[idx];
+  const key = SLIDES[idx];
 
   // auto-advance, pause on hover
   const [hover, setHover] = React.useState(false);
   React.useEffect(() => {
     if (hover) return;
-    const id = setInterval(() => setIdx((i) => (i + 1) % slides.length), 8000);
+    const id = setInterval(() => setIdx((i) => (i + 1) % SLIDES.length), 8000);
     return () => clearInterval(id);
   }, [hover]);
 
@@ -28,7 +29,7 @@ export default function InsightsCarousel({ players }: { players?: Player[] | nul
             : "Market Trends"}
         </div>
         <div className="flex items-center gap-1">
-          {slides.map((s, i) => (
+          {SLIDES.map((s, i) => (
             <button
               key={s}
               onClick={() => setIdx(i)}

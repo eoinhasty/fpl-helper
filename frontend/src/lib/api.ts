@@ -7,18 +7,18 @@ export type ApiResult<T> = { data: T; cache: CacheMeta };
 
 const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 
-// Extract cache headers into a typed shape
+// pull cache status/age out of response headers
 function cacheFrom(r: Response): CacheMeta {
   const status = (r.headers.get("x-cache-status") as CacheStatus) ?? null;
   const age = r.headers.get("x-cache-age");
   return { status, ageSeconds: age ? Number(age) : null };
 }
 
-// Small helper: fetch JSON with nicer errors
+// fetch JSON, throw on non-2xx with a readable message
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<{ json: T; resp: Response }> {
   const r = await fetch(url, { credentials: "include", ...init });
   if (!r.ok) {
-    // Try to surface server message if any; fallback to status text
+    // use server error body if there is one, otherwise fall back to status text
     let reason = r.statusText;
     try {
       const text = await r.text();
