@@ -93,7 +93,7 @@ class FPLService:
             r.raise_for_status()
             return r.json()
 
-    # ------------- cached helpers (the only ones routes call) -------------
+    # ------------- cached helpers -------------
     async def bootstrap(self) -> Tuple[dict, str, float]:
         key = "bootstrap"
         return await self.cache.get_or_set(
@@ -144,7 +144,9 @@ class FPLService:
         # pick next event (else current), then earliest kickoff fixture
         boot, _, _ = await self.bootstrap()
         events = boot["events"]
-        ev = next((e for e in events if e["is_next"]), None) or next(e for e in events if e["is_current"])
+        ev = next((e for e in events if e["is_next"]), None) or next((e for e in events if e["is_current"]), None)
+        if ev is None:
+            raise HTTPException(status_code=404, detail="No current or next gameweek found.")
         gw = ev["id"]
         fixtures, _, _ = await self.fixtures(gw)
         fixtures = [f for f in fixtures if f.get("kickoff_time")]
@@ -198,7 +200,10 @@ class FPLService:
             print("Fetched real PL standings from football-data.org")
             js = r.json()
             # shape to a compact table
-            table = next(s for s in js["standings"] if s["type"] == "TOTAL")["table"]
+            standing = next((s for s in js["standings"] if s["type"] == "TOTAL"), None)
+            if not standing:
+                raise HTTPException(status_code=502, detail="Unexpected standings shape from football-data.org")
+            table = standing["table"]
             return {
                 "source": "football-data.org",
                 "rows": [
