@@ -2,35 +2,26 @@
 import * as React from "react";
 import SettingsModal from "../settings/SettingsModal";
 import { useEntryId } from "../../hooks/useEntryID";
+import { useNavCenter } from "../../contexts/NavCenterContext";
 
 type Props = {
-  /** App title shown next to the logo */
   title?: string;
-  /** Max container width (px), default 1400 to match layout */
   maxWidthPx?: number;
-  /** Optional custom nav content (center area) */
-  nav?: React.ReactNode;
-  /** Custom actions rendered on the right, before the settings button */
-  actions?: React.ReactNode;
-  /** Hide the search button if you don’t use it */
   hideSearch?: boolean;
-  /** Callback for search button (optional) */
   onSearch?: () => void;
-  /** Extra class on the header element */
   className?: string;
 };
 
 export default function TopNav({
   title = "FF Helper",
   maxWidthPx = 1400,
-  nav,
-  actions,
   hideSearch = false,
   onSearch,
   className = "",
 }: Props) {
   const { entry, setEntry } = useEntryId();
   const [open, setOpen] = React.useState(false);
+  const { navCenter, navActions } = useNavCenter();
 
   return (
     <>
@@ -57,16 +48,16 @@ export default function TopNav({
             <div className="font-semibold text-foreground">{title}</div>
           </a>
 
-          {/* Optional centered nav */}
-          {nav && (
-            <nav className="hidden md:flex items-center gap-4 text-sm" aria-label="Primary">
-              {nav}
-            </nav>
+          {/* Context-injected center content */}
+          {navCenter && (
+            <div className="hidden md:flex items-center gap-2.5 text-sm flex-1 min-w-0">
+              {navCenter}
+            </div>
           )}
 
           {/* Right actions */}
           <div className="ml-auto flex items-center gap-2">
-            {actions}
+            {navActions}
             {!hideSearch && (
               <IconBtn
                 label="Search"

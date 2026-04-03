@@ -1,15 +1,21 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react";
 
-type NavCenterContextValue = {
+type NavContextValue = {
   navCenter: ReactNode;
   setNavCenter: (node: ReactNode) => void;
+  navActions: ReactNode;
+  setNavActions: (node: ReactNode) => void;
 };
 
-const NavCenterContext = createContext<NavCenterContextValue | null>(null);
+const NavCenterContext = createContext<NavContextValue | null>(null);
 
 export function NavCenterProvider({ children }: { children: ReactNode }) {
   const [navCenter, setNavCenter] = useState<ReactNode>(null);
-  const value = useMemo(() => ({ navCenter, setNavCenter }), [navCenter]);
+  const [navActions, setNavActions] = useState<ReactNode>(null);
+  const value = useMemo(
+    () => ({ navCenter, setNavCenter, navActions, setNavActions }),
+    [navCenter, navActions]
+  );
   return (
     <NavCenterContext.Provider value={value}>
       {children}
@@ -30,6 +36,17 @@ export function useSetNavCenter(node: ReactNode) {
   useEffect(() => {
     setNavCenter(node);
     return () => setNavCenter(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node]);
+}
+
+// Call inside any page to inject actions into the TopNav right slot.
+// Clears automatically on unmount. Wrap the node in useMemo to avoid thrashing.
+export function useSetNavActions(node: ReactNode) {
+  const { setNavActions } = useNavCenter();
+  useEffect(() => {
+    setNavActions(node);
+    return () => setNavActions(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node]);
 }

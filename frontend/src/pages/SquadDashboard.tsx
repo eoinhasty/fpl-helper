@@ -13,6 +13,7 @@ import NextMatchCard from "../components/right/NextMatchCard";
 import HotNewsCard from "../components/right/HotNewsCard";
 import StandingsCard from "../components/right/StandingsCard";
 import { Segmented } from "../components/controls/Segmented";
+import { useSetNavCenter, useSetNavActions } from "../contexts/NavCenterContext";
 
 import type { Player } from "../lib/types";
 import PlayerDetailModal from "../components/squad/PlayerDetailModal";
@@ -66,7 +67,7 @@ export default function SquadDashboard() {
     </>
   );
 
-  const navMiddle = (
+  const navMiddle = useMemo(() => (
     <SquadStatusBar
       gw={data?.used_gw}
       deadlineISO={data?.deadline}
@@ -75,9 +76,9 @@ export default function SquadDashboard() {
       activeChip={data?.active_chip ?? null}
       cache={cache ?? { status: null, ageSeconds: null }}
     />
-  );
+  ), [data?.used_gw, data?.deadline, data?.team_value, data?.team_bank, data?.active_chip, cache]);
 
-  const navActions = (
+  const navActions = useMemo(() => (
     <div className="flex items-center gap-2">
       <Segmented<Mode>
         value={mode}
@@ -88,7 +89,7 @@ export default function SquadDashboard() {
         ]}
       />
       <select
-        className="bg-card border border-border rounded-xl px-3 py-1.5 text-sm disabled:opacity-60"
+        className="bg-background text-foreground border border-border rounded-xl px-3 py-1.5 text-sm disabled:opacity-60"
         value={gw ?? data?.used_gw ?? ""}
         onChange={(e) => setGw(Number(e.target.value))}
         disabled={mode === "live"}
@@ -105,15 +106,16 @@ export default function SquadDashboard() {
         Refresh
       </button>
     </div>
-  );
+  ), [mode, setMode, gw, data?.used_gw, gwOptions, loadLive, loadSquad]);
+
+  useSetNavCenter(navMiddle);
+  useSetNavActions(navActions);
 
   return (
     <>
       <DashboardLayout
         left={left}
         right={right}
-        navMiddle={navMiddle}
-        navActions={navActions}
       >
         {prefs.squadLayout === "pitch" ? (
           <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} />
