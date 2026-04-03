@@ -1,5 +1,10 @@
 /* src/styles/ui.css */
 @layer components {
+  /* Page background — gradient using theme tokens so it adapts to dark mode */
+  .page-bg {
+    background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface-2) 100%);
+  }
+
   /* Surfaces */
   .ds-surface {
     @apply rounded-2xl border border-border shadow-card bg-[--color-elevated] text-foreground;

@@ -1,9 +1,9 @@
 /* LIGHT is default */
 @theme {
   /* brand */
-  --color-primary:       #4f46e5; /* indigo-600 */
-  --color-primary-600:   #4f46e5;
-  --color-primary-700:   #4338ca;
+  --color-primary:       #0284c7; /* sky-600 */
+  --color-primary-600:   #0284c7;
+  --color-primary-700:   #0369a1; /* sky-700 */
 
   /* base surfaces (LIGHT) */
   --color-bg:            #f8fafc;    /* slate-50 */
@@ -18,12 +18,12 @@
 
   /* borders & rings (LIGHT) */
   --color-border:        rgba(2,6,23,0.14); /* slate-900 at 14% */
-  --color-ring:          rgba(79,70,229,0.35);
+  --color-ring:          rgba(2,132,199,0.35);
 
   /* status */
-  --success:             #16a34a;    /* green-600 */
-  --warning:             #f59e0b;    /* amber-500/600 */
-  --danger:              #ef4444;    /* red-500/600 */
+  --success:             #22c55e;    /* green-500 */
+  --warning:             #fbbf24;    /* amber-400 */
+  --danger:              #f87171;    /* red-400 */
 
   /* elevation & radius */
   --shadow-card:         0 8px 24px -16px rgb(2 6 23 / 0.25);
@@ -52,9 +52,9 @@
 
 /* DARK overrides */
 :root.dark {
-  --color-primary:       #8b5cf6;
-  --color-primary-600:   #7c3aed;
-  --color-primary-700:   #6d28d9;
+  --color-primary:       #38bdf8; /* sky-400 */
+  --color-primary-600:   #0ea5e9; /* sky-500 */
+  --color-primary-700:   #0284c7; /* sky-600 */
 
   --color-bg:            #0b1022;               /* deep navy */
   --color-surface:       rgba(2,6,23,0.9);
@@ -66,9 +66,9 @@
   --color-invert:        #0b1022;
 
   --color-border:        rgba(255,255,255,0.12);
-  --color-ring:          rgba(139,92,246,0.35);
+  --color-ring:          rgba(56,189,248,0.35);
 
-  --success:             #22c55e;
-  --warning:             #fbbf24;
-  --danger:              #f87171;
+  --success:             #4ade80; /* green-400 */
+  --warning:             #fcd34d; /* amber-300 */
+  --danger:              #fca5a5; /* red-300 */
 }
