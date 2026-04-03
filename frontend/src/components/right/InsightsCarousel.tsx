@@ -126,8 +126,8 @@ function HealthSlide({ players }: { players: Player[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="text-sm">
-        <span className="font-semibold text-foreground">{flagged.length}</span> at risk
+      <div className="text-sm text-foreground">
+        <span className="font-semibold">{flagged.length}</span> at risk
         <span className="text-muted-foreground"> • under 60% start or flagged</span>
       </div>
       {lowStart.length > 0 && (
@@ -137,7 +137,7 @@ function HealthSlide({ players }: { players: Player[] }) {
               key={p.element}
               className="text-sm flex items-center justify-between rounded-md border border-border bg-card px-2 py-1"
             >
-              <span className="truncate">
+              <span className="truncate text-foreground">
                 {p.name}{" "}
                 <span className="text-xs text-muted-foreground">({p.team})</span>
               </span>

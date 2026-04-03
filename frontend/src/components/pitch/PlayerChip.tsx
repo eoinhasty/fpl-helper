@@ -73,10 +73,10 @@ function Points({
 
   const styles =
     variant === "bench"
-      ? "bg-[#F4F4F4] text-[#555] opacity-70"
+      ? "bg-muted text-muted-foreground opacity-70"
       : isCaptain
-        ? "bg-[#FFF7ED] text-[#9A3412] ring-1 ring-[#F59E0B] shadow-sm"
-        : "bg-[#EDEDED] text-[#222] shadow-sm";
+        ? "bg-warning/15 text-warning ring-1 ring-warning shadow-sm"
+        : "bg-muted text-foreground shadow-sm";
 
   return (
     <div className={`${base} ${styles}`} title={title}>
@@ -91,10 +91,10 @@ function StartProbBar({ probability }: { probability?: number | null }) {
   const fill = probability >= 0.7 ? "#22c55e" : probability >= 0.4 ? "#f59e0b" : "#ef4444";
   return (
     <div className="flex items-center justify-center gap-1 mt-1">
-      <div className="w-9 h-[3px] rounded-full overflow-hidden bg-black/10">
+      <div className="w-9 h-[3px] rounded-full overflow-hidden bg-muted">
         <div style={{ width: `${pct}%`, height: "100%", background: fill, borderRadius: 2 }} />
       </div>
-      <span style={{ fontSize: 9, color: "rgba(0,0,0,0.4)", fontVariantNumeric: "tabular-nums" }}>
+      <span className="text-muted-foreground" style={{ fontSize: 9, fontVariantNumeric: "tabular-nums" }}>
         {pct}%
       </span>
     </div>
@@ -106,7 +106,7 @@ function BenchOrderBadge({ label }: { label: string }) {
     <div
       className="absolute left-1/2 -translate-x-1/2 -bottom-5
                  text-[10px] font-semibold px-2 py-0.5 rounded-full
-                 bg-slate-100 text-slate-700 ring-1 ring-black/5"
+                 bg-muted text-muted-foreground ring-1 ring-border"
     >
       {label}
     </div>

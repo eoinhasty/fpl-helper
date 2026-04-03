@@ -103,8 +103,8 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
 
       {/* Bench band (visually attached to pitch) */}
       <div className="-mt-6 sm:-mt-8">
-        <div className="rounded-b-2xl border-t border-black/5
-                  bg-white/50 backdrop-blur-sm
+        <div className="rounded-b-2xl border-t border-border
+                  bg-card/80 backdrop-blur-sm
                   shadow-[0_-6px_18px_rgba(0,0,0,0.05)]
                   overflow-hidden">
           {/* subtle fade from pitch -> band */}

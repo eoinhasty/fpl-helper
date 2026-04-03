@@ -15,8 +15,8 @@ export default function BenchStrip({
         <div className="w-full flex justify-center">
             <div className="w-[min(760px,96vw)] px-3 py-3">
                 <div className="mb-2 flex items-center justify-between">
-                    <div className="text-xs font-semibold text-slate-700">
-                        Bench <span className="text-slate-400 font-medium">• Auto-sub priority</span>
+                    <div className="text-xs font-semibold text-foreground">
+                        Bench <span className="text-muted-foreground font-medium">• Auto-sub priority</span>
                     </div>
                 </div>
 
@@ -32,7 +32,7 @@ export default function BenchStrip({
                                         />
                                     </div>
                                 ) : (
-                                    <div className="h-[74px] w-[92px] rounded-lg bg-slate-100 ring-1 ring-black/5" />
+                                    <div className="h-[74px] w-[92px] rounded-lg bg-muted ring-1 ring-border" />
                                 )}
                             </div>
                         </div>
