@@ -238,18 +238,31 @@ class FPLService:
 
     # ----------------- utilities for shaping data -----------------
     @staticmethod
-    def start_prob_from(player: dict) -> float:
+    def start_prob_from(player: dict, played_gws: int = 1) -> float:
         status = player.get("status", "a")
         news = (player.get("news") or "").lower()
-        base = {"a": 0.88, "d": 0.55, "i": 0.0, "s": 0.0, "n": 0.0}.get(status, 0.5)
+
+        # Use FPL's own chance field when set (0/25/50/75/100)
+        chance = player.get("chance_of_playing_next_round")
+        if chance is not None:
+            base = chance / 100
+        else:
+            status_base = {"a": 0.88, "d": 0.55, "i": 0.0, "s": 0.0, "n": 0.0}.get(status, 0.5)
+            minutes = player.get("minutes", 0)
+            if status == "a" and played_gws > 0 and minutes > 0:
+                # Blend status base with actual play-time ratio to catch rotation risk
+                time_ratio = min(minutes / (played_gws * 90), 0.99)
+                base = (status_base + time_ratio) / 2
+            else:
+                base = status_base
+
         if any(k in news for k in ["ruled out", "surgery", "setback"]):
             base *= 0.2
         elif any(k in news for k in ["doubt", "late test", "assess"]):
             base *= 0.7
-        elif any(
-            k in news for k in ["back in training", "available", "returned", "fit"]
-        ):
+        elif any(k in news for k in ["back in training", "available", "returned", "fit"]):
             base = max(base, 0.9)
+
         return round(max(0.0, min(0.99, base)), 2)
 
     @staticmethod
@@ -261,7 +274,11 @@ class FPLService:
             e["id"]: (e.get("stats") or {}).get("total_points", 0)
             for e in (live.get("elements") or [])
         }
-        
+
+        played_gws = next(
+            (e["id"] for e in boot.get("events", []) if e.get("is_current")), 1
+        )
+
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
 
@@ -308,7 +325,10 @@ class FPLService:
                     "total_points": p.get("total_points"),              # total points this season
                     "gw_points": live_points.get(el),                   # points this GW (live)
                     "selected_by_percent": p.get("selected_by_percent"),# e.g. "28.5"
-                    "start_probability": FPLService.start_prob_from(p), # estimated start probability
+                    "start_probability": FPLService.start_prob_from(p, played_gws), # estimated start probability
+                    "form": p.get("form"),                              # rolling avg points last 3 GWs (e.g. "6.5")
+                    "minutes": p.get("minutes"),                        # total minutes played this season
+                    "ict_index": p.get("ict_index"),                    # influence/creativity/threat index
                     "is_captain": pick.get("is_captain"),               # is captain this GW? (e.g. True/False)
                     "is_vice_captain": pick.get("is_vice_captain"),     # is vice-captain this GW? (e.g. True/False)
                     "fixture": fdr or None,                             # next fixture details or None (e.g. {"opp": "CHE", "home": True, "difficulty": 3, "kickoff": "2024-08-09T19:45:00Z"})

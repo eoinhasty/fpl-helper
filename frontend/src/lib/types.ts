@@ -14,6 +14,8 @@ export type Player = {
     status?: string;
     news?: string | null;
     total_points?: number;
+    form?: string;
+    minutes?: number;
     ict_index?: string;
     influence?: string; creativity?: string; threat?: string;
     selected_by_percent?: string;
