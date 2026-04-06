@@ -58,14 +58,16 @@ function CaptaincySlide({ players }: { players: Player[] }) {
   // XI only
   const xi = players.filter((p) => (p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11);
 
-  // simple score: start% * (6 - FDR) + small home boost + recent points
+  // score: start% * exponential FDR weight + home boost + rolling form + ICT signal
   const scored = xi
     .map((p) => {
       const sp = (p.start_probability ?? 0) * 100;
       const fdr = p.fixture?.difficulty ?? 3;
       const home = p.fixture?.home ? 4 : 0;
-      const recent = (p.total_points ?? 0) / 10;
-      const score = sp * (6 - fdr) + home + recent;
+      const form = parseFloat(p.form ?? "0");          // rolling avg last 3 GWs
+      const ict = parseFloat(p.ict_index ?? "0") / 10; // attacking threat signal
+      const fdrPenalty = Math.pow(2, fdr - 1);         // FDR1=1, FDR2=2, FDR3=4, FDR4=8, FDR5=16
+      const score = sp * (10 / fdrPenalty) + home + form * 2 + ict;
       return { p, score };
     })
     .sort((a, b) => b.score - a.score)
