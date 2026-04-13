@@ -333,7 +333,7 @@ async def news_hot(
 async def pl_standings(request: Request, response: Response):
     svc: FPLService = request.app.state.svc
     key = "pl:standings"
-    token = getenv("FOOTBALL_DATA_API_KEY")  # optional
+    token = os.getenv("FOOTBALL_DATA_API_KEY")  # optional
 
     async def _fetch():
         return await svc.standings_pl(token)
