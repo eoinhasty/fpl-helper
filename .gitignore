@@ -12,6 +12,7 @@ __pycache__/
 # Env / secrets
 .env
 .env.*
+!.env.example
 *.sqlite
 *.db
 

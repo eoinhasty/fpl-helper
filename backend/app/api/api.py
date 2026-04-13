@@ -1,6 +1,6 @@
 # api.py
 from __future__ import annotations
-import asyncio
+import os
 from typing import Optional, List
 from fastapi import APIRouter, Response, Request
 from app.services.service import (
@@ -17,10 +17,7 @@ from app.services.service import (
     SWR_NEWS,
     SWR_STANDINGS,
 )
-from dotenv import load_dotenv
-from pydantic import BaseModel
-from os import getenv
-import logging 
+import logging
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -37,12 +34,6 @@ def set_cache_headers(resp: Response, status: str, age: float, ttl: int):
 async def health():
     return {"ok": True}
 
-
-@router.post("/admin/reload-env")
-async def reload_env(request: Request):
-    # Re-read .env into the current process environment
-    load_dotenv(override=True)
-    return {"ok": True}
 
 
 @router.get("/squad/{entry_id}")
@@ -138,8 +129,11 @@ async def live(request: Request, response: Response, entry_id: int, noCache: int
     )
     used_gw = used_event["id"]
 
+    # token: prefer per-request header, fall back to server env var
+    token = request.headers.get("x-fpl-token") or os.getenv("FPL_BEARER_TOKEN")
+
     # live (cached micro-TTL + bypass)
-    live_data, mt_status, mt_age = await svc.my_team(entry_id, no_cache=bool(noCache))
+    live_data, mt_status, mt_age = await svc.my_team(entry_id, token=token, no_cache=bool(noCache))
 
     fixtures_data, _, _ = await svc.fixtures(used_gw)
     event_live, _, _ = await svc.live_event(used_gw)
@@ -196,32 +190,6 @@ async def live(request: Request, response: Response, entry_id: int, noCache: int
         "players": enriched,
     }
 
-
-class SetTokenBody(BaseModel):
-    token: Optional[str] = None  # null/empty clears override
-
-
-@router.post("/admin/set-token")
-async def set_token(request: Request, body: SetTokenBody):
-    svc: FPLService = request.app.state.svc
-    # normalize: strip and treat empty as clear
-    tok = (body.token or "").strip() or None
-    svc.set_token(tok)
-    # mask a preview for UX
-    masked = None
-    if tok:
-        if len(tok) <= 10:
-            masked = "*" * len(tok)
-        else:
-            masked = f"{tok[:5]}…{tok[-4:]}"
-    return {"ok": True, "masked": masked, "active": bool(tok)}
-
-
-@router.get("/admin/token-status")
-async def token_status(request: Request):
-    svc: FPLService = request.app.state.svc
-    tok = svc.current_token()
-    return {"active": bool(tok)}
 
 
 @router.get("/team-next/{team_id}")

@@ -47,10 +47,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS (tune origins for prod)
+# CORS — lock to specific origins in production via ALLOWED_ORIGINS env var
+# (comma-separated, e.g. "https://my-app.vercel.app,https://www.my-app.com")
+# Unset or empty → allow all origins (local dev only)
+import os as _os
+_raw_origins = _os.getenv("ALLOWED_ORIGINS", "")
+_allow_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] or ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # set your frontend origin in prod
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

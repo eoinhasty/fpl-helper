@@ -5,7 +5,11 @@ export type CacheStatus = "hit" | "miss" | "stale-serve" | "bypass-refresh" | nu
 export type CacheMeta = { status: CacheStatus; ageSeconds: number | null };
 export type ApiResult<T> = { data: T; cache: CacheMeta };
 
-const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+// In production with separate frontend/backend hosts, set VITE_API_BASE_URL to
+// the backend URL (e.g. "https://fpl-helper-api.railway.app").
+// Leave unset when both are on the same origin (local dev uses Vite proxy).
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+const ORIGIN = API_BASE || (typeof window !== "undefined" ? window.location.origin : "");
 
 // pull cache status/age out of response headers
 function cacheFrom(r: Response): CacheMeta {
@@ -29,11 +33,16 @@ async function fetchJSON<T>(url: string, init?: RequestInit): Promise<{ json: T;
   return { json: await r.json(), resp: r };
 }
 
+function tokenHeaders(): Record<string, string> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("fpl_token") : null;
+  return token ? { "X-Fpl-Token": token } : {};
+}
+
 export async function getLive(entry: number, opts?: { forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {
   const u = new URL(`/api/live/${entry}`, ORIGIN);
   if (opts?.forceRefresh) u.searchParams.set("noCache", "1");
 
-  const { json, resp } = await fetchJSON<SquadResponse>(u.toString());
+  const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
   return { data: json, cache: cacheFrom(resp) };
 }
 
@@ -44,18 +53,4 @@ export async function getSquad(entry: string, opts?: { gw?: number; forceRefresh
 
   const { json, resp } = await fetchJSON<SquadResponse>(u.toString());
   return { data: json, cache: cacheFrom(resp) };
-}
-
-export async function setToken(token: string | null): Promise<{ ok: boolean; masked?: string; active: boolean }> {
-  const { json } = await fetchJSON<{ ok: boolean; masked?: string; active: boolean }>(`/api/admin/set-token`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token }),
-  });
-  return json;
-}
-
-export async function getTokenStatus(): Promise<{ active: boolean }> {
-  const { json } = await fetchJSON<{ active: boolean }>(`/api/admin/token-status`);
-  return json;
 }

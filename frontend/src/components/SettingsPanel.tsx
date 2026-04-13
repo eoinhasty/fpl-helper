@@ -1,47 +1,45 @@
 import React from 'react';
-import { setToken, getTokenStatus } from '../lib/api';
+
+const STORAGE_KEY = "fpl_token";
+
+function maskToken(tok: string): string {
+  if (tok.length <= 10) return "*".repeat(tok.length);
+  return `${tok.slice(0, 5)}…${tok.slice(-4)}`;
+}
 
 export default function SettingsPanel() {
   const [token, setLocal] = React.useState('');
-  const [status, setStatus] = React.useState<'idle'|'saving'|'ok'|'err'>('idle');
-  const [active, setActive] = React.useState<boolean | null>(null);
-  const [masked, setMasked] = React.useState<string | null>(null);
+  const [status, setStatus] = React.useState<'idle'|'saved'|'cleared'>('idle');
 
-  React.useEffect(() => {
-    getTokenStatus().then(s => setActive(s.active)).catch(() => setActive(null));
-  }, []);
+  // Read current stored token on mount
+  const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+  const [active, setActive] = React.useState<boolean>(Boolean(stored));
+  const [masked, setMasked] = React.useState<string | null>(stored ? maskToken(stored) : null);
 
-  async function onSave(e: React.FormEvent) {
+  function onSave(e: React.FormEvent) {
     e.preventDefault();
-    setStatus('saving');
-    try {
-      const res = await setToken(token || null);
-      setMasked(res.masked ?? null);
-      setActive(res.active);
-      setStatus('ok');
-    } catch {
-      setStatus('err');
-    }
+    const tok = token.trim();
+    if (!tok) return;
+    localStorage.setItem(STORAGE_KEY, tok);
+    setActive(true);
+    setMasked(maskToken(tok));
+    setLocal('');
+    setStatus('saved');
   }
 
-  async function onClear() {
-    setStatus('saving');
-    try {
-      const res = await setToken(null);
-      setMasked(res.masked ?? null);
-      setActive(res.active);
-      setLocal('');
-      setStatus('ok');
-    } catch {
-      setStatus('err');
-    }
+  function onClear() {
+    localStorage.removeItem(STORAGE_KEY);
+    setActive(false);
+    setMasked(null);
+    setLocal('');
+    setStatus('cleared');
   }
 
   return (
     <div className="p-3 border border-border rounded-xl bg-card text-foreground">
-      
+
       <div className="text-sm mb-3">
-        <div>Token status: {active == null ? '—' : active ? '✅ active' : '❌ not set'}</div>
+        <div>Token status: {active ? '✅ active' : '❌ not set'}</div>
         {masked && (
           <div className="text-muted-foreground">
             Current: <code>{masked}</code>
@@ -61,20 +59,17 @@ export default function SettingsPanel() {
           autoComplete="off"
         />
         <div className="flex gap-2">
-          <button className="btn text-sm" type="submit" disabled={status === 'saving'}>
-            {status === 'saving' ? 'Saving…' : 'Save'}
+          <button className="btn text-sm" type="submit">
+            Save
           </button>
-          <button className="btn text-sm" type="button" onClick={onClear} disabled={status === 'saving'}>
+          <button className="btn text-sm" type="button" onClick={onClear}>
             Clear
           </button>
         </div>
 
-        {status === 'ok' && <div className="text-xs text-success">Saved.</div>}
-        {status === 'err' && <div className="text-xs text-destructive">Error saving token.</div>}
+        {status === 'saved' && <div className="text-xs text-success">Saved.</div>}
+        {status === 'cleared' && <div className="text-xs text-muted-foreground">Token cleared.</div>}
       </form>
-
-      {/* Optional: keep your existing dev-only Reload .env action here */}
-      {/* <button onClick={reloadEnv}>Reload .env</button> */}
     </div>
   );
 }

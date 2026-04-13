@@ -35,7 +35,7 @@ def _ua() -> Dict[str, str]:
 
 def _auth_headers_from(token: Optional[str]) -> Dict[str, str]:
     if not token:
-        raise HTTPException(400, detail="Missing FPL_BEARER_TOKEN (env or set-token).")
+        raise HTTPException(400, detail="No FPL token provided. Enter your bearer token in Settings.")
     return {"X-Api-Authorization": token}
 
 
@@ -44,28 +44,19 @@ class FPLService:
         self.public = httpx.AsyncClient(base_url=FPL_BASE, headers=_ua(), timeout=20.0)
         self._auth_client: Optional[httpx.AsyncClient] = None
         self.cache = AsyncCache()
-        self._token_override: Optional[str] = None  # <— NEW
 
-    # optionally expose helpers
-    def set_token(self, token: Optional[str]) -> None:
-        self._token_override = token or None
-
-    def current_token(self) -> Optional[str]:
-        return self._token_override or os.getenv("FPL_BEARER_TOKEN") or None
-
-    async def _get_json_auth(self, path: str, params: Optional[dict] = None) -> Any:
+    async def _get_json_auth(self, path: str, token: Optional[str], params: Optional[dict] = None) -> Any:
         if not self._auth_client:
             self._auth_client = httpx.AsyncClient(
                 base_url=FPL_BASE, headers=_ua(), timeout=20.0
             )
-        token = self.current_token()
         r = await self._auth_client.get(
             path, params=params, headers=_auth_headers_from(token)
         )
         if r.status_code in (401, 403):
             raise HTTPException(
                 r.status_code,
-                detail="Unauthorized for /my-team. Paste a fresh token in Settings or use the extension.",
+                detail="Unauthorized for /my-team. Check your bearer token in Settings.",
             )
         r.raise_for_status()
         return r.json()
@@ -122,10 +113,10 @@ class FPLService:
         return await self.cache.get_or_set(key, fetch, TTL_PICKS, SWR_PICKS)
 
     async def my_team(
-        self, entry_id: int, *, no_cache: bool = False
+        self, entry_id: int, *, token: Optional[str] = None, no_cache: bool = False
     ) -> Tuple[dict, str, float]:
         key = f"myteam:{entry_id}"
-        fetch = lambda: self._get_json_auth(f"/my-team/{entry_id}/")
+        fetch = lambda: self._get_json_auth(f"/my-team/{entry_id}/", token)
         if no_cache:
             return await self.cache.refresh(key, fetch, TTL_MYTEAM, SWR_MYTEAM)
         return await self.cache.get_or_set(key, fetch, TTL_MYTEAM, SWR_MYTEAM)

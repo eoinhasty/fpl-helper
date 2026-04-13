@@ -3,6 +3,8 @@ import type { Player } from "../../lib/types";
 import { statusClass, statusToText, fdrClass } from "../../lib/utils";
 import { fmtKickoff } from "../../lib/format";
 
+const _apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+
 type TeamFixture = {
   event: number;
   opp: string;
@@ -31,7 +33,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
       setLoading(true);
       setErr(null);
       try {
-        const r = await fetch(`/api/team-next/${player.team_id}?count=3`);
+        const r = await fetch(`${_apiBase}/api/team-next/${player.team_id}?count=3`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const json = await r.json();
         if (!abort) setNextFixt(json.fixtures || []);
