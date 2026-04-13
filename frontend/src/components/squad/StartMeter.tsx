@@ -6,10 +6,6 @@ interface StartMeterProps {
 
 export const StartMeter: React.FC<StartMeterProps> = ({ probability }) => {
     const pct = Math.round((probability || 0) * 100);
-    const safePct = Math.min(Math.max(pct, 0), 99);
-
-    const color =
-        pct >= 75 ? "bg-accent" : pct >= 60 ? "bg-warn" : "bg-danger";
 
     return (
         // Full-featured version with % label:
