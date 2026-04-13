@@ -20,7 +20,7 @@ function cacheFrom(r: Response): CacheMeta {
 
 // fetch JSON, throw on non-2xx with a readable message
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<{ json: T; resp: Response }> {
-  const r = await fetch(url, { credentials: "include", ...init });
+  const r = await fetch(url, init);
   if (!r.ok) {
     // use server error body if there is one, otherwise fall back to status text
     let reason = r.statusText;
