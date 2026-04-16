@@ -233,19 +233,14 @@ class FPLService:
         status = player.get("status", "a")
         news = (player.get("news") or "").lower()
 
-        # Use FPL's own chance field when set (0/25/50/75/100)
-        chance = player.get("chance_of_playing_next_round")
-        if chance is not None:
-            base = chance / 100
+        # Heuristic: status base blended with actual play-time ratio to catch rotation risk
+        status_base = {"a": 0.88, "d": 0.55, "i": 0.0, "s": 0.0, "n": 0.0}.get(status, 0.5)
+        minutes = player.get("minutes", 0)
+        if status == "a" and played_gws > 0 and minutes > 0:
+            time_ratio = min(minutes / (played_gws * 90), 0.99)
+            base = (status_base + time_ratio) / 2
         else:
-            status_base = {"a": 0.88, "d": 0.55, "i": 0.0, "s": 0.0, "n": 0.0}.get(status, 0.5)
-            minutes = player.get("minutes", 0)
-            if status == "a" and played_gws > 0 and minutes > 0:
-                # Blend status base with actual play-time ratio to catch rotation risk
-                time_ratio = min(minutes / (played_gws * 90), 0.99)
-                base = (status_base + time_ratio) / 2
-            else:
-                base = status_base
+            base = status_base
 
         if any(k in news for k in ["ruled out", "surgery", "setback"]):
             base *= 0.2
@@ -253,6 +248,11 @@ class FPLService:
             base *= 0.7
         elif any(k in news for k in ["back in training", "available", "returned", "fit"]):
             base = max(base, 0.9)
+
+        # FPL's chance field reflects availability, not starting likelihood — use as a multiplier
+        chance = player.get("chance_of_playing_next_round")
+        if chance is not None:
+            base *= chance / 100
 
         return round(max(0.0, min(0.99, base)), 2)
 
