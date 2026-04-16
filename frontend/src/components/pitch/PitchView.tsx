@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import PitchSVG from "./PitchSVG";
 import PlayerChip from "./PlayerChip";
 import type { Player } from "../../lib/types";
-import { ROW_Y, type RowId, spreadXsSymmetric } from "../../lib/pitchLayout"; // <—
+import { type RowId, spreadXsSymmetric } from "../../lib/pitchLayout";
+import { PITCH } from "../../lib/constants";
 import BenchStrip from "./BenchStrip";
 
 type Props = {
@@ -35,11 +36,26 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
   const mid = xi.filter((p) => p.position === 3);
   const fwd = xi.filter((p) => p.position === 4);
 
+  // Distribute field rows evenly across the pitch based on the actual formation.
+  // This means a 5-4-1 and a 3-4-3 both space their rows proportionally rather
+  // than using the same fixed Y values regardless of how many players are in each row.
+  const fieldRows: Array<{ id: RowId; list: Player[] }> = [
+    { id: "DEF", list: def },
+    { id: "MID", list: mid },
+    { id: "FWD", list: fwd },
+  ].filter((r): r is { id: RowId; list: Player[] } => r.list.length > 0);
+
+  const { TOP: Y_FIELD_TOP, BOT: Y_FIELD_BOT } = PITCH.FIELD_Y;
+  const numField = fieldRows.length;
+
   const rows: Array<{ id: RowId; y: number; list: Player[] }> = [
-    { id: "GK", y: ROW_Y.GK, list: gk },
-    { id: "DEF", y: ROW_Y.DEF, list: def },
-    { id: "MID", y: ROW_Y.MID, list: mid },
-    { id: "FWD", y: ROW_Y.FWD, list: fwd },
+    { id: "GK", y: PITCH.Y_GK, list: gk },
+    ...fieldRows.map((r, i) => ({
+      ...r,
+      y: numField === 1
+        ? (Y_FIELD_TOP + Y_FIELD_BOT) / 2
+        : Y_FIELD_TOP + (Y_FIELD_BOT - Y_FIELD_TOP) * (i / (numField - 1)),
+    })),
   ];
 
   // Bench labels like FPL: keeper + 1/2/3 subs
