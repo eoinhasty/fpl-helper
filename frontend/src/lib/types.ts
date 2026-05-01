@@ -17,12 +17,15 @@ export type Player = {
     form?: string;
     minutes?: number;
     ict_index?: string;
+    ep_next?: string | null;
     influence?: string; creativity?: string; threat?: string;
     selected_by_percent?: string;
     start_probability: number;
     gw_points?: number;
     is_captain?: boolean; is_vice_captain?: boolean;
     fixture?: FixtureLite | null;
+    has_dgw?: boolean;
+    fixtures?: FixtureLite[];
     slot?: number; multiplier?: number;
     shirt_url?: string;
 };

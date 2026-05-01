@@ -273,28 +273,29 @@ class FPLService:
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
 
-        fdr_by_team: Dict[int, dict] = {}
+        fdr_by_team: Dict[int, list] = {}
         for fx in fixtures:
             h, a = fx["team_h"], fx["team_a"]
-            fdr_by_team[h] = {
+            fdr_by_team.setdefault(h, []).append({
                 "opp": teams[a]["short_name"],
                 "home": True,
                 "difficulty": fx["team_h_difficulty"],
                 "kickoff": fx["kickoff_time"],
-            }
-            fdr_by_team[a] = {
+            })
+            fdr_by_team.setdefault(a, []).append({
                 "opp": teams[h]["short_name"],
                 "home": False,
                 "difficulty": fx["team_a_difficulty"],
                 "kickoff": fx["kickoff_time"],
-            }
+            })
 
         enriched = []
         for pick in picks.get("picks", []):
             el = pick["element"]
             p = players.get(el, {})
             t = teams.get(p.get("team", 0), {})
-            fdr = fdr_by_team.get(p.get("team", 0), {})
+            team_fixtures = fdr_by_team.get(p.get("team", 0), [])
+            fdr = team_fixtures[0] if team_fixtures else None
             team_code = t.get("code")
             is_gk = p.get("element_type") == 1
             suffix = "_1" if is_gk else ""
@@ -320,9 +321,12 @@ class FPLService:
                     "form": p.get("form"),                              # rolling avg points last 3 GWs (e.g. "6.5")
                     "minutes": p.get("minutes"),                        # total minutes played this season
                     "ict_index": p.get("ict_index"),                    # influence/creativity/threat index
+                    "ep_next": p.get("ep_next"),                        # FPL expected points next GW (e.g. "5.2" or None)
                     "is_captain": pick.get("is_captain"),               # is captain this GW? (e.g. True/False)
                     "is_vice_captain": pick.get("is_vice_captain"),     # is vice-captain this GW? (e.g. True/False)
-                    "fixture": fdr or None,                             # next fixture details or None (e.g. {"opp": "CHE", "home": True, "difficulty": 3, "kickoff": "2024-08-09T19:45:00Z"})
+                    "fixture": fdr,                                     # next fixture or None (e.g. {"opp": "CHE", "home": True, "difficulty": 3, "kickoff": "..."})
+                    "has_dgw": len(team_fixtures) > 1,                  # True if player has 2+ fixtures this GW
+                    "fixtures": team_fixtures,                          # all fixtures this GW (list)
                     "slot": pick.get("position"),                       # squad slot 1-15 (starting 1-11, bench 12-15)
                     "multiplier": pick.get("multiplier"),               # points multiplier (2 if captain, 1 otherwise)
                     "shirt_url": shirt_url,                             # shirt image URL

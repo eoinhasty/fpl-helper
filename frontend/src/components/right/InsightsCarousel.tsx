@@ -6,7 +6,7 @@ type SlideKey = "captaincy" | "health" | "market";
 
 const SLIDES: SlideKey[] = ["captaincy", "health", "market"];
 
-export default function InsightsCarousel({ players }: { players?: Player[] | null }) {
+export default function InsightsCarousel({ players, isHistorical }: { players?: Player[] | null; isHistorical?: boolean }) {
   const [idx, setIdx] = React.useState(0);
   const key = SLIDES[idx];
 
@@ -44,7 +44,11 @@ export default function InsightsCarousel({ players }: { players?: Player[] | nul
       </div>
 
       <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-        {key === "captaincy" && <CaptaincySlide players={players || []} />}
+        {key === "captaincy" && (
+          isHistorical
+            ? <Empty text="Captain picks use live data — not available for past GWs." />
+            : <CaptaincySlide players={players || []} />
+        )}
         {key === "health" && <HealthSlide players={players || []} />}
         {key === "market" && <MarketStub />}
       </div>
@@ -55,20 +59,59 @@ export default function InsightsCarousel({ players }: { players?: Player[] | nul
 /* ---------- Slides ---------- */
 
 function CaptaincySlide({ players }: { players: Player[] }) {
-  // XI only
-  const xi = players.filter((p) => (p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11);
+  // XI only, exclude GKs (never captain candidates)
+  const xi = players.filter(
+    (p) => ((p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11) && p.position !== 1
+  );
 
-  // score: start% * exponential FDR weight + home boost + rolling form + ICT signal
-  const scored = xi
-    .map((p) => {
-      const sp = (p.start_probability ?? 0) * 100;
-      const fdr = p.fixture?.difficulty ?? 3;
-      const home = p.fixture?.home ? 4 : 0;
-      const form = parseFloat(p.form ?? "0");          // rolling avg last 3 GWs
-      const ict = parseFloat(p.ict_index ?? "0") / 10; // attacking threat signal
-      const fdrPenalty = Math.pow(2, fdr - 1);         // FDR1=1, FDR2=2, FDR3=4, FDR4=8, FDR5=16
-      const score = sp * (10 / fdrPenalty) + home + form * 2 + ict;
-      return { p, score };
+  const norm = (v: number, arr: number[]) => {
+    const mn = Math.min(...arr), mx = Math.max(...arr);
+    return mx === mn ? 0.5 : (v - mn) / (mx - mn);
+  };
+
+  // position multiplier: FWD > MID > DEF — GKs already excluded above
+  const posMult = (pos?: number) => pos === 4 ? 1.0 : pos === 3 ? 0.92 : 0.72;
+
+  const raw = xi.map((p) => {
+    const fxs = p.fixtures ?? (p.fixture ? [p.fixture] : []);
+    const avgFdr = fxs.length
+      ? fxs.reduce((s, f) => s + f.difficulty, 0) / fxs.length
+      : 3;
+    const homeRatio = fxs.length
+      ? fxs.filter((f) => f.home).length / fxs.length
+      : 0;
+    const ep = parseFloat(p.ep_next ?? "0");
+    return {
+      p,
+      form: parseFloat(p.form ?? "0"),
+      ict:  parseFloat(p.ict_index ?? "0"),
+      ep,
+      epDisplay: fxs.length > 1 && ep > 0 ? ep * fxs.length : ep,
+      fdr:  avgFdr,
+      home: homeRatio,
+      sp:   p.start_probability ?? 0,
+      dgw:  fxs.length > 1,
+      bgw:  fxs.length === 0,
+    };
+  });
+
+  const forms      = raw.map((r) => r.form);
+  const icts       = raw.map((r) => r.ict);
+  const epDisplays = raw.map((r) => r.epDisplay);
+  const hasEp      = epDisplays.some((e) => e > 0);
+
+  const scored = raw
+    .map((r) => {
+      const normForm  = norm(r.form, forms);
+      const normIct   = norm(r.ict, icts);
+      const normEp    = norm(r.epDisplay, epDisplays);
+      const base      = hasEp ? normEp : normForm * 0.5 + normIct * 0.5;
+      const fdrFactor = 1 - (r.fdr - 1) / 4;    // linear avg: FDR1=1.0 … FDR5=0.0
+      const homeBoost = 1 + r.home * 0.08;        // ratio of home fixtures × 8%
+      const dgwBoost  = r.dgw ? 1.8 : 1.0;        // two fixtures ≈ 1.8× expected output
+      const bgwPenalty = r.bgw ? 0.1 : 1.0;       // no fixture this GW — strongly demote
+      const score     = base * fdrFactor * homeBoost * dgwBoost * bgwPenalty * r.sp * posMult(r.p.position);
+      return { p: r.p, score, epDisplay: r.epDisplay };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
@@ -77,7 +120,7 @@ function CaptaincySlide({ players }: { players: Player[] }) {
 
   return (
     <ul className="space-y-2">
-      {scored.map(({ p, score }, i) => (
+      {scored.map(({ p, epDisplay }, i) => (
         <li
           key={p.element}
           className="flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5"
@@ -95,15 +138,21 @@ function CaptaincySlide({ players }: { players: Player[] }) {
               </div>
               <div className="text-[11px] text-muted-foreground truncate">
                 {p.team} •{" "}
-                {p.fixture
-                  ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp} • FDR ${p.fixture.difficulty}`
-                  : "No fixture"}
+                {p.has_dgw && p.fixtures
+                  ? p.fixtures.map((f) => `${f.home ? "vs" : "@"} ${f.opp}`).join(", ") + " • DGW"
+                  : p.fixture
+                    ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp} • FDR ${p.fixture.difficulty}`
+                    : "BGW"}
               </div>
             </div>
           </div>
           <div className="text-xs text-muted-foreground text-right">
             start {Math.round((p.start_probability ?? 0) * 100)}%
-            <div className="font-semibold text-foreground">{Math.round(score)}</div>
+            <div className="font-semibold text-foreground">
+              {epDisplay > 0
+                ? `${epDisplay.toFixed(1)} xPts`
+                : `${parseFloat(p.form ?? "0").toFixed(1)} form`}
+            </div>
           </div>
         </li>
       ))}
