@@ -5,7 +5,7 @@ A Fantasy Premier League companion app that enriches your squad view with live d
 ## Features
 
 - **Squad view** — XI + bench with player shirts, price, start probability, and next fixture (FDR colour-coded). Toggle between list and pitch layouts.
-- **Live points** — Real-time GW points for your squad (requires FPL bearer token).
+- **Live points** — Real-time GW points for your squad (requires FPL bearer token, set via Settings).
 - **Captaincy picks** — Top 3 captain recommendations scored on start probability, fixture difficulty, form, and ICT index.
 - **Team health** — Flags players under 60% start probability or carrying injuries.
 - **Player detail** — Click any player to see availability, injury news, next 3 fixtures, and quick stats.
@@ -13,6 +13,7 @@ A Fantasy Premier League companion app that enriches your squad view with live d
 - **Hot news** — Recent injury and transfer news for your squad players.
 - **PL standings** — Live Premier League table.
 - **Dark / light / system theme** — Persisted per device.
+- **Cache status** — Live cache hit/miss/stale indicators and data age shown in the top nav.
 
 ## Stack
 
@@ -34,7 +35,11 @@ cd fpl-helper
 
 # Backend
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+# source .venv/bin/activate
 pip install -r requirements.txt
 
 # Frontend
@@ -44,22 +49,25 @@ npm install
 
 ### Configure
 
-Create `backend/.env`:
+Create `backend/.env` (copy from `backend/.env.example`):
 
 ```env
-# Required
-FPL_ENTRY_ID=your_entry_id
+# Optional — server-side fallback bearer token for Live Points.
+# Can also be set at runtime via the in-app Settings panel.
+FPL_BEARER_TOKEN=
 
-# Optional — needed for Live Points tab
-FPL_BEARER_TOKEN=your_bearer_token
+# Optional — enables the live Premier League standings widget.
+# Leave empty to use stub data.
+FOOTBALL_DATA_API_KEY=
 
-# Optional — needed for real PL standings (football-data.org)
-FOOTBALL_DATA_API_KEY=your_key
+# Optional — comma-separated allowed CORS origins.
+# Leave empty for local development.
+ALLOWED_ORIGINS=
 ```
 
-**Finding your entry ID**: log in to the FPL website, go to the Points tab — the number in the URL (`/entry/XXXXXXX/`) is your entry ID.
+**Entry ID**: entered directly in the app — no env var needed. Log in to the FPL website, go to the Points tab — the number in the URL (`/entry/XXXXXXX/`) is your entry ID.
 
-**Getting your bearer token**: open browser DevTools → Network tab → reload the FPL site → find a request to `https://fantasy.premierleague.com/api/` → copy the `Authorization` header value.
+**Bearer token**: set via the in-app Settings panel. To extract it, use the included `FPL X-Api-Authorization Sniffer` browser extension, or open DevTools → Network → reload the FPL site → find a request to `https://fantasy.premierleague.com/api/` → copy the `Authorization` header value.
 
 ### Run
 
