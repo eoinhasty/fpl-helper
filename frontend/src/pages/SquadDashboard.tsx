@@ -60,7 +60,10 @@ export default function SquadDashboard() {
 
   const right = (
     <>
-      <InsightsCarousel players={data?.players} />
+      <InsightsCarousel
+        players={data?.players}
+        isHistorical={data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0)}
+      />
       <NextMatchCard />
       <HotNewsCard />
       <StandingsCard />
