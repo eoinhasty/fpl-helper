@@ -107,8 +107,9 @@ export default function SquadDashboard() {
         className="btn"
         onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
         title="Force fresh fetch"
+        aria-label="Refresh"
       >
-        Refresh
+        ↻
       </button>
     </div>
   ), [mode, setMode, gw, data?.used_gw, gwOptions, loadLive, loadSquad]);

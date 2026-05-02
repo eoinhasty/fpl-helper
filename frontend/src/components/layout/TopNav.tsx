@@ -7,16 +7,12 @@ import { useNavCenter } from "../../contexts/NavCenterContext";
 type Props = {
   title?: string;
   maxWidthPx?: number;
-  hideSearch?: boolean;
-  onSearch?: () => void;
   className?: string;
 };
 
 export default function TopNav({
   title = "FF Helper",
   maxWidthPx = 1400,
-  hideSearch = false,
-  onSearch,
   className = "",
 }: Props) {
   const { entry, setEntry } = useEntryId();
@@ -58,16 +54,6 @@ export default function TopNav({
           {/* Right actions */}
           <div className="ml-auto flex items-center gap-2">
             {navActions}
-            {!hideSearch && (
-              <IconBtn
-                label="Search"
-                onClick={onSearch}
-                title="Search"
-                ariaLabel="Search"
-              >
-                🔍
-              </IconBtn>
-            )}
             <IconBtn
               label="Settings"
               onClick={() => setOpen(true)}
