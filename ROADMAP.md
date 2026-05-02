@@ -9,7 +9,7 @@
 
 ### Beyond MVP
 - **Live points** — real-time GW scoring via `/my-team/{id}` (requires bearer token)
-- **Captaincy recommendations** — top 3 picks scored on start%, fixture difficulty, form, ICT (shown in Insights carousel)
+- **Captaincy recommendations** — top 3 picks scored on ep_next, fixture difficulty, DGW/BGW awareness, home advantage, positional weighting, and start probability (shown in Insights carousel; hidden for historical GW views)
 - **League rankings** — overall rank, GW rank, classic/H2H league positions
 - **Hot news feed** — recent injury and transfer news, prioritised by recency
 - **PL standings** — live Premier League table (football-data.org or stub fallback)
@@ -30,11 +30,22 @@
 3. News keyword tweaks: "ruled out/surgery/setback" ×0.2 · "doubt/late test/assess" ×0.7 · "fit/back in training" floor 0.9
 4. Clamp to [0, 0.99]
 
-### Captaincy scoring (v1)
+### Captaincy scoring (v1 — retired)
 ```
-score = start_prob × (10 / 2^(FDR-1))   # exponential FDR penalty
-      + 4 if home
-      + form × 2
-      + ict_index / 10
+score = start_prob × (10 / 2^(FDR-1)) + 4 if home + form × 2 + ict_index / 10
 ```
-FDR penalty: FDR 1 → ÷1, FDR 2 → ÷2, FDR 3 → ÷4, FDR 4 → ÷8, FDR 5 → ÷16.
+
+### Captaincy scoring (v2 — current)
+Candidates: XI outfield players only (GKs excluded).
+```
+base       = norm(ep_next) if available, else norm(form) × 0.5 + norm(ict) × 0.5
+fdrFactor  = 1 − (avgFDR − 1) / 4     # linear, averaged across all GW fixtures
+homeBoost  = 1 + homeRatio × 0.08
+dgwBoost   = 1.8 if has_dgw else 1.0
+bgwPenalty = 0.1 if no fixture else 1.0
+posMult    = FWD 1.0 · MID 0.92 · DEF 0.72
+score      = base × fdrFactor × homeBoost × dgwBoost × bgwPenalty × start_prob × posMult
+```
+- `norm()` = min-max normalised across XI candidates
+- DGW `ep_next` display scaled by fixture count
+- Slide hidden for historical GW views

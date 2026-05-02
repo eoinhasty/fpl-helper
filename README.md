@@ -6,7 +6,7 @@ A Fantasy Premier League companion app that enriches your squad view with live d
 
 - **Squad view** — XI + bench with player shirts, price, start probability, and next fixture (FDR colour-coded). Toggle between list and pitch layouts.
 - **Live points** — Real-time GW points for your squad (requires FPL bearer token, set via Settings).
-- **Captaincy picks** — Top 3 captain recommendations scored on start probability, fixture difficulty, form, and ICT index.
+- **Captaincy picks** — Top 3 captain recommendations. Scored on FPL expected points (ep_next), fixture difficulty, home advantage, DGW/BGW detection, positional weighting, and start probability. Hidden for historical GW views where data would be stale.
 - **Team health** — Flags players under 60% start probability or carrying injuries.
 - **Player detail** — Click any player to see availability, injury news, next 3 fixtures, and quick stats.
 - **League rankings** — Your overall rank, GW rank, and position in classic/H2H leagues.
