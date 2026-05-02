@@ -63,6 +63,7 @@ export default function SquadDashboard() {
       <InsightsCarousel
         players={data?.players}
         isHistorical={data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0)}
+        onPlayerClick={openPlayer}
       />
       <NextMatchCard />
       <HotNewsCard />

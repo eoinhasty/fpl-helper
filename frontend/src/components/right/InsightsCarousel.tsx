@@ -6,7 +6,7 @@ type SlideKey = "captaincy" | "health" | "market";
 
 const SLIDES: SlideKey[] = ["captaincy", "health", "market"];
 
-export default function InsightsCarousel({ players, isHistorical }: { players?: Player[] | null; isHistorical?: boolean }) {
+export default function InsightsCarousel({ players, isHistorical, onPlayerClick }: { players?: Player[] | null; isHistorical?: boolean; onPlayerClick?: (p: Player) => void }) {
   const [idx, setIdx] = React.useState(0);
   const key = SLIDES[idx];
 
@@ -47,7 +47,7 @@ export default function InsightsCarousel({ players, isHistorical }: { players?: 
         {key === "captaincy" && (
           isHistorical
             ? <Empty text="Captain picks use live data — not available for past GWs." />
-            : <CaptaincySlide players={players || []} />
+            : <CaptaincySlide players={players || []} onPlayerClick={onPlayerClick} />
         )}
         {key === "health" && <HealthSlide players={players || []} />}
         {key === "market" && <MarketStub />}
@@ -58,7 +58,7 @@ export default function InsightsCarousel({ players, isHistorical }: { players?: 
 
 /* ---------- Slides ---------- */
 
-function CaptaincySlide({ players }: { players: Player[] }) {
+function CaptaincySlide({ players, onPlayerClick }: { players: Player[]; onPlayerClick?: (p: Player) => void }) {
   // XI only, exclude GKs (never captain candidates)
   const xi = players.filter(
     (p) => ((p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11) && p.position !== 1
@@ -123,7 +123,8 @@ function CaptaincySlide({ players }: { players: Player[] }) {
       {scored.map(({ p, epDisplay }, i) => (
         <li
           key={p.element}
-          className="flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5"
+          onClick={() => onPlayerClick?.(p)}
+          className={`flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5${onPlayerClick ? " cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
         >
           <div className="flex items-center gap-2 min-w-0">
             <img
