@@ -78,8 +78,9 @@ export default function SquadDashboard() {
       teamBank={data?.team_bank}
       activeChip={data?.active_chip ?? null}
       cache={cache ?? { status: null, ageSeconds: null }}
+      isLive={mode === "live"}
     />
-  ), [data?.used_gw, data?.deadline, data?.team_value, data?.team_bank, data?.active_chip, cache]);
+  ), [data?.used_gw, data?.deadline, data?.team_value, data?.team_bank, data?.active_chip, cache, mode]);
 
   const navActions = useMemo(() => (
     <div className="flex items-center gap-2">
@@ -121,7 +122,7 @@ export default function SquadDashboard() {
         right={right}
       >
         {prefs.squadLayout === "pitch" ? (
-          <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} />
+          <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error} />
         ) : (
           <XIList
             players={data?.players}

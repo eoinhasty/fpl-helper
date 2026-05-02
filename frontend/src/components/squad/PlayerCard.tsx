@@ -13,7 +13,10 @@ export default function PlayerCard({
   onOpen: () => void;
 }) {
   const cap = p.is_captain ? (
-    <span className="text-[11px] px-2 py-0.5 rounded-full bg-success/15 text-success border border-success/30">
+    <span
+      className="text-[11px] px-2 py-0.5 rounded-full ring-1 ring-black/15"
+      style={{ backgroundColor: "#38003C", color: "#fcfcfc" }}
+    >
       C
     </span>
   ) : p.is_vice_captain ? (

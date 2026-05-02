@@ -12,6 +12,8 @@ type Props = {
   brand?: string;
   className?: string;
   onPlayerClick?: (p: Player) => void;
+  loading?: boolean;
+  error?: string | null;
 };
 
 // SVG viewBox
@@ -22,7 +24,7 @@ const VB_H = 788;
 const CHIP_W_PX = 128;
 const CHIP_MARGIN_PX = 14;
 
-export default function PitchView({ players, brand = "YOUR BRAND", className, onPlayerClick }: Props) {
+export default function PitchView({ players, brand = "YOUR BRAND", className, onPlayerClick, loading, error }: Props) {
   const all = players ?? [];
 
   // XI is 1..11, bench is 12..15 (based on your existing slot usage)
@@ -87,7 +89,19 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
   const gutterVB = pxToVB ? 6 * pxToVB : 8;
 
   return (
-    <div className={`w-full select-none ${className ?? ""}`}>
+    <div className={`w-full select-none relative ${className ?? ""}`}>
+      {(loading || error) && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/55 backdrop-blur-[3px] rounded-2xl">
+          {loading ? (
+            <p className="text-sm font-medium text-white/80 tracking-wide">Loading…</p>
+          ) : (
+            <div className="text-center px-10 space-y-2">
+              <p className="text-base font-semibold text-white">Live squad unavailable</p>
+              <p className="text-sm text-white/65 leading-snug">{error}</p>
+            </div>
+          )}
+        </div>
+      )}
       <div className={`relative overflow-hidden w-full`}>
         <div className="-mx-6 sm:-mx-8">
           <div className="relative w-full" style={{ aspectRatio: "1417 / 1200" }}>
