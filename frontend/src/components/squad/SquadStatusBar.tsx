@@ -34,6 +34,7 @@ export default function SquadStatusBar({
   teamBank,
   cache,
   activeChip,
+  isLive,
 }: {
   gw?: number;
   deadlineISO?: string | null;
@@ -41,14 +42,22 @@ export default function SquadStatusBar({
   teamBank?: number | null;
   activeChip?: string | null;
   cache: CacheMeta;
+  isLive?: boolean;
 }) {
   const { text, ended } = useCountdown(deadlineISO);
 
   return (
     <div className="flex items-center gap-2.5 text-sm">
-      <span className="badge bg-primary text-primary-foreground border-0 shrink-0">
-        GW {gw ?? "—"}
-      </span>
+      {isLive ? (
+        <span className="badge flex items-center gap-1.5 bg-success/15 text-success border border-success/30 shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+          LIVE
+        </span>
+      ) : (
+        <span className="badge bg-primary text-primary-foreground border-0 shrink-0">
+          GW {gw ?? "—"}
+        </span>
+      )}
       <span className={ended ? "text-destructive font-medium" : "text-muted-foreground"}>
         {text}
       </span>

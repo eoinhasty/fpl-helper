@@ -73,13 +73,18 @@ function Points({
 
   const styles =
     variant === "bench"
-      ? "bg-muted text-muted-foreground opacity-70"
+      ? "bg-muted text-muted-foreground"
       : isCaptain
-        ? "bg-warning/15 text-warning ring-1 ring-warning shadow-sm"
+        ? "ring-1 ring-black/15 shadow-sm"
         : "bg-muted text-foreground shadow-sm";
 
+  const inlineStyle =
+    isCaptain && variant !== "bench"
+      ? { backgroundColor: PURPLE, color: ROLE_TEXT }
+      : undefined;
+
   return (
-    <div className={`${base} ${styles}`} title={title}>
+    <div className={`${base} ${styles}`} style={inlineStyle} title={title}>
       {n}
     </div>
   );
