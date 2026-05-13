@@ -2,10 +2,10 @@
 from __future__ import annotations
 import os
 from typing import Optional, List
-from fastapi import APIRouter, Response, Request
+from fastapi import APIRouter, Response, Request, Depends
+from app.deps import limiter, verify_api_key, nocache_guard
 from app.services.service import (
     FPLService,
-    TTL_BOOTSTRAP,
     TTL_FIXTURES,
     TTL_PICKS,
     TTL_MYTEAM,
@@ -21,7 +21,11 @@ import logging
 
 logger = logging.getLogger("uvicorn.error")
 
-router = APIRouter(prefix="/api")
+# Health check has no auth or rate limit so Render's healthcheck always works
+health_router = APIRouter(prefix="/api")
+
+# All other endpoints require a valid X-Api-Key header
+router = APIRouter(prefix="/api", dependencies=[Depends(verify_api_key)])
 
 
 def set_cache_headers(resp: Response, status: str, age: float, ttl: int):
@@ -30,19 +34,20 @@ def set_cache_headers(resp: Response, status: str, age: float, ttl: int):
     resp.headers["cache-control"] = f"public, max-age=0, stale-while-revalidate={ttl}"
 
 
-@router.get("/health")
+@health_router.get("/health")
 async def health():
     return {"ok": True}
 
 
-
 @router.get("/squad/{entry_id}")
+@limiter.limit("30/minute")
 async def squad(
     request: Request,
     response: Response,
     entry_id: int,
     gw: Optional[int] = None,
     noCache: int = 0,
+    _: None = Depends(nocache_guard),
 ):
     svc: FPLService = request.app.state.svc
 
@@ -66,7 +71,7 @@ async def squad(
         )
         # reflect cache from the actual used gw
         _, pick_status, pick_age = await svc.picks(entry_id, used_gw)
-        
+
     live_data, _, _ = await svc.live_event(used_gw)
 
     # fixtures (cached)
@@ -95,7 +100,9 @@ async def squad(
             fav_team = t.get("short_name")
 
     # shape for UI
-    enriched, team_value, team_bank = svc.enrich_picks(picks_data, boot, fixtures_data, live_data)
+    enriched, team_value, team_bank = svc.enrich_picks(
+        picks_data, boot, fixtures_data, live_data
+    )
     used_event = next(e for e in events if e["id"] == used_gw)
 
     set_cache_headers(response, pick_status, pick_age, TTL_PICKS)
@@ -114,12 +121,19 @@ async def squad(
         "team_value": team_value,
         "team_bank": team_bank,
         "players": enriched,
-        "debug_version": "squad-live-wired-1"
+        "debug_version": "squad-live-wired-1",
     }
 
 
 @router.get("/live/{entry_id}")
-async def live(request: Request, response: Response, entry_id: int, noCache: int = 0):
+@limiter.limit("30/minute")
+async def live(
+    request: Request,
+    response: Response,
+    entry_id: int,
+    noCache: int = 0,
+    _: None = Depends(nocache_guard),
+):
     svc: FPLService = request.app.state.svc
 
     boot, _, _ = await svc.bootstrap()
@@ -133,7 +147,9 @@ async def live(request: Request, response: Response, entry_id: int, noCache: int
     token = request.headers.get("x-fpl-token") or os.getenv("FPL_BEARER_TOKEN")
 
     # live (cached micro-TTL + bypass)
-    live_data, mt_status, mt_age = await svc.my_team(entry_id, token=token, no_cache=bool(noCache))
+    live_data, mt_status, mt_age = await svc.my_team(
+        entry_id, token=token, no_cache=bool(noCache)
+    )
 
     fixtures_data, _, _ = await svc.fixtures(used_gw)
     event_live, _, _ = await svc.live_event(used_gw)
@@ -191,8 +207,8 @@ async def live(request: Request, response: Response, entry_id: int, noCache: int
     }
 
 
-
 @router.get("/team-next/{team_id}")
+@limiter.limit("30/minute")
 async def team_next(request: Request, response: Response, team_id: int, count: int = 3):
     svc: FPLService = request.app.state.svc
 
@@ -223,7 +239,7 @@ async def team_next(request: Request, response: Response, team_id: int, count: i
                     ),
                     "home": True,
                     "difficulty": fx["team_h_difficulty"],
-                    "kickoff": fx.get("kickoff_time"),  # may be None
+                    "kickoff": fx.get("kickoff_time"),
                 }
             )
         elif fx["team_a"] == team_id:
@@ -243,7 +259,6 @@ async def team_next(request: Request, response: Response, team_id: int, count: i
 
     upcoming.sort(key=lambda x: (x["event"], x["kickoff"] or ""))
 
-    # cache headers so your UI’s indicators stay consistent
     set_cache_headers(response, fx_status, fx_age, TTL_FIXTURES)
 
     count = max(1, min(int(count or 3), 10))
@@ -251,6 +266,7 @@ async def team_next(request: Request, response: Response, team_id: int, count: i
 
 
 @router.get("/leagues/{entry_id}")
+@limiter.limit("30/minute")
 async def leagues(request: Request, response: Response, entry_id: int):
     svc: FPLService = request.app.state.svc
     entry_json, status, age = await svc.entry(entry_id)
@@ -271,7 +287,7 @@ async def leagues(request: Request, response: Response, entry_id: int):
         return {
             "id": x.get("id"),
             "name": x.get("name"),
-            "rank": x.get("entry_rank"),  # h2h uses points table rank
+            "rank": x.get("entry_rank"),
             "last_rank": x.get("entry_last_rank"),
         }
 
@@ -286,6 +302,7 @@ async def leagues(request: Request, response: Response, entry_id: int):
 
 
 @router.get("/pl/next-match")
+@limiter.limit("30/minute")
 async def pl_next_match(request: Request, response: Response):
     svc: FPLService = request.app.state.svc
     key = "pl:nextmatch"
@@ -310,11 +327,15 @@ async def pl_next_match(request: Request, response: Response):
 
         return {"gw": gw, "first": shape(first), "fixtures": shaped}
 
-    data, status, age = await svc.cache.get_or_set(key, _fetch, TTL_NEXTMATCH, SWR_NEXTMATCH)
+    data, status, age = await svc.cache.get_or_set(
+        key, _fetch, TTL_NEXTMATCH, SWR_NEXTMATCH
+    )
     set_cache_headers(response, status, age, TTL_NEXTMATCH)
     return data
 
+
 @router.get("/news/hot")
+@limiter.limit("30/minute")
 async def news_hot(
     request: Request, response: Response, days: int = 7, limit: int = 12
 ):
@@ -330,6 +351,7 @@ async def news_hot(
 
 
 @router.get("/pl/standings")
+@limiter.limit("30/minute")
 async def pl_standings(request: Request, response: Response):
     svc: FPLService = request.app.state.svc
     key = "pl:standings"

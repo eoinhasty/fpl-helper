@@ -10,6 +10,7 @@ export type ApiResult<T> = { data: T; cache: CacheMeta };
 // Leave unset when both are on the same origin (local dev uses Vite proxy).
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 const ORIGIN = API_BASE || (typeof window !== "undefined" ? window.location.origin : "");
+const API_SECRET = (import.meta.env.VITE_API_SECRET as string | undefined) ?? "";
 
 // pull cache status/age out of response headers
 function cacheFrom(r: Response): CacheMeta {
@@ -33,9 +34,13 @@ async function fetchJSON<T>(url: string, init?: RequestInit): Promise<{ json: T;
   return { json: await r.json(), resp: r };
 }
 
+function baseHeaders(): Record<string, string> {
+  return API_SECRET ? { "X-Api-Key": API_SECRET } : {};
+}
+
 function tokenHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem("fpl_token") : null;
-  return token ? { "X-Fpl-Token": token } : {};
+  return token ? { ...baseHeaders(), "X-Fpl-Token": token } : baseHeaders();
 }
 
 export async function getLive(entry: number, opts?: { forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {
@@ -51,6 +56,6 @@ export async function getSquad(entry: string, opts?: { gw?: number; forceRefresh
   if (opts?.gw != null) u.searchParams.set("gw", String(opts.gw));
   if (opts?.forceRefresh) u.searchParams.set("noCache", "1");
 
-  const { json, resp } = await fetchJSON<SquadResponse>(u.toString());
+  const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: baseHeaders() });
   return { data: json, cache: cacheFrom(resp) };
 }
