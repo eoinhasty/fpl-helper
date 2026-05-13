@@ -1,6 +1,6 @@
 # service.py
 from __future__ import annotations
-import os, asyncio
+import os, asyncio, hashlib
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
@@ -115,7 +115,8 @@ class FPLService:
     async def my_team(
         self, entry_id: int, *, token: Optional[str] = None, no_cache: bool = False
     ) -> Tuple[dict, str, float]:
-        key = f"myteam:{entry_id}"
+        token_hash = hashlib.sha256((token or "").encode()).hexdigest()[:16]
+        key = f"myteam:{entry_id}:{token_hash}"
         fetch = lambda: self._get_json_auth(f"/my-team/{entry_id}/", token)
         if no_cache:
             return await self.cache.refresh(key, fetch, TTL_MYTEAM, SWR_MYTEAM)
