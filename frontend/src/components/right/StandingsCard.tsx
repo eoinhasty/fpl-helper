@@ -3,7 +3,7 @@
 import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 
-type Row = { pos: number; team: string; played: number; w: number; d: number; l: number; gf: number; ga: number; pts: number; };
+type Row = { pos: number; team: string; played: number; w: number; d: number; l: number; pts: number; };
 type Resp = { source: string; rows: Row[] };
 
 export default function StandingsCard() {
@@ -18,8 +18,7 @@ export default function StandingsCard() {
               <tr>
                 <th className="px-3 py-2 text-left">#</th><th className="px-2 text-left">Team</th>
                 <th className="px-2 text-center">P</th><th className="px-2 text-center">W</th><th className="px-2 text-center">D</th>
-                <th className="px-2 text-center">L</th><th className="px-2 text-center">GF</th><th className="px-2 text-center">GA</th>
-                <th className="px-2 text-center">Pts</th>
+                <th className="px-2 text-center">L</th><th className="px-2 text-center">Pts</th>
               </tr>
             </thead>
             <tbody>
@@ -31,8 +30,6 @@ export default function StandingsCard() {
                   <td className="text-center">{r.w}</td>
                   <td className="text-center">{r.d}</td>
                   <td className="text-center">{r.l}</td>
-                  <td className="text-center">{r.gf}</td>
-                  <td className="text-center">{r.ga}</td>
                   <td className="text-center font-semibold">{r.pts}</td>
                 </tr>
               ))}
