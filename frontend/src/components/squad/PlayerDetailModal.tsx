@@ -26,12 +26,12 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
 
   // lazy-load next fixtures when opened
   React.useEffect(() => {
+    setNextFixt(null);
+    setErr(null);
     let abort = false;
     async function run() {
-      if (!open) return;
-      if (!player?.team_id) return;
+      if (!open || !player?.team_id) return;
       setLoading(true);
-      setErr(null);
       try {
         const r = await fetch(`${_apiBase}/api/team-next/${player.team_id}?count=3`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -165,6 +165,9 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
             </div>
             {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
             {err && <div className="text-sm text-destructive">{" "}{err}</div>}
+            {!loading && !err && !player?.team_id && (
+              <div className="text-sm text-muted-foreground">Not available.</div>
+            )}
             {!loading && !err && nextFixt && nextFixt.length === 0 && (
               <div className="text-sm text-muted-foreground">No upcoming fixtures found.</div>
             )}
