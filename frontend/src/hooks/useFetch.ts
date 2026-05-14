@@ -2,6 +2,7 @@
 import * as React from "react";
 
 const _apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+const _apiSecret = (import.meta.env.VITE_API_SECRET as string | undefined) ?? "";
 
 export function useFetch<T>(url?: string | null) {
   const prefixedUrl = url ? `${_apiBase}${url}` : url;
@@ -16,7 +17,8 @@ export function useFetch<T>(url?: string | null) {
     (async () => {
       try {
         setLoading(true); setError(null);
-        const r = await fetch(prefixedUrl, { signal: ac.signal });
+        const headers: Record<string, string> = _apiSecret ? { "X-Api-Key": _apiSecret } : {};
+        const r = await fetch(prefixedUrl, { signal: ac.signal, headers });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         setData(await r.json());
       } catch (e: any) {
