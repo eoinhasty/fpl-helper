@@ -43,7 +43,5 @@ export function useSquad(entry: number | "") {
     } finally { if (id === reqId.current) setLoading(false); }
   }, [entry]);
 
-  useEffect(() => { if (entry !== "") loadSquad(); }, [entry, loadSquad]);
-
   return { data, loading, error, cache, loadSquad, loadLive };
 }
