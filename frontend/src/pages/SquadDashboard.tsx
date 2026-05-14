@@ -5,14 +5,10 @@ import LeaguesCard from "../components/left/LeaguesCard";
 import XIList from "../components/squad/XIList";
 import PitchView from "../components/pitch/PitchView";
 import SquadStatusBar from "../components/squad/SquadStatusBar";
-import CaptaincyCard from "../components/right/CaptaincyCard";
-import HealthCard from "../components/right/HealthCard";
+import RightPanel from "../components/right/RightPanel";
 import { useEntryId } from "../hooks/useEntryID";
 import { useSquad } from "../hooks/useSquad";
 import { usePreferences } from "../hooks/usePreferences";
-import NextMatchCard from "../components/right/NextMatchCard";
-import HotNewsCard from "../components/right/HotNewsCard";
-import StandingsCard from "../components/right/StandingsCard";
 import { Segmented } from "../components/controls/Segmented";
 import { useSetNavCenter, useSetNavActions } from "../contexts/NavCenterContext";
 
@@ -62,17 +58,11 @@ export default function SquadDashboard() {
   const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
 
   const right = (
-    <>
-      <CaptaincyCard
-        players={data?.players}
-        isHistorical={isHistorical}
-        onPlayerClick={openPlayer}
-      />
-      <HealthCard players={data?.players} />
-      <HotNewsCard />
-      <NextMatchCard />
-      <StandingsCard />
-    </>
+    <RightPanel
+      players={data?.players}
+      isHistorical={isHistorical}
+      onPlayerClick={openPlayer}
+    />
   );
 
   const navMiddle = useMemo(() => (
