@@ -1,7 +1,9 @@
 from __future__ import annotations
-import asyncio, time
+import asyncio
+import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
+
 
 @dataclass
 class CacheEntry:
@@ -9,6 +11,7 @@ class CacheEntry:
     created_at: float
     fresh_until: float
     stale_until: float
+
 
 class AsyncCache:
     """
@@ -18,6 +21,7 @@ class AsyncCache:
       - Optional forced refresh (for 'Refresh' button)
     Keep it simple and readable.
     """
+
     def __init__(self):
         self._store: Dict[str, CacheEntry] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
@@ -31,7 +35,9 @@ class AsyncCache:
     def _now(self) -> float:
         return time.time()
 
-    def set(self, key: str, data: Any, ttl: float, stale_ttl: Optional[float] = None) -> None:
+    def set(
+        self, key: str, data: Any, ttl: float, stale_ttl: Optional[float] = None
+    ) -> None:
         if stale_ttl is None:
             stale_ttl = ttl * 2
         now = self._now()
@@ -44,7 +50,7 @@ class AsyncCache:
 
     def get_meta(self, key: str) -> Tuple[Optional[CacheEntry], float]:
         entry = self._store.get(key)
-        return entry, (self._now() - entry.created_at) if entry else (None, 0.0)
+        return entry, (self._now() - entry.created_at if entry else 0.0)
 
     async def get_or_set(
         self,
@@ -70,12 +76,14 @@ class AsyncCache:
         # Stale serve + background refresh
         if entry and now < entry.stale_until:
             if key not in self._bg:  # start one background refresh
+
                 async def _bg():
                     try:
                         data = await fetcher()
                         self.set(key, data, ttl, stale_ttl)
                     finally:
                         self._bg.pop(key, None)
+
                 self._bg[key] = asyncio.create_task(_bg())
             return entry.data, "stale-serve", age
 
