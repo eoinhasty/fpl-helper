@@ -2,7 +2,7 @@
 from __future__ import annotations
 import os
 from typing import Optional, List
-from fastapi import APIRouter, Response, Request, Depends
+from fastapi import APIRouter, Response, Request, Depends, HTTPException
 from app.deps import limiter, verify_api_key, nocache_guard
 from app.services.service import (
     FPLService,
@@ -54,10 +54,12 @@ async def squad(
     # bootstrap (cached)
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
-    current_event = next(e for e in events if e["is_current"])
-    next_event = next(e for e in events if e["is_next"])
-    current_gw_id = current_event["id"]
-    next_gw_id = next_event["id"]
+    current_event = next((e for e in events if e["is_current"]), None)
+    next_event = next((e for e in events if e["is_next"]), None)
+    if not current_event and not next_event:
+        raise HTTPException(404, detail="No active gameweek found.")
+    current_gw_id = current_event["id"] if current_event else next_event["id"]
+    next_gw_id = next_event["id"] if next_event else current_event["id"]
 
     # picks (cached with tiny TTL; allow bypass)
     if gw is not None:
@@ -66,11 +68,13 @@ async def squad(
         )
         used_gw, used_label = gw, "explicit"
     else:
-        picks_data, used_gw, used_label = await svc.picks_with_fallback(
-            entry_id, next_gw_id, current_gw_id
-        )
-        # reflect cache from the actual used gw
-        _, pick_status, pick_age = await svc.picks(entry_id, used_gw)
+        (
+            picks_data,
+            used_gw,
+            used_label,
+            pick_status,
+            pick_age,
+        ) = await svc.picks_with_fallback(entry_id, next_gw_id, current_gw_id)
 
     live_data, _, _ = await svc.live_event(used_gw)
 
@@ -103,7 +107,9 @@ async def squad(
     enriched, team_value, team_bank = svc.enrich_picks(
         picks_data, boot, fixtures_data, live_data
     )
-    used_event = next(e for e in events if e["id"] == used_gw)
+    used_event = next((e for e in events if e["id"] == used_gw), None)
+    if used_event is None:
+        raise HTTPException(404, detail=f"Gameweek {used_gw} not found.")
 
     set_cache_headers(response, pick_status, pick_age, TTL_PICKS)
     return {
@@ -139,8 +145,10 @@ async def live(
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
     used_event = next((e for e in events if e["is_next"]), None) or next(
-        e for e in events if e["is_current"]
+        (e for e in events if e["is_current"]), None
     )
+    if used_event is None:
+        raise HTTPException(404, detail="No active gameweek found.")
     used_gw = used_event["id"]
 
     # token: prefer per-request header, fall back to server env var
@@ -186,7 +194,8 @@ async def live(
     team_value = transfers.get("value")
     team_bank = transfers.get("bank")
 
-    current_gw_id = next(e for e in events if e["is_current"])["id"]
+    current_event = next((e for e in events if e["is_current"]), None)
+    current_gw_id = current_event["id"] if current_event else used_gw
 
     set_cache_headers(response, mt_status, mt_age, TTL_MYTEAM)
     return {

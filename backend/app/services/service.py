@@ -1,11 +1,16 @@
 # service.py
 from __future__ import annotations
-import os, asyncio, hashlib
+import os
+import asyncio
+import hashlib
+import logging
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
 from datetime import datetime, timezone
 from app.simple_cache import AsyncCache
+
+logger = logging.getLogger("uvicorn.error")
 
 FPL_BASE = "https://fantasy.premierleague.com/api"
 
@@ -18,16 +23,17 @@ TTL_PICKS = 60  # 60s fresh
 SWR_PICKS = 5 * 60  # +5m
 TTL_MYTEAM = 30  # 30s fresh
 SWR_MYTEAM = 2 * 60  # +2m
-TTL_ENTRY = 60 * 60       # 1h
-SWR_ENTRY = 6 * 60 * 60   # +6h
-TTL_ENTRY_HIST = 15 * 60   # 15m
+TTL_ENTRY = 60 * 60  # 1h
+SWR_ENTRY = 6 * 60 * 60  # +6h
+TTL_ENTRY_HIST = 15 * 60  # 15m
 SWR_ENTRY_HIST = 2 * 60 * 60  # +2h
-TTL_NEXTMATCH = 5 * 60        # 5m fresh (fixtures change rarely but scorelines can)
+TTL_NEXTMATCH = 5 * 60  # 5m fresh (fixtures change rarely but scorelines can)
 SWR_NEXTMATCH = 30 * 60
-TTL_NEWS = 30 * 60            # 30m fresh
+TTL_NEWS = 30 * 60  # 30m fresh
 SWR_NEWS = 6 * 60 * 60
-TTL_STANDINGS = 60 * 60       # 1h fresh
+TTL_STANDINGS = 60 * 60  # 1h fresh
 SWR_STANDINGS = 6 * 60 * 60
+
 
 def _ua() -> Dict[str, str]:
     return {"User-Agent": "Personal FPL Helper"}
@@ -35,22 +41,21 @@ def _ua() -> Dict[str, str]:
 
 def _auth_headers_from(token: Optional[str]) -> Dict[str, str]:
     if not token:
-        raise HTTPException(400, detail="No FPL token provided. Enter your bearer token in Settings.")
+        raise HTTPException(
+            400, detail="No FPL token provided. Enter your bearer token in Settings."
+        )
     return {"X-Api-Authorization": token}
 
 
 class FPLService:
     def __init__(self) -> None:
         self.public = httpx.AsyncClient(base_url=FPL_BASE, headers=_ua(), timeout=20.0)
-        self._auth_client: Optional[httpx.AsyncClient] = None
         self.cache = AsyncCache()
 
-    async def _get_json_auth(self, path: str, token: Optional[str], params: Optional[dict] = None) -> Any:
-        if not self._auth_client:
-            self._auth_client = httpx.AsyncClient(
-                base_url=FPL_BASE, headers=_ua(), timeout=20.0
-            )
-        r = await self._auth_client.get(
+    async def _get_json_auth(
+        self, path: str, token: Optional[str], params: Optional[dict] = None
+    ) -> Any:
+        r = await self.public.get(
             path, params=params, headers=_auth_headers_from(token)
         )
         if r.status_code in (401, 403):
@@ -63,8 +68,6 @@ class FPLService:
 
     async def close(self):
         await self.public.aclose()
-        if self._auth_client:
-            await self._auth_client.aclose()
 
     # ----------- low-level GET with polite backoff -----------
     async def _get_json(self, path: str, params: Optional[dict] = None) -> Any:
@@ -121,12 +124,12 @@ class FPLService:
         if no_cache:
             return await self.cache.refresh(key, fetch, TTL_MYTEAM, SWR_MYTEAM)
         return await self.cache.get_or_set(key, fetch, TTL_MYTEAM, SWR_MYTEAM)
-    
+
     async def entry(self, entry_id: int) -> Tuple[dict, str, float]:
         key = f"entry:{entry_id}"
         fetch = lambda: self._get_json(f"/entry/{entry_id}/")
         return await self.cache.get_or_set(key, fetch, TTL_ENTRY, SWR_ENTRY)
-    
+
     async def entry_history(self, entry_id: int) -> Tuple[dict, str, float]:
         key = f"entryhist:{entry_id}"
         fetch = lambda: self._get_json(f"/entry/{entry_id}/history/")
@@ -136,9 +139,13 @@ class FPLService:
         # pick next event (else current), then earliest kickoff fixture
         boot, _, _ = await self.bootstrap()
         events = boot["events"]
-        ev = next((e for e in events if e["is_next"]), None) or next((e for e in events if e["is_current"]), None)
+        ev = next((e for e in events if e["is_next"]), None) or next(
+            (e for e in events if e["is_current"]), None
+        )
         if ev is None:
-            raise HTTPException(status_code=404, detail="No current or next gameweek found.")
+            raise HTTPException(
+                status_code=404, detail="No current or next gameweek found."
+            )
         gw = ev["id"]
         fixtures, _, _ = await self.fixtures(gw)
         fixtures = [f for f in fixtures if f.get("kickoff_time")]
@@ -153,30 +160,36 @@ class FPLService:
         now = datetime.now(timezone.utc)
         for p in boot["elements"]:
             news = (p.get("news") or "").strip()
-            if not news: continue
+            if not news:
+                continue
             added = p.get("news_added")
             recent = True
             if added:
                 try:
-                    dt = datetime.fromisoformat(added.replace("Z","+00:00"))
+                    dt = datetime.fromisoformat(added.replace("Z", "+00:00"))
                     recent = (now - dt).days <= days
                 except Exception:
                     pass
-            if not recent: continue
+            if not recent:
+                continue
             t = teams.get(p["team"])
-            out.append({
-                "id": p["id"],
-                "name": p["web_name"],
-                "team": t["short_name"] if t else None,
-                "position": p["element_type"],
-                "news": news,
-                "news_added": added,
-                "status": p["status"],
-                "start_probability": self.start_prob_from(p),
-            })
+            out.append(
+                {
+                    "id": p["id"],
+                    "name": p["web_name"],
+                    "team": t["short_name"] if t else None,
+                    "position": p["element_type"],
+                    "news": news,
+                    "news_added": added,
+                    "status": p["status"],
+                    "start_probability": self.start_prob_from(p),
+                }
+            )
         # simple relevance: newest first, then “injury/transfer” hints first
-        pri = lambda n: (("injury" in n["news"].lower()) or ("transfer" in n["news"].lower()))
-        out.sort(key=lambda x: (not pri(x), x["news_added"] or ""), reverse=False)
+        pri = lambda n: (
+            ("injury" in n["news"].lower()) or ("transfer" in n["news"].lower())
+        )
+        out.sort(key=lambda x: (pri(x), x["news_added"] or ""), reverse=True)
         return out[: max(1, limit)]
 
     async def standings_pl(self, token: str | None) -> dict:
@@ -185,16 +198,21 @@ class FPLService:
         Option B: stub data if no key (so the card still renders).
         """
         if token:
-            client = self.public  # reuse base client
-            r = await client.get("https://api.football-data.org/v4/competitions/2021/standings",
-                                headers={"X-Auth-Token": token, **_ua()})
+            async with httpx.AsyncClient(timeout=20.0) as fd_client:
+                r = await fd_client.get(
+                    "https://api.football-data.org/v4/competitions/2021/standings",
+                    headers={"X-Auth-Token": token, **_ua()},
+                )
             r.raise_for_status()
-            print("Fetched real PL standings from football-data.org")
+            logger.info("Fetched real PL standings from football-data.org")
             js = r.json()
             # shape to a compact table
             standing = next((s for s in js["standings"] if s["type"] == "TOTAL"), None)
             if not standing:
-                raise HTTPException(status_code=502, detail="Unexpected standings shape from football-data.org")
+                raise HTTPException(
+                    status_code=502,
+                    detail="Unexpected standings shape from football-data.org",
+                )
             table = standing["table"]
             return {
                 "source": "football-data.org",
@@ -203,21 +221,56 @@ class FPLService:
                         "pos": row["position"],
                         "team": row["team"]["shortName"] or row["team"]["name"],
                         "played": row["playedGames"],
-                        "w": row["won"], "d": row["draw"], "l": row["lost"],
-                        "gf": row["goalsFor"], "ga": row["goalsAgainst"], "pts": row["points"],
-                    } for row in table
+                        "w": row["won"],
+                        "d": row["draw"],
+                        "l": row["lost"],
+                        "gf": row["goalsFor"],
+                        "ga": row["goalsAgainst"],
+                        "pts": row["points"],
+                    }
+                    for row in table
                 ],
             }
         # Fallback stub
         return {
             "source": "stub",
             "rows": [
-                {"pos":1,"team":"Man City","played":18,"w":14,"d":2,"l":2,"gf":43,"ga":15,"pts":44},
-                {"pos":2,"team":"Arsenal","played":18,"w":13,"d":4,"l":1,"gf":38,"ga":12,"pts":43},
-                {"pos":3,"team":"Liverpool","played":18,"w":12,"d":5,"l":1,"gf":41,"ga":17,"pts":41},
+                {
+                    "pos": 1,
+                    "team": "Man City",
+                    "played": 18,
+                    "w": 14,
+                    "d": 2,
+                    "l": 2,
+                    "gf": 43,
+                    "ga": 15,
+                    "pts": 44,
+                },
+                {
+                    "pos": 2,
+                    "team": "Arsenal",
+                    "played": 18,
+                    "w": 13,
+                    "d": 4,
+                    "l": 1,
+                    "gf": 38,
+                    "ga": 12,
+                    "pts": 43,
+                },
+                {
+                    "pos": 3,
+                    "team": "Liverpool",
+                    "played": 18,
+                    "w": 12,
+                    "d": 5,
+                    "l": 1,
+                    "gf": 41,
+                    "ga": 17,
+                    "pts": 41,
+                },
             ],
         }
-        
+
     async def live_event(self, gw: int) -> Tuple[dict, str, float]:
         key = f"live:{gw}"
         return await self.cache.get_or_set(
@@ -227,7 +280,6 @@ class FPLService:
             SWR_PICKS,
         )
 
-
     # ----------------- utilities for shaping data -----------------
     @staticmethod
     def start_prob_from(player: dict, played_gws: int = 1) -> float:
@@ -235,7 +287,9 @@ class FPLService:
         news = (player.get("news") or "").lower()
 
         # Heuristic: status base blended with actual play-time ratio to catch rotation risk
-        status_base = {"a": 0.88, "d": 0.55, "i": 0.0, "s": 0.0, "n": 0.0}.get(status, 0.5)
+        status_base = {"a": 0.88, "d": 0.55, "i": 0.0, "s": 0.0, "n": 0.0}.get(
+            status, 0.5
+        )
         minutes = player.get("minutes", 0)
         if status == "a" and played_gws > 0 and minutes > 0:
             time_ratio = min(minutes / (played_gws * 90), 0.99)
@@ -247,7 +301,9 @@ class FPLService:
             base *= 0.2
         elif any(k in news for k in ["doubt", "late test", "assess"]):
             base *= 0.7
-        elif any(k in news for k in ["back in training", "available", "returned", "fit"]):
+        elif any(
+            k in news for k in ["back in training", "available", "returned", "fit"]
+        ):
             base = max(base, 0.9)
 
         # FPL's chance field reflects availability, not starting likelihood — use as a multiplier
@@ -267,9 +323,7 @@ class FPLService:
             for e in (live.get("elements") or [])
         }
 
-        played_gws = next(
-            (e["id"] for e in boot.get("events", []) if e.get("is_current")), 1
-        )
+        played_gws = max(1, sum(1 for e in boot.get("events", []) if e.get("finished")))
 
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
@@ -277,18 +331,22 @@ class FPLService:
         fdr_by_team: Dict[int, list] = {}
         for fx in fixtures:
             h, a = fx["team_h"], fx["team_a"]
-            fdr_by_team.setdefault(h, []).append({
-                "opp": teams[a]["short_name"],
-                "home": True,
-                "difficulty": fx["team_h_difficulty"],
-                "kickoff": fx["kickoff_time"],
-            })
-            fdr_by_team.setdefault(a, []).append({
-                "opp": teams[h]["short_name"],
-                "home": False,
-                "difficulty": fx["team_a_difficulty"],
-                "kickoff": fx["kickoff_time"],
-            })
+            fdr_by_team.setdefault(h, []).append(
+                {
+                    "opp": teams[a]["short_name"],
+                    "home": True,
+                    "difficulty": fx["team_h_difficulty"],
+                    "kickoff": fx["kickoff_time"],
+                }
+            )
+            fdr_by_team.setdefault(a, []).append(
+                {
+                    "opp": teams[h]["short_name"],
+                    "home": False,
+                    "difficulty": fx["team_a_difficulty"],
+                    "kickoff": fx["kickoff_time"],
+                }
+            )
 
         enriched = []
         for pick in picks.get("picks", []):
@@ -307,30 +365,49 @@ class FPLService:
             )
             enriched.append(
                 {
-                    "element": el,                                      # player ID (e.g. 254)
-                    "name": p.get("web_name"),                          # player short name (e.g. "Salah")
-                    "team": t.get("short_name"),                        # team short name (e.g. "LIV")
-                    "team_id": p.get("team"),                           # team ID (e.g. 14)
-                    "position": p.get("element_type"),                  # position ID (1=GK, 2=DEF, 3=MID, 4=FWD)
-                    "price": p.get("now_cost"),                         # current price (e.g. 125 = £12.5m)
-                    "status": p.get("status"),                          # "a", "d", "i", "s", "n"
-                    "news": p.get("news"),                              # injury news (e.g. "" or "Knee Injury - Expected back 01 Jan")
-                    "total_points": p.get("total_points"),              # total points this season
-                    "gw_points": live_points.get(el),                   # points this GW (live)
-                    "selected_by_percent": p.get("selected_by_percent"),# e.g. "28.5"
-                    "start_probability": FPLService.start_prob_from(p, played_gws), # estimated start probability
-                    "form": p.get("form"),                              # rolling avg points last 3 GWs (e.g. "6.5")
-                    "minutes": p.get("minutes"),                        # total minutes played this season
-                    "ict_index": p.get("ict_index"),                    # influence/creativity/threat index
-                    "ep_next": p.get("ep_next"),                        # FPL expected points next GW (e.g. "5.2" or None)
-                    "is_captain": pick.get("is_captain"),               # is captain this GW? (e.g. True/False)
-                    "is_vice_captain": pick.get("is_vice_captain"),     # is vice-captain this GW? (e.g. True/False)
-                    "fixture": fdr,                                     # next fixture or None (e.g. {"opp": "CHE", "home": True, "difficulty": 3, "kickoff": "..."})
-                    "has_dgw": len(team_fixtures) > 1,                  # True if player has 2+ fixtures this GW
-                    "fixtures": team_fixtures,                          # all fixtures this GW (list)
-                    "slot": pick.get("position"),                       # squad slot 1-15 (starting 1-11, bench 12-15)
-                    "multiplier": pick.get("multiplier"),               # points multiplier (2 if captain, 1 otherwise)
-                    "shirt_url": shirt_url,                             # shirt image URL
+                    "element": el,  # player ID (e.g. 254)
+                    "name": p.get("web_name"),  # player short name (e.g. "Salah")
+                    "team": t.get("short_name"),  # team short name (e.g. "LIV")
+                    "team_id": p.get("team"),  # team ID (e.g. 14)
+                    "position": p.get(
+                        "element_type"
+                    ),  # position ID (1=GK, 2=DEF, 3=MID, 4=FWD)
+                    "price": p.get("now_cost"),  # current price (e.g. 125 = £12.5m)
+                    "status": p.get("status"),  # "a", "d", "i", "s", "n"
+                    "news": p.get(
+                        "news"
+                    ),  # injury news (e.g. "" or "Knee Injury - Expected back 01 Jan")
+                    "total_points": p.get("total_points"),  # total points this season
+                    "gw_points": live_points.get(el),  # points this GW (live)
+                    "selected_by_percent": p.get("selected_by_percent"),  # e.g. "28.5"
+                    "start_probability": FPLService.start_prob_from(
+                        p, played_gws
+                    ),  # estimated start probability
+                    "form": p.get("form"),  # rolling avg points last 3 GWs (e.g. "6.5")
+                    "minutes": p.get("minutes"),  # total minutes played this season
+                    "ict_index": p.get(
+                        "ict_index"
+                    ),  # influence/creativity/threat index
+                    "ep_next": p.get(
+                        "ep_next"
+                    ),  # FPL expected points next GW (e.g. "5.2" or None)
+                    "is_captain": pick.get(
+                        "is_captain"
+                    ),  # is captain this GW? (e.g. True/False)
+                    "is_vice_captain": pick.get(
+                        "is_vice_captain"
+                    ),  # is vice-captain this GW? (e.g. True/False)
+                    "fixture": fdr,  # next fixture or None (e.g. {"opp": "CHE", "home": True, "difficulty": 3, "kickoff": "..."})
+                    "has_dgw": len(team_fixtures)
+                    > 1,  # True if player has 2+ fixtures this GW
+                    "fixtures": team_fixtures,  # all fixtures this GW (list)
+                    "slot": pick.get(
+                        "position"
+                    ),  # squad slot 1-15 (starting 1-11, bench 12-15)
+                    "multiplier": pick.get(
+                        "multiplier"
+                    ),  # points multiplier (2 if captain, 1 otherwise)
+                    "shirt_url": shirt_url,  # shirt image URL
                 }
             )
 
@@ -339,12 +416,12 @@ class FPLService:
 
     async def picks_with_fallback(
         self, entry_id: int, next_gw: int, current_gw: int
-    ) -> Tuple[dict, int, str]:
-        """Try next GW; if 404, fall back to current GW. Return (picks, used_gw, label)."""
+    ) -> Tuple[dict, int, str, str, float]:
+        """Try next GW; if 404, fall back to current GW. Return (picks, used_gw, label, cache_status, age)."""
         for gw, label in ((next_gw, "next"), (current_gw, "current")):
             try:
-                data, _, _ = await self.picks(entry_id, gw)
-                return data, gw, label
+                data, status, age = await self.picks(entry_id, gw)
+                return data, gw, label, status, age
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 404:
                     continue
