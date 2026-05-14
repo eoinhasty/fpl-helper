@@ -5,7 +5,8 @@ import LeaguesCard from "../components/left/LeaguesCard";
 import XIList from "../components/squad/XIList";
 import PitchView from "../components/pitch/PitchView";
 import SquadStatusBar from "../components/squad/SquadStatusBar";
-import InsightsCarousel from "../components/right/InsightsCarousel";
+import CaptaincyCard from "../components/right/CaptaincyCard";
+import HealthCard from "../components/right/HealthCard";
 import { useEntryId } from "../hooks/useEntryID";
 import { useSquad } from "../hooks/useSquad";
 import { usePreferences } from "../hooks/usePreferences";
@@ -58,15 +59,18 @@ export default function SquadDashboard() {
 
   const left = <LeaguesCard entry={entry} />;
 
+  const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
+
   const right = (
     <>
-      <InsightsCarousel
+      <CaptaincyCard
         players={data?.players}
-        isHistorical={data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0)}
+        isHistorical={isHistorical}
         onPlayerClick={openPlayer}
       />
-      <NextMatchCard />
+      <HealthCard players={data?.players} />
       <HotNewsCard />
+      <NextMatchCard />
       <StandingsCard />
     </>
   );
