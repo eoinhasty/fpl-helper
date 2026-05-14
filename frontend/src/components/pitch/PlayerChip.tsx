@@ -142,7 +142,7 @@ export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => 
       : isBench
         ? `Bench: ${p.gw_points} points (not counted)`
         : p.is_captain
-          ? `Captain: ${p.gw_points} × 2 = ${displayPoints}`
+          ? `Captain: ${p.gw_points} × ${p.multiplier ?? 2} = ${displayPoints}`
           : `GW points: ${displayPoints}`;
 
   return (
