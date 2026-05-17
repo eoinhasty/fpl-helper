@@ -2,7 +2,6 @@
 import * as React from "react";
 import SettingsModal from "../settings/SettingsModal";
 import { useEntryId } from "../../hooks/useEntryID";
-import { useNavCenter } from "../../contexts/NavCenterContext";
 
 type Props = {
   title?: string;
@@ -17,22 +16,20 @@ export default function TopNav({
 }: Props) {
   const { entry, setEntry } = useEntryId();
   const [open, setOpen] = React.useState(false);
-  const { navCenter, navActions } = useNavCenter();
 
   return (
     <>
       <header
         className={[
-          "sticky top-0 z-40 border-b border-border bg-background/70 backdrop-blur",
+          "border-b border-border",
           className,
         ].filter(Boolean).join(" ")}
         role="banner"
       >
         <div
-          className="mx-auto px-4 py-3 flex items-center gap-4"
+          className="mx-auto px-4 py-3 flex items-center justify-between"
           style={{ maxWidth: `${maxWidthPx}px` }}
         >
-          {/* Brand */}
           <a
             href="/"
             className="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg"
@@ -44,25 +41,14 @@ export default function TopNav({
             <div className="font-semibold text-foreground">{title}</div>
           </a>
 
-          {/* Context-injected center content */}
-          {navCenter && (
-            <div className="hidden md:flex items-center gap-2.5 text-sm flex-1 min-w-0">
-              {navCenter}
-            </div>
-          )}
-
-          {/* Right actions */}
-          <div className="ml-auto flex items-center gap-2">
-            {navActions}
-            <IconBtn
-              label="Settings"
-              onClick={() => setOpen(true)}
-              title="Settings"
-              ariaLabel="Open settings"
-            >
-              ⚙️
-            </IconBtn>
-          </div>
+          <IconBtn
+            label="Settings"
+            onClick={() => setOpen(true)}
+            title="Settings"
+            ariaLabel="Open settings"
+          >
+            ⚙️
+          </IconBtn>
         </div>
       </header>
 
