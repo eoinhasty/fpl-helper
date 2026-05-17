@@ -119,9 +119,7 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
                       className="absolute -translate-x-1/2 -translate-y-1/2"
                       style={{ left: `${leftPct}%`, top: `${topPct}%` }}
                     >
-                      <div className="pointer-events-auto">
-                        <PlayerChip p={p} onClick={() => onPlayerClick?.(p)} />
-                      </div>
+                      <PlayerChip p={p} onClick={() => onPlayerClick?.(p)} />
                     </div>
                   );
                 });

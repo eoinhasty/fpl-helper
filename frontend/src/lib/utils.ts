@@ -1,4 +1,7 @@
 // lib/utils.ts
+import type { Player } from "./types";
+
+export const isStarting = (p: Player): boolean => (p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11;
 
 export const pctColor = (p: number) =>
   p >= 0.75 ? "bg-accent" : p >= 0.60 ? "bg-warn" : "bg-danger";
@@ -25,32 +28,5 @@ export function statusToText(s: string | undefined) {
     case "s": return "Suspended";
     case "n": return "Not in squad";
     default:  return "Unknown";
-  }
-}
-
-export function teamShortToLong(t: string) {
-  switch (t) {
-    case "ARS": return "Arsenal";
-    case "AVL": return "Aston Villa";
-    case "BRE": return "Brentford";
-    case "BHA": return "Brighton";
-    case "BUR": return "Burnley";
-    case "CHE": return "Chelsea";
-    case "CRY": return "Crystal Palace";
-    case "EVE": return "Everton";
-    case "FUL": return "Fulham";
-    case "LEE": return "Leeds";
-    case "LEI": return "Leicester";
-    case "LIV": return "Liverpool";
-    case "MCI": return "Manchester City";
-    case "MUN": return "Manchester United";
-    case "NEW": return "Newcastle";
-    case "NFO": return "Nottingham Forest";
-    case "SOU": return "Southampton";
-    case "TOT": return "Tottenham";
-    case "WAT": return "Watford";
-    case "WHU": return "West Ham";
-    case "WOL": return "Wolves";
-    default:    return t;
   }
 }

@@ -19,7 +19,7 @@ export function useSquad(entry: number | "") {
     const id = ++reqId.current;
     const { gw, forceRefresh } = opts;
     try {
-      setLoading(true); setError(null); setData(null);
+      setLoading(true); setError(null);
       const res = await getSquad(String(entry), { gw, forceRefresh });
       if (id !== reqId.current) return; // stale response
       setData(res.data as SquadResponse); setCache(res.cache);
@@ -33,7 +33,7 @@ export function useSquad(entry: number | "") {
     if (!entry) return;
     const id = ++reqId.current;
     try {
-      setLoading(true); setError(null); setData(null);
+      setLoading(true); setError(null);
       const res = await getLive(Number(entry), { forceRefresh });
       if (id !== reqId.current) return;
       setData(res.data as SquadResponse); setCache(res.cache);

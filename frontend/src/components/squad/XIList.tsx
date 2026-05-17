@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Player } from "../../lib/types";
+import { isStarting } from "../../lib/utils";
 import PlayerCard from "./PlayerCard";
 import Card from "../ui/Card";
 
@@ -24,18 +25,12 @@ export default function XIList({
   onPlayerClick?: (p: Player) => void;
 }) {
   const xi = useMemo(
-    () =>
-      (players || [])
-        .filter((p) => (p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11)
-        .sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99)),
+    () => (players || []).filter(isStarting).sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99)),
     [players]
   );
 
   const bench = useMemo(
-    () =>
-      (players || [])
-        .filter((p) => !((p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11))
-        .sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99)),
+    () => (players || []).filter((p) => !isStarting(p)).sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99)),
     [players]
   );
 

@@ -1,6 +1,6 @@
 // components/pitch/PlayerChip.tsx
 import type { Player } from "../../lib/types";
-import { CHIP } from "../../lib/constants";
+import { BENCH_LABEL, CHIP } from "../../lib/constants";
 
 const PURPLE = "#38003C";
 const AMBER = "#F59E0B";
@@ -122,12 +122,7 @@ function BenchOrderBadge({ label }: { label: string }) {
 export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => void }) {
   const isBench = (p.slot ?? 99) >= 12 || (p.multiplier ?? 1) === 0;
 
-  const benchLabel =
-    (p.slot ?? 0) === 12 ? "GKP"
-      : (p.slot ?? 0) === 13 ? "1"
-        : (p.slot ?? 0) === 14 ? "2"
-          : (p.slot ?? 0) === 15 ? "3"
-            : undefined;
+  const benchLabel = BENCH_LABEL[p.slot ?? 0];
 
   const displayPoints =
     p.gw_points == null

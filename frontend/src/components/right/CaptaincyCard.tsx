@@ -1,5 +1,6 @@
 import Card from "../ui/Card";
 import type { Player } from "../../lib/types";
+import { isStarting } from "../../lib/utils";
 
 function norm(v: number, arr: number[]) {
   const mn = Math.min(...arr), mx = Math.max(...arr);
@@ -9,9 +10,7 @@ function norm(v: number, arr: number[]) {
 const posMult = (pos?: number) => pos === 4 ? 1.0 : pos === 3 ? 0.92 : 0.72;
 
 function score(players: Player[]) {
-  const xi = players.filter(
-    (p) => ((p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11) && p.position !== 1
-  );
+  const xi = players.filter((p) => isStarting(p) && p.position !== 1);
 
   const raw = xi.map((p) => {
     const fxs = p.fixtures ?? (p.fixture ? [p.fixture] : []);

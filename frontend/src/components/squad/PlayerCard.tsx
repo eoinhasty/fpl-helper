@@ -30,45 +30,43 @@ export default function PlayerCard({
   ) : null;
 
   return (
-    <>
-      <div
-        onClick={onOpen}
-        className="rounded-xl p-3 cursor-pointer transition bg-card border border-border hover:shadow-card"
-        title="Click for details"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <img
-              src={p.shirt_url || ""}
-              alt={`${p.team} shirt`}
-              className="w-10 h-10 object-contain rounded-md border border-border bg-card p-0.5"
-            />
-            <div className="min-w-0">
-              <div className="font-semibold leading-tight truncate text-foreground">
-                {p.name}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {p.team} • {fmtPrice(p.price)}
-              </div>
+    <div
+      onClick={onOpen}
+      className="rounded-xl p-3 cursor-pointer transition bg-card border border-border hover:shadow-card"
+      title="Click for details"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <img
+            src={p.shirt_url || ""}
+            alt={`${p.team} shirt`}
+            className="w-10 h-10 object-contain rounded-md border border-border bg-card p-0.5"
+          />
+          <div className="min-w-0">
+            <div className="font-semibold leading-tight truncate text-foreground">
+              {p.name}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {p.team} • {fmtPrice(p.price)}
             </div>
           </div>
-
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {cap}
-            <FixturePill f={p.fixture ?? undefined} />
-          </div>
         </div>
 
-        <div className="mt-2">
-          <StartMeter probability={p.start_probability} />
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {cap}
+          <FixturePill f={p.fixture ?? undefined} />
         </div>
-
-        {p.news ? (
-          <div className="text-xs text-muted-foreground mt-2 line-clamp-2">
-            {p.news}
-          </div>
-        ) : null}
       </div>
-    </>
+
+      <div className="mt-2">
+        <StartMeter probability={p.start_probability} />
+      </div>
+
+      {p.news ? (
+        <div className="text-xs text-muted-foreground mt-2 line-clamp-2">
+          {p.news}
+        </div>
+      ) : null}
+    </div>
   );
 }
