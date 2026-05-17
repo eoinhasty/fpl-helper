@@ -10,7 +10,6 @@ import { useEntryId } from "../hooks/useEntryID";
 import { useSquad } from "../hooks/useSquad";
 import { usePreferences } from "../hooks/usePreferences";
 import { Segmented } from "../components/controls/Segmented";
-import { useSetNavCenter, useSetNavActions } from "../contexts/NavCenterContext";
 
 import type { Player } from "../lib/types";
 import PlayerDetailModal from "../components/squad/PlayerDetailModal";
@@ -65,57 +64,60 @@ export default function SquadDashboard() {
     />
   );
 
-  const navMiddle = useMemo(() => (
-    <SquadStatusBar
-      gw={data?.used_gw}
-      deadlineISO={data?.deadline}
-      teamValue={data?.team_value}
-      teamBank={data?.team_bank}
-      activeChip={data?.active_chip ?? null}
-      cache={cache ?? { status: null, ageSeconds: null }}
-      isLive={mode === "live"}
-    />
-  ), [data?.used_gw, data?.deadline, data?.team_value, data?.team_bank, data?.active_chip, cache, mode]);
-
-  const navActions = useMemo(() => (
-    <div className="flex items-center gap-2">
-      <Segmented<Mode>
-        value={mode}
-        onChange={setMode}
-        options={[
-          { label: "Squad", value: "squad" },
-          { label: "Live", value: "live" },
-        ]}
+  const contentHeader = useMemo(() => (
+    <div
+      className="sticky z-30 border-b border-border bg-background/80 backdrop-blur"
+      style={{ top: 0 }}
+    >
+    <div className="mx-auto px-4 py-2.5 flex items-center justify-between gap-4" style={{ maxWidth: 1400 }}>
+      <SquadStatusBar
+        gw={data?.used_gw}
+        deadlineISO={data?.deadline}
+        teamValue={data?.team_value}
+        teamBank={data?.team_bank}
+        activeChip={data?.active_chip ?? null}
+        cache={cache ?? { status: null, ageSeconds: null }}
+        isLive={mode === "live"}
       />
-      <select
-        className="bg-background text-foreground border border-border rounded-xl px-3 py-1.5 text-sm disabled:opacity-60"
-        value={gw ?? data?.used_gw ?? ""}
-        onChange={(e) => setGw(Number(e.target.value))}
-        disabled={mode === "live"}
-      >
-        {gwOptions.map((g) => (
-          <option key={g} value={g}>GW {g}</option>
-        ))}
-      </select>
-      <button
-        className="btn"
-        onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
-        title="Force fresh fetch"
-        aria-label="Refresh"
-      >
-        ↻
-      </button>
+      <div className="flex items-center gap-2 shrink-0">
+        <Segmented<Mode>
+          value={mode}
+          onChange={setMode}
+          options={[
+            { label: "Squad", value: "squad" },
+            { label: "Live", value: "live" },
+          ]}
+        />
+        <select
+          className="bg-background text-foreground border border-border rounded-xl px-3 py-1.5 text-sm disabled:opacity-60"
+          value={gw ?? data?.used_gw ?? ""}
+          onChange={(e) => setGw(Number(e.target.value))}
+          disabled={mode === "live"}
+        >
+          {gwOptions.map((g) => (
+            <option key={g} value={g}>GW {g}</option>
+          ))}
+        </select>
+        <button
+          className="btn"
+          onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
+          title="Force fresh fetch"
+          aria-label="Refresh"
+        >
+          ↻
+        </button>
+      </div>
     </div>
-  ), [mode, setMode, gw, data?.used_gw, gwOptions, loadLive, loadSquad]);
-
-  useSetNavCenter(navMiddle);
-  useSetNavActions(navActions);
+    </div>
+  ), [data?.used_gw, data?.deadline, data?.team_value, data?.team_bank, data?.active_chip, cache, mode, setMode, gw, gwOptions, loadLive, loadSquad]);
 
   return (
     <>
+      {contentHeader}
       <DashboardLayout
         left={left}
         right={right}
+        stickyOffsetPx={52}
       >
         {prefs.squadLayout === "pitch" ? (
           <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error} />
