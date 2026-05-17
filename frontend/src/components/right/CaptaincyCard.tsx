@@ -47,11 +47,63 @@ function score(players: Player[]) {
       const s = base * fdrFactor * homeBoost * dgwBoost * bgwPenalty * r.sp * posMult(r.p.position);
       return { p: r.p, score: s, epDisplay: r.epDisplay };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+    .sort((a, b) => b.score - a.score);
 }
 
+const DIFF_THRESHOLD = 15;
+
 const RANK_ICON = ["⭐", "🥈", "🥉"];
+
+function PlayerRow({
+  p,
+  epDisplay,
+  rank,
+  onPlayerClick,
+}: {
+  p: import("../../lib/types").Player;
+  epDisplay: number;
+  rank?: number;
+  onPlayerClick?: (p: import("../../lib/types").Player) => void;
+}) {
+  const fxs = p.fixtures ?? (p.fixture ? [p.fixture] : []);
+  return (
+    <li
+      onClick={() => onPlayerClick?.(p)}
+      className={`flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5${onPlayerClick ? " cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <img
+          src={p.shirt_url || ""}
+          alt=""
+          className="w-6 h-6 rounded border border-border bg-card object-contain"
+        />
+        <div className="truncate">
+          <div className="text-sm font-medium text-foreground truncate">
+            {rank !== undefined ? `${RANK_ICON[rank]} ` : "💡 "}{p.name}
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            {p.team} •{" "}
+            {p.has_dgw && fxs.length > 0
+              ? fxs.map((f) => `${f.home ? "vs" : "@"} ${f.opp}`).join(", ") + " • DGW"
+              : p.fixture
+                ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp} • FDR ${p.fixture.difficulty}`
+                : "BGW"}
+          </div>
+        </div>
+      </div>
+      <div className="text-xs text-muted-foreground text-right shrink-0">
+        {typeof p.selected_by_percent !== "undefined" && (
+          <div>{Number(p.selected_by_percent).toFixed(1)}% own</div>
+        )}
+        <div className="font-semibold text-foreground">
+          {epDisplay > 0
+            ? `${epDisplay.toFixed(1)} xPts`
+            : `${parseFloat(p.form ?? "0").toFixed(1)} form`}
+        </div>
+      </div>
+    </li>
+  );
+}
 
 export default function CaptaincyCard({
   players,
@@ -71,7 +123,15 @@ export default function CaptaincyCard({
     );
   }
 
-  const picks = players ? score(players) : [];
+  const all = players ? score(players) : [];
+  const picks = all.slice(0, 3);
+  const topIds = new Set(picks.map((r) => r.p.element));
+  const differential = all.find(
+    (r) =>
+      !topIds.has(r.p.element) &&
+      typeof r.p.selected_by_percent !== "undefined" &&
+      Number(r.p.selected_by_percent) < DIFF_THRESHOLD
+  ) ?? null;
 
   return (
     <Card className="p-4">
@@ -79,49 +139,23 @@ export default function CaptaincyCard({
       {picks.length === 0 ? (
         <div className="text-sm text-muted-foreground">No XI loaded yet.</div>
       ) : (
-        <ul className="space-y-2">
-          {picks.map(({ p, epDisplay }, i) => {
-            const fxs = p.fixtures ?? (p.fixture ? [p.fixture] : []);
-            return (
-              <li
-                key={p.element}
-                onClick={() => onPlayerClick?.(p)}
-                className={`flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5${onPlayerClick ? " cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <img
-                    src={p.shirt_url || ""}
-                    alt=""
-                    className="w-6 h-6 rounded border border-border bg-card object-contain"
-                  />
-                  <div className="truncate">
-                    <div className="text-sm font-medium text-foreground truncate">
-                      {RANK_ICON[i]} {p.name}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {p.team} •{" "}
-                      {p.has_dgw && fxs.length > 0
-                        ? fxs.map((f) => `${f.home ? "vs" : "@"} ${f.opp}`).join(", ") + " • DGW"
-                        : p.fixture
-                          ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp} • FDR ${p.fixture.difficulty}`
-                          : "BGW"}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground text-right shrink-0">
-                  {typeof p.selected_by_percent !== "undefined" && (
-                    <div>{Number(p.selected_by_percent).toFixed(1)}% own</div>
-                  )}
-                  <div className="font-semibold text-foreground">
-                    {epDisplay > 0
-                      ? `${epDisplay.toFixed(1)} xPts`
-                      : `${parseFloat(p.form ?? "0").toFixed(1)} form`}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className="space-y-2">
+            {picks.map(({ p, epDisplay }, i) => (
+              <PlayerRow key={p.element} p={p} epDisplay={epDisplay} rank={i} onPlayerClick={onPlayerClick} />
+            ))}
+          </ul>
+
+          {differential && (
+            <>
+              <div className="mt-3 mb-2 border-t border-border" />
+              <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Differential</div>
+              <ul>
+                <PlayerRow p={differential.p} epDisplay={differential.epDisplay} onPlayerClick={onPlayerClick} />
+              </ul>
+            </>
+          )}
+        </>
       )}
     </Card>
   );
