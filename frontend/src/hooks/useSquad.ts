@@ -1,5 +1,5 @@
 // hooks/useSquad.ts
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { SquadResponse } from "../lib/types";
 import { getSquad, getLive, type CacheMeta } from "../lib/api";
 
