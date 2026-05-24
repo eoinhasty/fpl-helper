@@ -389,12 +389,25 @@ class FPLService:
                     ),  # estimated start probability
                     "form": p.get("form"),  # rolling avg points last 3 GWs (e.g. "6.5")
                     "minutes": p.get("minutes"),  # total minutes played this season
-                    "ict_index": p.get(
-                        "ict_index"
-                    ),  # influence/creativity/threat index
                     "ep_next": p.get(
                         "ep_next"
                     ),  # FPL expected points next GW (e.g. "5.2" or None)
+                    "points_per_game": p.get(
+                        "points_per_game"
+                    ),  # season avg pts per game (e.g. "6.1")
+                    "goals_scored": p.get("goals_scored"),
+                    "assists": p.get("assists"),
+                    "clean_sheets": p.get("clean_sheets"),
+                    "bonus": p.get("bonus"),  # bonus points this season
+                    "transfers_in_event": p.get(
+                        "transfers_in_event"
+                    ),  # transfers in this GW
+                    "transfers_out_event": p.get(
+                        "transfers_out_event"
+                    ),  # transfers out this GW
+                    "cost_change_start": p.get(
+                        "cost_change_start"
+                    ),  # price change since season start (0.1m units)
                     "is_captain": pick.get(
                         "is_captain"
                     ),  # is captain this GW? (e.g. True/False)

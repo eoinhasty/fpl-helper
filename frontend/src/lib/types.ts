@@ -16,9 +16,15 @@ export type Player = {
     total_points?: number;
     form?: string;
     minutes?: number;
-    ict_index?: string;
     ep_next?: string | null;
-    influence?: string; creativity?: string; threat?: string;
+    points_per_game?: string;
+    goals_scored?: number;
+    assists?: number;
+    clean_sheets?: number;
+    bonus?: number;
+    transfers_in_event?: number;
+    transfers_out_event?: number;
+    cost_change_start?: number;
     selected_by_percent?: string;
     start_probability: number;
     gw_points?: number;
