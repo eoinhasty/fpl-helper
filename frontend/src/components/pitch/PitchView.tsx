@@ -5,6 +5,7 @@ import PlayerChip from "./PlayerChip";
 import type { Player } from "../../lib/types";
 import { type RowId, spreadXsSymmetric } from "../../lib/pitchLayout";
 import { PITCH } from "../../lib/constants";
+import { isStarting } from "../../lib/utils";
 import BenchStrip from "./BenchStrip";
 
 type Props = {
@@ -27,8 +28,7 @@ const CHIP_MARGIN_PX = 14;
 export default function PitchView({ players, brand = "YOUR BRAND", className, onPlayerClick, loading, error }: Props) {
   const all = players ?? [];
 
-  // XI is 1..11, bench is 12..15 (based on your existing slot usage)
-  const xi = all.filter((p) => (p.slot ?? 99) <= 11);
+  const xi = all.filter(isStarting);
   const benchPlayers = all
     .filter((p) => (p.slot ?? 99) >= 12 && (p.slot ?? 99) <= 15)
     .sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));

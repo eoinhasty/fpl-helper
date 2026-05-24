@@ -1,15 +1,10 @@
 import { useMemo } from "react";
 import type { Player } from "../../lib/types";
 import { isStarting } from "../../lib/utils";
+import { BENCH_LABEL } from "../../lib/constants";
 import PlayerCard from "./PlayerCard";
 import Card from "../ui/Card";
 
-function benchLabel(p: Player) {
-  if ((p.slot ?? 0) === 12 || p.position === 1) return "GK";
-  const n = (p.slot ?? 0) - 11;
-  if (n >= 2 && n <= 4) return `B${n - 1}`;
-  return null;
-}
 
 export default function XIList({
   players,
@@ -50,7 +45,7 @@ export default function XIList({
         <>
           <div className="text-sm text-foreground font-semibold mt-4 mb-2">Bench</div>
           {bench.map((p) => (
-            <PlayerCard key={p.element} p={p} benchBadge={benchLabel(p)} onOpen={() => onPlayerClick?.(p)} />
+            <PlayerCard key={p.element} p={p} benchBadge={BENCH_LABEL[p.slot ?? 0] ?? null} onOpen={() => onPlayerClick?.(p)} />
           ))}
         </>
       )}
