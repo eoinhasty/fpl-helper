@@ -17,6 +17,7 @@ export type Player = {
     news?: string | null;
     total_points?: number;
     form?: string;
+    ict_index?: string;
     minutes?: number;
     ep_next?: string | null;
     points_per_game?: string;

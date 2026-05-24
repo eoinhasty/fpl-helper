@@ -447,6 +447,9 @@ class FPLService:
                         p, played_gws
                     ),  # estimated start probability
                     "form": p.get("form"),  # rolling avg points last 3 GWs (e.g. "6.5")
+                    "ict_index": p.get(
+                        "ict_index"
+                    ),  # influence/creativity/threat index
                     "minutes": p.get("minutes"),  # total minutes played this season
                     "ep_next": p.get(
                         "ep_next"
