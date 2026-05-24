@@ -3,7 +3,7 @@
 import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 
-type Item = { id: number; name: string; team: string | null; position: number; news: string; news_added: string | null; status: string; start_probability: number; };
+type Item = { id: number; name: string; team: string | null; badge_url: string | null; position: number; news: string; news_added: string | null; status: string; start_probability: number; };
 type Resp = { items: Item[] };
 
 export default function HotNewsCard() {
@@ -14,8 +14,11 @@ export default function HotNewsCard() {
       <div className="space-y-3">
         {data?.items.map((t) => (
           <div key={t.id} className="flex gap-3">
-            <div className="w-12 h-12 rounded-lg bg-card border border-border grid place-content-center text-xs text-muted-foreground">
-              {t.team || "—"}
+            <div className="w-12 h-12 rounded-lg bg-card border border-border grid place-content-center shrink-0">
+              {t.badge_url
+                ? <img src={t.badge_url} alt={t.team || ""} className="w-8 h-8 object-contain" loading="lazy" />
+                : <span className="text-xs text-muted-foreground">{t.team || "—"}</span>
+              }
             </div>
             <div className="flex-1">
               <div className="text-sm text-foreground font-medium">

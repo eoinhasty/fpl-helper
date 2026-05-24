@@ -173,11 +173,15 @@ class FPLService:
             if not recent:
                 continue
             t = teams.get(p["team"])
+            team_code = t.get("code") if t else None
             out.append(
                 {
                     "id": p["id"],
                     "name": p["web_name"],
                     "team": t["short_name"] if t else None,
+                    "badge_url": f"https://resources.premierleague.com/premierleague/badges/50/t{team_code}.png"
+                    if team_code
+                    else None,
                     "position": p["element_type"],
                     "news": news,
                     "news_added": added,
