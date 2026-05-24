@@ -14,3 +14,14 @@ export const delta = (curr: number | null, prev: number | null) => {
 };
 export const pct = (p?: number | null) =>
   p == null ? "—" : `${Math.round(p * 100)}%`;
+
+export function fmtRelTime(iso: string | null | undefined): string {
+  if (!iso) return "recently";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 60) return mins <= 1 ? "just now" : `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
