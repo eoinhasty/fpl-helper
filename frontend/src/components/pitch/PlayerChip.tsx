@@ -1,6 +1,7 @@
 // components/pitch/PlayerChip.tsx
 import type { Player } from "../../lib/types";
 import { BENCH_LABEL, CHIP } from "../../lib/constants";
+import StartMeter from "../squad/StartMeter";
 
 const PURPLE = "#38003C";
 const AMBER = "#F59E0B";
@@ -90,21 +91,6 @@ function Points({
   );
 }
 
-function StartProbBar({ probability }: { probability?: number | null }) {
-  if (probability == null) return null;
-  const pct = Math.round(probability * 100);
-  const fill = probability >= 0.7 ? "#22c55e" : probability >= 0.4 ? "#f59e0b" : "#ef4444";
-  return (
-    <div className="flex items-center justify-center gap-1 mt-1">
-      <div className="w-9 h-[3px] rounded-full overflow-hidden bg-muted">
-        <div style={{ width: `${pct}%`, height: "100%", background: fill, borderRadius: 2 }} />
-      </div>
-      <span className="text-muted-foreground" style={{ fontSize: 9, fontVariantNumeric: "tabular-nums" }}>
-        {pct}%
-      </span>
-    </div>
-  );
-}
 
 function BenchOrderBadge({ label }: { label: string }) {
   return (
@@ -170,7 +156,9 @@ export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => 
               </div>
             </div>
           </div>
-          {!isBench && <StartProbBar probability={p.start_probability} />}
+          {!isBench && p.start_probability != null && (
+            <StartMeter probability={p.start_probability} showLabel className="justify-center mt-1 w-14 mx-auto" />
+          )}
         </div>
       </div>
     </div>

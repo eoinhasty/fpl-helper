@@ -1,40 +1,26 @@
-import React from "react";
-
 interface StartMeterProps {
-    probability: number; // 0 → 1
+  probability: number; // 0 → 1
+  showLabel?: boolean;
+  className?: string;
 }
 
-export const StartMeter: React.FC<StartMeterProps> = ({ probability }) => {
-    const pct = Math.round((probability || 0) * 100);
+export default function StartMeter({ probability, showLabel = false, className }: StartMeterProps) {
+  const pct = Math.round((probability ?? 0) * 100);
+  const fillClass =
+    probability >= 0.7 ? "bg-success" :
+    probability >= 0.4 ? "bg-warning" :
+    "bg-destructive";
 
-    return (
-        // Full-featured version with % label:
-        // <div className="relative w-full h-4 bg-gray-200 rounded-md overflow-hidden">
-        //   <div className={`h-full ${color} relative`} style={{ width: `${safePct}%` }}>
-        //     {pct >= 15 && (
-        //       <span className="absolute right-1 top-1/2 -translate-y-1/2 text-xs font-semibold text-white drop-shadow">
-        //         {pct}%
-        //       </span>
-        //     )}
-        //   </div>
-        //   {pct < 15 && (
-        //     <span className="absolute left-[calc(100%+0.25rem)] top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-600">
-        //       {pct}%
-        //     </span>
-        //   )}
-        // </div>
-
-        // Minimal tokenised bar:
-        <div className="h-2 rounded-full border border-border"
-             style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-2)' }}>
-            <div className="h-full rounded-full"
-                 style={{
-                     width: `${pct}%`,
-                     background: pct >= 80 ? 'var(--success)' :
-                                 pct >= 60 ? 'var(--warning)' : 'var(--danger)'
-                 }} />
-        </div>
-    );
-};
-
-export default StartMeter;
+  return (
+    <div className={`flex items-center gap-1 ${className ?? ""}`}>
+      <div className="flex-1 h-[3px] rounded-full bg-muted overflow-hidden">
+        <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${pct}%` }} />
+      </div>
+      {showLabel && (
+        <span className="text-muted-foreground tabular-nums" style={{ fontSize: 9 }}>
+          {pct}%
+        </span>
+      )}
+    </div>
+  );
+}
