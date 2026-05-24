@@ -1,7 +1,10 @@
 /* src/styles/ui.css */
 @layer components {
-  /* Page background — gradient using theme tokens so it adapts to dark mode */
+  /* Page background */
   .page-bg {
+    background: linear-gradient(160deg, #dbeafe 0%, #eff6ff 45%, var(--color-surface-2) 100%);
+  }
+  :root.dark .page-bg {
     background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface-2) 100%);
   }
 
@@ -45,7 +48,7 @@
   }
 
   /* Status pills */
-  .pill-good { @apply bg-success/12 text-success; }
-  .pill-warn { @apply bg-warning/12 text-warning; }
-  .pill-bad  { @apply bg-destructive/12 text-destructive; }
+  .pill-good { @apply bg-success/20 text-success; }
+  .pill-warn { @apply bg-warning/20 text-warning; }
+  .pill-bad  { @apply bg-destructive/20 text-destructive; }
 }
