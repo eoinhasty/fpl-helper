@@ -2,8 +2,7 @@ import * as React from "react";
 import type { Player, PlayerRank } from "../../lib/types";
 import { statusToText, fdrClass } from "../../lib/utils";
 import { fmtKickoff, fmtPrice, pct } from "../../lib/format";
-
-const _apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+import { useFetch } from "../../hooks/useFetch";
 
 const POS_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
@@ -186,35 +185,12 @@ function FixturePill({ f }: { f: TeamFixture }) {
 }
 
 export default function PlayerDetailModal({ open, onClose, player }: Props) {
-  const [loading, setLoading] = React.useState(false);
-  const [nextFixt, setNextFixt] = React.useState<TeamFixture[] | null>(null);
-  const [err, setErr] = React.useState<string | null>(null);
+  const fixtUrl = open && player?.team_id ? `/api/team-next/${player.team_id}?count=5` : null;
+  const { data: fixtData, loading, error: err } = useFetch<{ fixtures: TeamFixture[] }>(fixtUrl);
+  const nextFixt = fixtData?.fixtures ?? null;
+
   const [tab, setTab] = React.useState<Tab>("overview");
   const [statsOpen, setStatsOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    setNextFixt(null);
-    setErr(null);
-    setTab("overview");
-    setStatsOpen(false);
-    let abort = false;
-    async function run() {
-      if (!open || !player?.team_id) return;
-      setLoading(true);
-      try {
-        const r = await fetch(`${_apiBase}/api/team-next/${player.team_id}?count=5`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const json = await r.json();
-        if (!abort) setNextFixt(json.fixtures || []);
-      } catch (e: any) {
-        if (!abort) setErr(e?.message ?? "Failed to load fixtures");
-      } finally {
-        if (!abort) setLoading(false);
-      }
-    }
-    run();
-    return () => { abort = true; };
-  }, [open, player?.team_id]);
 
   React.useEffect(() => {
     if (!open) return;
