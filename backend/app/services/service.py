@@ -318,6 +318,63 @@ class FPLService:
         return round(max(0.0, min(0.99, base)), 2)
 
     @staticmethod
+    def _position_ranks(boot: dict) -> dict:
+        """Compute within-position stat ranks for active players (minutes > 0)."""
+        from collections import defaultdict
+
+        by_pos: dict = defaultdict(list)
+        for p in boot.get("elements", []):
+            if (p.get("minutes") or 0) > 0:
+                by_pos[p["element_type"]].append(p)
+
+        result: dict = {}
+        for group in by_pos.values():
+            n = len(group)
+            if n == 0:
+                continue
+
+            def rank_by(stat_fn, key: str, grp=group, total=n):
+                for i, p in enumerate(sorted(grp, key=stat_fn, reverse=True)):
+                    r = i + 1
+                    pct = round((1 - (r - 1) / total) * 100) if total > 1 else 100
+                    result.setdefault(p["id"], {})[key] = {
+                        "rank": r,
+                        "of": total,
+                        "pct": pct,
+                    }
+
+            rank_by(lambda p: p.get("goals_scored") or 0, "goals")
+            rank_by(lambda p: p.get("assists") or 0, "assists")
+            rank_by(lambda p: p.get("clean_sheets") or 0, "clean_sheets")
+            rank_by(lambda p: p.get("saves") or 0, "saves")
+            rank_by(lambda p: float(p.get("points_per_game") or 0), "ppg")
+
+        return result
+
+    @staticmethod
+    def _transfer_ranks(boot: dict) -> dict:
+        """Compute within-position rank by net transfers (in - out) for the current GW."""
+        from collections import defaultdict
+
+        by_pos: dict = defaultdict(list)
+        for p in boot.get("elements", []):
+            by_pos[p["element_type"]].append(p)
+
+        result: dict = {}
+        for group in by_pos.values():
+            n = len(group)
+
+            def net(p: dict) -> int:
+                return (p.get("transfers_in_event") or 0) - (
+                    p.get("transfers_out_event") or 0
+                )
+
+            for i, p in enumerate(sorted(group, key=net, reverse=True)):
+                result[p["id"]] = {"rank": i + 1, "of": n}
+
+        return result
+
+    @staticmethod
     def enrich_picks(
         picks: dict, boot: dict, fixtures: list, live: dict
     ) -> Tuple[List[dict], Optional[int], Optional[int]]:
@@ -331,6 +388,8 @@ class FPLService:
 
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
+        pos_ranks = FPLService._position_ranks(boot)
+        transfer_ranks = FPLService._transfer_ranks(boot)
 
         fdr_by_team: Dict[int, list] = {}
         for fx in fixtures:
@@ -398,6 +457,7 @@ class FPLService:
                     "goals_scored": p.get("goals_scored"),
                     "assists": p.get("assists"),
                     "clean_sheets": p.get("clean_sheets"),
+                    "saves": p.get("saves"),
                     "bonus": p.get("bonus"),  # bonus points this season
                     "transfers_in_event": p.get(
                         "transfers_in_event"
@@ -425,6 +485,9 @@ class FPLService:
                         "multiplier"
                     ),  # points multiplier (2 if captain, 1 otherwise)
                     "shirt_url": shirt_url,  # shirt image URL
+                    "cost_change_event": p.get("cost_change_event"),
+                    "transfer_rank": transfer_ranks.get(el),
+                    "ranks": pos_ranks.get(el),  # within-position stat ranks
                 }
             )
 

@@ -1,5 +1,7 @@
 // lib/types.ts
 
+export type PlayerRank = { rank: number; of: number; pct: number };
+
 export type FixtureLite = {
     opp: string; home: boolean; difficulty: 2 | 3 | 4 | 5; kickoff?: string;
 };
@@ -21,7 +23,10 @@ export type Player = {
     goals_scored?: number;
     assists?: number;
     clean_sheets?: number;
+    saves?: number;
     bonus?: number;
+    cost_change_event?: number;
+    transfer_rank?: { rank: number; of: number };
     transfers_in_event?: number;
     transfers_out_event?: number;
     cost_change_start?: number;
@@ -34,6 +39,7 @@ export type Player = {
     fixtures?: FixtureLite[];
     slot?: number; multiplier?: number;
     shirt_url?: string;
+    ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
 };
 
 export type SquadResponse = {

@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { Player } from "../../lib/types";
+import type { Player, PlayerRank } from "../../lib/types";
 import { statusToText, fdrClass } from "../../lib/utils";
 import { fmtKickoff, fmtPrice, pct } from "../../lib/format";
 
@@ -15,7 +15,7 @@ type TeamFixture = {
   kickoff: string | null;
 };
 
-type Tab = "overview" | "fixtures";
+type Tab = "overview" | "stats" | "fixtures";
 
 type Props = {
   open: boolean;
@@ -23,23 +23,24 @@ type Props = {
   player: Player;
 };
 
-function KeyNum({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
+function TopNum({ label, value, delta, accent }: { label: string; value: React.ReactNode; delta?: string; accent?: boolean }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[9px] uppercase tracking-[0.12em] font-mono text-muted-foreground leading-none">{label}</span>
-      <span className="text-[20px] font-semibold text-foreground tabular-nums leading-tight tracking-tight">{value ?? "—"}</span>
-      {sub != null && <span className="text-[10px] font-mono leading-none">{sub}</span>}
+    <div>
+      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.14em] leading-none">{label}</div>
+      <div className={`text-[24px] font-bold tabular-nums tracking-[-0.02em] leading-tight mt-[3px] ${accent ? "text-primary" : "text-foreground"}`}>
+        {value ?? "—"}
+      </div>
+      {delta && <div className="font-mono text-[10px] text-muted-foreground mt-[2px] leading-none">{delta}</div>}
     </div>
   );
 }
 
-function InlineStat({ label, value }: { label: string; value: React.ReactNode }) {
+function SectionHeader({ label, right }: { label: string; right?: React.ReactNode }) {
   return (
-    <span className="text-sm">
-      <span className="font-semibold text-foreground">{value ?? "—"}</span>
-      {" "}
-      <span className="text-muted-foreground">{label}</span>
-    </span>
+    <div className="flex items-center justify-between mb-2.5">
+      <div className="text-xs font-bold text-foreground/80 tracking-[-0.005em]">{label}</div>
+      {right}
+    </div>
   );
 }
 
@@ -72,9 +73,10 @@ function StatusBanner({ player }: { player: Player }) {
 
 function fmtTransfers(n?: number): string {
   if (n == null) return "—";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
-  return String(n);
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `${(abs / 1_000_000).toFixed(1)}m`;
+  if (abs >= 1_000) return `${Math.round(abs / 1_000)}k`;
+  return String(abs);
 }
 
 function fmtCostChange(n?: number): string | null {
@@ -85,6 +87,90 @@ function fmtCostChange(n?: number): string | null {
 
 function isPlayed(kickoff: string | null | undefined): boolean {
   return !!kickoff && new Date(kickoff) < new Date();
+}
+
+const POS_STATS: Record<number, Array<{ key: keyof Player; unit: string; rankKey: keyof NonNullable<Player["ranks"]>; primary?: boolean }>> = {
+  1: [
+    { key: "saves", unit: "SV", rankKey: "saves", primary: true },
+    { key: "clean_sheets", unit: "CS", rankKey: "clean_sheets" },
+    { key: "points_per_game", unit: "PPG", rankKey: "ppg" },
+  ],
+  2: [
+    { key: "clean_sheets", unit: "CS", rankKey: "clean_sheets", primary: true },
+    { key: "assists", unit: "A", rankKey: "assists" },
+    { key: "points_per_game", unit: "PPG", rankKey: "ppg" },
+  ],
+  3: [
+    { key: "assists", unit: "A", rankKey: "assists", primary: true },
+    { key: "goals_scored", unit: "G", rankKey: "goals" },
+    { key: "points_per_game", unit: "PPG", rankKey: "ppg" },
+  ],
+  4: [
+    { key: "goals_scored", unit: "G", rankKey: "goals", primary: true },
+    { key: "assists", unit: "A", rankKey: "assists" },
+    { key: "points_per_game", unit: "PPG", rankKey: "ppg" },
+  ],
+};
+
+function TightRank({ val, unit, rank, primary }: { val: React.ReactNode; unit: string; rank?: PlayerRank; primary?: boolean }) {
+  return (
+    <div className={`p-3 rounded-xl border bg-muted/30 ${primary ? "border-border/60" : "border-border/40"}`}>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[22px] font-bold text-foreground tabular-nums leading-none tracking-tight">{val ?? "—"}</span>
+        <span className="text-[10px] font-semibold text-muted-foreground tracking-widest uppercase">{unit}</span>
+      </div>
+      {rank != null && (
+        <>
+          <div className="mt-1.5 text-xs text-foreground/80 leading-none">
+            #{rank.rank} <span className="text-muted-foreground">of {rank.of}</span>
+          </div>
+          <div className="mt-1.5 h-[3px] rounded-full bg-border overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-none ${primary ? "bg-primary" : "bg-muted-foreground/60"}`}
+              style={{ width: `${rank.pct}%` }}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MarketRow({ label, value, valueClass, sub, right }: {
+  label: string;
+  value: React.ReactNode;
+  valueClass?: string;
+  sub?: React.ReactNode;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="grid items-baseline gap-3" style={{ gridTemplateColumns: "90px 1fr auto" }}>
+      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.1em]">{label}</div>
+      <div className="flex items-baseline gap-2.5 min-w-0">
+        <span className={`text-[20px] font-bold tabular-nums tracking-[-0.01em] ${valueClass ?? "text-foreground"}`}>{value}</span>
+        {sub != null && <span className="text-xs leading-snug">{sub}</span>}
+      </div>
+      {right != null && <div className="text-xs text-right shrink-0">{right}</div>}
+    </div>
+  );
+}
+
+function OverviewFixtureCard({ f }: { f: TeamFixture }) {
+  return (
+    <div className="flex items-center justify-between border border-border rounded-xl px-4 py-3 bg-muted/30">
+      <div className="flex flex-col min-w-0">
+        <span className="text-sm font-semibold text-foreground leading-snug">
+          GW{f.event}: {f.home ? "Home vs" : "Away at"} {f.opp}
+        </span>
+        <span className="text-xs text-muted-foreground mt-0.5">
+          {isPlayed(f.kickoff) ? "Played" : fmtKickoff(f.kickoff ?? null)}
+        </span>
+      </div>
+      <span className={`text-xs px-2.5 py-1 rounded-lg font-bold tracking-[0.04em] ml-3 shrink-0 ${fdrClass(f.difficulty)}`}>
+        FDR {f.difficulty}
+      </span>
+    </div>
+  );
 }
 
 function FixturePill({ f }: { f: TeamFixture }) {
@@ -104,11 +190,13 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
   const [nextFixt, setNextFixt] = React.useState<TeamFixture[] | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<Tab>("overview");
+  const [statsOpen, setStatsOpen] = React.useState(false);
 
   React.useEffect(() => {
     setNextFixt(null);
     setErr(null);
     setTab("overview");
+    setStatsOpen(false);
     let abort = false;
     async function run() {
       if (!open || !player?.team_id) return;
@@ -138,13 +226,27 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
   if (!open) return null;
 
   const posLabel = player.position ? POS_LABEL[player.position] : null;
-  const hasCap = player.is_captain || player.is_vice_captain;
   const hasGwPoints = player.gw_points != null;
   const costChange = fmtCostChange(player.cost_change_start);
-  const hasTransfers = player.transfers_in_event != null || player.transfers_out_event != null;
   const xPts = player.ep_next ? Number(player.ep_next).toFixed(1) : "—";
   const ppg = player.points_per_game ? Number(player.points_per_game).toFixed(1) : "—";
   const form = player.form ? Number(player.form).toFixed(1) : "—";
+  const xPtsDelta = nextFixt?.[0] ? `${nextFixt[0].home ? "vs" : "@"} ${nextFixt[0].opp}` : undefined;
+
+  const name = player.name ?? "";
+  const lastSpace = name.lastIndexOf(" ");
+  const nameParts = lastSpace === -1
+    ? { first: "", last: name }
+    : { first: name.slice(0, lastSpace), last: name.slice(lastSpace + 1) };
+
+  const netTransfers = (player.transfers_in_event ?? 0) - (player.transfers_out_event ?? 0);
+  const hasTransferData = player.transfers_in_event != null || player.transfers_out_event != null;
+  const netSign = netTransfers > 0 ? "+" : netTransfers < 0 ? "−" : "";
+  const netStr = netTransfers !== 0 ? `${netSign}${fmtTransfers(netTransfers)}` : "0";
+  const transferSub = [
+    player.transfers_in_event != null && `▲ ${fmtTransfers(player.transfers_in_event)} in`,
+    player.transfers_out_event != null && `▼ ${fmtTransfers(player.transfers_out_event)} out`,
+  ].filter(Boolean).join(" · ");
 
   return (
     <div className="fixed inset-0 z-50">
@@ -161,62 +263,77 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
         aria-labelledby="player-modal-title"
       >
         {/* header */}
-        <div className="p-4 border-b border-border shrink-0 space-y-3">
+        <div className="relative shrink-0 overflow-hidden border-b border-border">
+          {/* watermark club code */}
+          <div
+            aria-hidden="true"
+            className="absolute pointer-events-none select-none font-bold leading-[0.85] tracking-[-0.04em]"
+            style={{ top: -36, right: -8, fontSize: 180, fontWeight: 800, color: "rgba(94,234,212,0.04)" }}
+          >
+            {player.team}
+          </div>
+
+          {/* close button */}
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-3.5 right-4 z-10 text-[12px] font-medium text-foreground/70 border border-border/60 px-3 py-[5px] rounded-lg"
+          >
+            Close
+          </button>
+
           {/* identity row */}
-          <div className="flex items-start gap-3">
-            <img
-              src={player.shirt_url || ""}
-              alt={`${player.team} shirt`}
-              className="w-14 h-14 object-contain rounded-lg border border-border bg-card p-1 shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+          <div className="relative flex gap-3.5 px-6 pt-5 pb-4">
+            <div className="w-[60px] h-[76px] shrink-0 rounded-[10px] bg-muted/50 border border-border flex items-center justify-center overflow-hidden">
+              {player.shirt_url
+                ? <img src={player.shirt_url} alt={`${player.team} shirt`} className="w-full h-full object-contain p-2" />
+                : <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M5 7L9 4H19L23 7L21 12L18 11V23H10V11L7 12L5 7Z" fill="currentColor" opacity="0.4" /></svg>
+              }
+            </div>
+            <div className="flex-1 min-w-0 pr-16">
+              <div className="flex gap-[5px] flex-wrap mb-[5px]">
                 {posLabel && (
-                  <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/30 font-mono tracking-wide">
+                  <span className="text-[10px] font-semibold text-foreground/70 border border-border/60 px-2 py-0.5 rounded-full tracking-[0.06em]">
                     {posLabel}
                   </span>
                 )}
-                {hasCap && (
-                  <span
-                    className="text-[11px] px-1.5 py-0.5 rounded-full ring-1 ring-black/15 text-[#fcfcfc]"
-                    style={{ backgroundColor: "#38003C" }}
-                  >
-                    {player.is_captain ? "C" : "VC"}
+                {player.team && (
+                  <span className="text-[10px] font-medium text-foreground/70 border border-border/60 px-2 py-0.5 rounded-full">
+                    {player.team}
                   </span>
                 )}
               </div>
-              <h2 id="player-modal-title" className="text-2xl font-bold leading-tight tracking-tight">
-                {player.name}
+              <h2
+                id="player-modal-title"
+                className="text-[28px] font-bold leading-[1.0] tracking-[-0.025em] m-0"
+              >
+                {nameParts.first && <span>{nameParts.first} </span>}
+                <span className="text-primary">{nameParts.last}</span>
+                {player.is_captain && (
+                  <span className="inline-block align-middle ml-2 text-[11px] font-bold text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-[6px] tracking-[0.08em]">
+                    C
+                  </span>
+                )}
+                {player.is_vice_captain && (
+                  <span className="inline-block align-middle ml-2 text-[11px] font-bold text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-[6px] tracking-[0.08em]">
+                    VC
+                  </span>
+                )}
               </h2>
-              <div className="text-sm text-muted-foreground mt-0.5">{player.team} · {fmtPrice(player.price)}</div>
             </div>
-            <button onClick={onClose} className="btn shrink-0 mt-1" aria-label="Close">
-              Close
-            </button>
           </div>
 
-          {/* key numbers strip */}
-          <div className="grid grid-cols-4 gap-0 pt-3 border-t border-border">
-            <KeyNum
-              label="Price"
-              value={fmtPrice(player.price)}
-              sub={costChange
-                ? <span className={player.cost_change_start! > 0 ? "text-success" : "text-destructive"}>{costChange}</span>
-                : <span className="text-muted-foreground">no change</span>}
+          {/* topline strip */}
+          <div className="grid grid-cols-4 gap-[14px] px-6 py-[14px] border-t border-border">
+            <TopNum label="PRICE" value={fmtPrice(player.price)} delta={costChange ?? undefined} />
+            <TopNum
+              label={hasGwPoints ? "GW PTS" : "FORM"}
+              value={hasGwPoints ? player.gw_points : form}
+              delta={hasGwPoints ? `Form ${form}` : `PPG ${ppg}`}
             />
-            {hasGwPoints
-              ? <KeyNum label="GW pts" value={player.gw_points} sub={<span className="text-muted-foreground">Form {form}</span>} />
-              : <KeyNum label="Form" value={form} sub={<span className="text-muted-foreground">PPG {ppg}</span>} />
-            }
-            <KeyNum
-              label="xPts next"
-              value={xPts}
-              sub={nextFixt?.[0]
-                ? <span className="text-muted-foreground">{nextFixt[0].home ? "vs" : "@"} {nextFixt[0].opp}</span>
-                : undefined}
-            />
-            <KeyNum
-              label="Owned"
+            <TopNum label="xPTS NEXT" value={xPts} delta={xPtsDelta} accent />
+            <TopNum
+              label="OWNED"
               value={player.selected_by_percent != null ? `${Number(player.selected_by_percent).toFixed(1)}%` : "—"}
             />
           </div>
@@ -224,7 +341,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
 
         {/* tab bar */}
         <div className="flex gap-6 px-4 border-b border-border shrink-0">
-          {(["overview", "fixtures"] as const).map((t) => (
+          {(["overview", "stats", "fixtures"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -241,77 +358,162 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
         </div>
 
         {/* scrollable body */}
-        <div className="p-4 space-y-4 overflow-y-auto" style={{ willChange: "transform" }}>
+        <div className="p-4 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
 
           {/* ── OVERVIEW TAB ── */}
           {tab === "overview" && (
-            <>
+            <div className="space-y-4">
               <StatusBanner player={player} />
 
-              {/* Season */}
+              {/* Market */}
               <section>
-                <div className="text-xs uppercase tracking-wide font-mono text-muted-foreground mb-2">● Season</div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {hasGwPoints && (
-                    <InlineStat label="ppg" value={ppg} />
+                <SectionHeader
+                  label="Market"
+                  right={posLabel && (
+                    <span className="text-[10px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 tracking-widest">
+                      vs {posLabel}
+                    </span>
                   )}
-                  <InlineStat label="goals" value={player.goals_scored ?? "—"} />
-                  <InlineStat label="assists" value={player.assists ?? "—"} />
-                  {player.position !== 4 && (
-                    <InlineStat label="clean sheets" value={player.clean_sheets ?? "—"} />
+                />
+                <div className="flex flex-col gap-2.5">
+                  {hasTransferData && (
+                    <>
+                      <MarketRow
+                        label="Transfers"
+                        value={netStr}
+                        valueClass={netTransfers > 0 ? "text-success" : "text-muted-foreground"}
+                        sub={<span className="text-muted-foreground">{transferSub}</span>}
+                        right={
+                          player.transfer_rank != null ? (
+                            <span className={`flex items-center gap-1 ${player.transfer_rank.rank <= 5 ? "text-primary" : "text-muted-foreground"}`}>
+                              {player.transfer_rank.rank <= 5 && "🔥"}#{player.transfer_rank.rank} most-bought {posLabel}
+                            </span>
+                          ) : undefined
+                        }
+                      />
+                      <div className="h-px bg-border" />
+                    </>
                   )}
-                  <InlineStat label="bonus" value={player.bonus ?? "—"} />
+                  <MarketRow
+                    label="Price"
+                    value={fmtPrice(player.price)}
+                    sub={
+                      player.cost_change_start != null && player.cost_change_start !== 0
+                        ? <span className={player.cost_change_start > 0 ? "text-success" : "text-destructive"}>
+                            {player.cost_change_start > 0 ? "↑" : "↓"} £{(Math.abs(player.cost_change_start) / 10).toFixed(1)} since start
+                          </span>
+                        : <span className="text-muted-foreground">no change since start</span>
+                    }
+                    right={
+                      player.cost_change_event != null && player.cost_change_event !== 0
+                        ? <span className={player.cost_change_event > 0 ? "text-success" : "text-destructive"}>
+                            {player.cost_change_event > 0 ? "↑" : "↓"} £{(Math.abs(player.cost_change_event) / 10).toFixed(1)} today
+                          </span>
+                        : <span className="text-muted-foreground">No change today</span>
+                    }
+                  />
                 </div>
               </section>
 
-              {/* Transfers this week */}
-              {(hasTransfers || costChange) && (
-                <section>
-                  <div className="text-xs uppercase tracking-wide font-mono text-muted-foreground mb-2">● This week</div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {player.transfers_in_event != null && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border bg-muted/40 text-xs">
-                        <span className="text-success font-semibold">▲</span>
-                        <span className="font-semibold text-foreground">{fmtTransfers(player.transfers_in_event)}</span>
-                        <span className="text-muted-foreground">in</span>
-                      </span>
-                    )}
-                    {player.transfers_out_event != null && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border bg-muted/40 text-xs">
-                        <span className="text-destructive font-semibold">▼</span>
-                        <span className="font-semibold text-foreground">{fmtTransfers(player.transfers_out_event)}</span>
-                        <span className="text-muted-foreground">out</span>
-                      </span>
-                    )}
-                    {costChange && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border bg-muted/40 text-xs">
-                        <span className={`font-semibold ${player.cost_change_start! > 0 ? "text-success" : "text-destructive"}`}>
-                          {costChange}
-                        </span>
-                        <span className="text-muted-foreground">since start</span>
-                      </span>
-                    )}
+              {/* Next fixtures */}
+              <section>
+                <SectionHeader label="Next fixtures" />
+                {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
+                {err && <div className="text-sm text-destructive">{err}</div>}
+                {!loading && !err && !player?.team_id && (
+                  <div className="text-sm text-muted-foreground">Not available.</div>
+                )}
+                {!loading && !err && nextFixt && nextFixt.length === 0 && (
+                  <div className="text-sm text-muted-foreground">No upcoming fixtures.</div>
+                )}
+                {!loading && !err && nextFixt && nextFixt.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {nextFixt.slice(0, 3).map((f) => (
+                      <OverviewFixtureCard key={`${f.event}-${f.kickoff ?? ""}`} f={f} />
+                    ))}
                   </div>
-                </section>
-              )}
-            </>
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* ── STATS TAB ── */}
+          {tab === "stats" && (
+            <div className="space-y-4">
+              {/* Season highlights */}
+              <section>
+                <SectionHeader
+                  label="Season highlights"
+                  right={posLabel && (
+                    <span className="text-[10px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 tracking-widest">
+                      vs {posLabel}
+                    </span>
+                  )}
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  {(POS_STATS[player.position] ?? POS_STATS[3]).map(({ key, unit, rankKey, primary }) => {
+                    const raw = player[key] as string | number | null | undefined;
+                    const val = raw != null ? (key === "points_per_game" ? Number(raw).toFixed(1) : raw) : null;
+                    return (
+                      <TightRank
+                        key={unit}
+                        val={val}
+                        unit={unit}
+                        rank={player.ranks?.[rankKey]}
+                        primary={primary}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {[
+                    player.position === 3 && player.clean_sheets != null && `${player.clean_sheets} CS`,
+                    (player.position === 4 && player.clean_sheets) ? `${player.clean_sheets} CS` : null,
+                    player.position === 2 && player.goals_scored ? `${player.goals_scored} G` : null,
+                    player.bonus != null && `${player.bonus} bonus`,
+                    player.minutes != null && `${player.minutes} mins`,
+                  ].filter(Boolean).join(" · ")}
+                </div>
+              </section>
+
+              {/* Per 90 (collapsed by default) */}
+              <section>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="text-xs font-bold text-foreground/80 tracking-[-0.005em]">
+                    Per 90 · vs {posLabel ?? "pos"}
+                  </div>
+                  <button
+                    onClick={() => setStatsOpen((v) => !v)}
+                    className="text-[11px] font-semibold text-muted-foreground tracking-[0.08em] hover:text-foreground transition-colors"
+                  >
+                    {statsOpen ? "Hide" : "Show"} ▾
+                  </button>
+                </div>
+                {statsOpen && (
+                  <div className="px-4 py-4 rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
+                    Per-90 data not yet available.
+                  </div>
+                )}
+              </section>
+            </div>
           )}
 
           {/* ── FIXTURES TAB ── */}
           {tab === "fixtures" && (
-            <>
+            <div className="space-y-4">
               {/* This GW */}
               {player.fixtures != null && (
                 <section>
-                  <div className="text-xs uppercase tracking-wide font-mono text-muted-foreground mb-2">
-                    ● This GW
-                    {player.has_dgw && (
-                      <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">DGW</span>
-                    )}
-                    {player.fixtures.length === 0 && (
-                      <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">BGW</span>
-                    )}
-                  </div>
+                  <SectionHeader
+                    label={`This GW${player.has_dgw ? "" : player.fixtures.length === 0 ? "" : ""}`}
+                    right={
+                      player.has_dgw
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">DGW</span>
+                        : player.fixtures.length === 0
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">BGW</span>
+                        : undefined
+                    }
+                  />
                   {player.fixtures.length === 0
                     ? <div className="text-sm text-muted-foreground">No fixture this gameweek.</div>
                     : (
@@ -335,7 +537,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
 
               {/* Next fixtures — pills */}
               <section>
-                <div className="text-xs uppercase tracking-wide font-mono text-muted-foreground mb-2">● Next fixtures</div>
+                <SectionHeader label="Next fixtures" />
                 {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
                 {err && <div className="text-sm text-destructive">{err}</div>}
                 {!loading && !err && !player?.team_id && (
@@ -352,9 +554,28 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
                   </div>
                 )}
               </section>
-            </>
+            </div>
           )}
 
+        </div>
+
+        {/* Sticky action bar */}
+        <div className="shrink-0 flex gap-2 px-[18px] py-3 border-t border-border bg-card">
+          <button
+            className="flex-1 bg-transparent border border-border/60 text-foreground rounded-[10px] px-3.5 py-[11px] text-[13px] font-semibold hover:bg-muted/40 transition-colors"
+            disabled
+            title="Compare — coming soon"
+          >
+            ⇄ Compare
+          </button>
+          <a
+            href="https://fantasy.premierleague.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-primary text-primary-foreground rounded-[10px] px-4 py-[11px] text-[13px] font-semibold hover:opacity-90 transition-opacity"
+          >
+            Open in FPL ↗
+          </a>
         </div>
       </div>
     </div>
