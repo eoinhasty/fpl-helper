@@ -13,6 +13,7 @@ import { Segmented } from "../components/controls/Segmented";
 
 import type { Player } from "../lib/types";
 import PlayerDetailModal from "../components/squad/PlayerDetailModal";
+import LiveAuthGate from "../components/squad/LiveAuthGate";
 
 type Mode = "live" | "squad";
 
@@ -119,16 +120,32 @@ export default function SquadDashboard() {
         right={right}
         stickyOffsetPx={52}
       >
-        {prefs.squadLayout === "pitch" ? (
-          <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error} />
+        {mode === "live" ? (
+          <LiveAuthGate key={error === "AUTH_EXPIRED" ? "expired" : "authed"} onAuthenticated={loadLive}>
+            {prefs.squadLayout === "pitch" ? (
+              <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error === "AUTH_EXPIRED" ? null : error} />
+            ) : (
+              <XIList
+                players={data?.players}
+                loading={loading}
+                error={error === "AUTH_EXPIRED" ? null : error}
+                entryMissing={entry === ""}
+                onPlayerClick={openPlayer}
+              />
+            )}
+          </LiveAuthGate>
         ) : (
-          <XIList
-            players={data?.players}
-            loading={loading}
-            error={error}
-            entryMissing={entry === ""}
-            onPlayerClick={openPlayer}
-          />
+          prefs.squadLayout === "pitch" ? (
+            <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error} />
+          ) : (
+            <XIList
+              players={data?.players}
+              loading={loading}
+              error={error}
+              entryMissing={entry === ""}
+              onPlayerClick={openPlayer}
+            />
+          )
         )}
       </DashboardLayout>
 

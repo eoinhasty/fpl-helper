@@ -1,7 +1,7 @@
 // hooks/useSquad.ts
 import { useCallback, useRef, useState } from "react";
 import type { SquadResponse } from "../lib/types";
-import { getSquad, getLive, type CacheMeta } from "../lib/api";
+import { getSquad, getLive, clearAuth, type CacheMeta } from "../lib/api";
 
 type LoadSquadOpts = { gw?: number; forceRefresh?: boolean };
 
@@ -39,7 +39,9 @@ export function useSquad(entry: number | "") {
       setData(res.data as SquadResponse); setCache(res.cache);
     } catch (e: any) {
       if (id !== reqId.current) return;
-      setError(e?.message ?? "Failed to load live squad");
+      const msg: string = e?.message ?? "Failed to load live squad";
+      if (msg === "AUTH_EXPIRED") clearAuth();
+      setError(msg);
     } finally { if (id === reqId.current) setLoading(false); }
   }, [entry]);
 

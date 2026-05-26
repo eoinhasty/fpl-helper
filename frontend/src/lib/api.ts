@@ -38,17 +38,74 @@ function baseHeaders(): Record<string, string> {
   return API_SECRET ? { "X-Api-Key": API_SECRET } : {};
 }
 
+const TOKEN_KEY = "fpl_token";
+const REFRESH_KEY = "fpl_refresh_token";
+
 function tokenHeaders(): Record<string, string> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("fpl_token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
   return token ? { ...baseHeaders(), "X-Fpl-Token": token } : baseHeaders();
+}
+
+export function isAuthenticated(): boolean {
+  return typeof window !== "undefined" && Boolean(localStorage.getItem(TOKEN_KEY));
+}
+
+export function clearAuth(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+}
+
+export async function fplLogin(email: string, password: string): Promise<void> {
+  const { json } = await fetchJSON<{ access_token: string; refresh_token: string }>(
+    new URL("/api/auth/login", ORIGIN).toString(),
+    {
+      method: "POST",
+      headers: { ...baseHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }
+  );
+  localStorage.setItem(TOKEN_KEY, `Bearer ${json.access_token}`);
+  localStorage.setItem(REFRESH_KEY, json.refresh_token);
+}
+
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = typeof window !== "undefined" ? localStorage.getItem(REFRESH_KEY) : null;
+  if (!refreshToken) return false;
+  try {
+    const { json } = await fetchJSON<{ access_token: string; refresh_token: string }>(
+      new URL("/api/auth/refresh", ORIGIN).toString(),
+      {
+        method: "POST",
+        headers: { ...baseHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      }
+    );
+    localStorage.setItem(TOKEN_KEY, `Bearer ${json.access_token}`);
+    localStorage.setItem(REFRESH_KEY, json.refresh_token);
+    return true;
+  } catch {
+    clearAuth();
+    return false;
+  }
 }
 
 export async function getLive(entry: number, opts?: { forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {
   const u = new URL(`/api/live/${entry}`, ORIGIN);
   if (opts?.forceRefresh) u.searchParams.set("noCache", "1");
 
-  const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
-  return { data: json, cache: cacheFrom(resp) };
+  try {
+    const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
+    return { data: json, cache: cacheFrom(resp) };
+  } catch (e: any) {
+    if (e?.message?.startsWith("401") && await tryRefresh()) {
+      const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
+      return { data: json, cache: cacheFrom(resp) };
+    }
+    if (e?.message?.startsWith("401")) {
+      throw new Error("AUTH_EXPIRED");
+    }
+    throw e;
+  }
 }
 
 export async function getSquad(entry: string, opts?: { gw?: number; forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {

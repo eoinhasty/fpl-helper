@@ -20,6 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from app.deps import limiter
 from app.services.service import FPLService
 from app.api.api import health_router, router as api_router
+from app.api.auth import router as auth_router
 
 
 @asynccontextmanager
@@ -67,3 +68,4 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(api_router)
+app.include_router(auth_router)
