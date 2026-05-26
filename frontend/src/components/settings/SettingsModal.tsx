@@ -63,7 +63,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
               </button>
             </div>
 
-            <div className="text-sm font-semibold mt-5 mb-2">Bearer Token</div>
+            <div className="text-sm font-semibold mt-5 mb-2">FPL Account</div>
             <SettingsPanel />
           </Card>
 
