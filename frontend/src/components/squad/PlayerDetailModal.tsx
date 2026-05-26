@@ -536,20 +536,19 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
         {/* Sticky action bar */}
         <div className="shrink-0 flex gap-2 px-[18px] py-3 border-t border-border bg-card">
           <button
-            className="flex-1 bg-transparent border border-border/60 text-foreground rounded-[10px] px-3.5 py-[11px] text-[13px] font-semibold hover:bg-muted/40 transition-colors"
+            className="flex-1 bg-transparent border border-border/60 text-foreground/40 rounded-[10px] px-3.5 py-[11px] text-[13px] font-semibold cursor-not-allowed"
             disabled
             title="Compare — coming soon"
           >
             ⇄ Compare
           </button>
-          <a
-            href="https://fantasy.premierleague.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-primary text-primary-foreground rounded-[10px] px-4 py-[11px] text-[13px] font-semibold hover:opacity-90 transition-opacity"
+          <button
+            className="bg-primary/40 text-primary-foreground/50 rounded-[10px] px-4 py-[11px] text-[13px] font-semibold cursor-not-allowed"
+            disabled
+            title="Open in FPL — coming soon"
           >
             Open in FPL ↗
-          </a>
+          </button>
         </div>
       </div>
     </div>
