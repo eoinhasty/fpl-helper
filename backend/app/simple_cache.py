@@ -28,9 +28,7 @@ class AsyncCache:
         self._bg: Dict[str, asyncio.Task] = {}
 
     def _lock(self, key: str) -> asyncio.Lock:
-        if key not in self._locks:
-            self._locks[key] = asyncio.Lock()
-        return self._locks[key]
+        return self._locks.setdefault(key, asyncio.Lock())
 
     def _now(self) -> float:
         return time.time()
@@ -99,6 +97,13 @@ class AsyncCache:
             data = await fetcher()
             self.set(key, data, ttl, stale_ttl)
             return data, "miss", 0.0
+
+    async def close(self) -> None:
+        for task in list(self._bg.values()):
+            task.cancel()
+        if self._bg:
+            await asyncio.gather(*self._bg.values(), return_exceptions=True)
+        self._bg.clear()
 
     async def refresh(
         self,

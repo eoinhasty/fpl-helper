@@ -68,6 +68,7 @@ class FPLService:
         return r.json()
 
     async def close(self):
+        await self.cache.close()
         await self.public.aclose()
 
     # ----------- low-level GET with polite backoff -----------

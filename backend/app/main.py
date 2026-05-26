@@ -1,17 +1,15 @@
 # main.py
 from __future__ import annotations
 
-from pathlib import Path
-from dotenv import load_dotenv
-
-BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
-ENV_PATH = BASE_DIR / ".env"
-
-load_dotenv(dotenv_path=ENV_PATH)
-
 import asyncio
 import os as _os
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
+load_dotenv(dotenv_path=BASE_DIR / ".env")
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -34,7 +32,7 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
 
-    asyncio.create_task(_prewarm())
+    app.state.prewarm_task = asyncio.create_task(_prewarm())
 
     try:
         yield
