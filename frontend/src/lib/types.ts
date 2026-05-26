@@ -3,7 +3,7 @@
 export type PlayerRank = { rank: number; of: number; pct: number };
 
 export type FixtureLite = {
-    opp: string; home: boolean; difficulty: 2 | 3 | 4 | 5; kickoff?: string;
+    opp: string; home: boolean; difficulty: 1 | 2 | 3 | 4 | 5; kickoff?: string;
 };
 
 export type Player = {

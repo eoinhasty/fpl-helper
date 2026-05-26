@@ -1,5 +1,6 @@
 // lib/constants.ts
 export const BENCH_LABEL: Record<number, string> = { 12: "GKP", 13: "1", 14: "2", 15: "3" };
+export const POSITION_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
 export const VB = { W: 1417, H: 788 };
 export const CHIP = { WIDTH: 128, SHIRT_BOX: 64, SHIRT_IMG: 46, BANNER_H: 32, NAME_FS: 13, TEAM_FS: 11 };

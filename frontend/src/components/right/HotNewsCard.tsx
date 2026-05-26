@@ -3,11 +3,10 @@
 import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import { fmtRelTime } from "../../lib/format";
+import { POSITION_LABEL } from "../../lib/constants";
 
 type Item = { id: number; name: string; team: string | null; badge_url: string | null; position: number; news: string; news_added: string | null; status: string; start_probability: number; };
 type Resp = { items: Item[] };
-
-const POSITION_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
 function statusDotClass(status: string): string {
   if (status === "a") return "bg-success";

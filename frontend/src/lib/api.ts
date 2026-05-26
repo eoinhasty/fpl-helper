@@ -34,7 +34,9 @@ async function fetchJSON<T>(url: string, init?: RequestInit): Promise<{ json: T;
   return { json: await r.json(), resp: r };
 }
 
-function baseHeaders(): Record<string, string> {
+export const apiBase = API_BASE;
+
+export function baseHeaders(): Record<string, string> {
   return API_SECRET ? { "X-Api-Key": API_SECRET } : {};
 }
 
