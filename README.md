@@ -5,7 +5,7 @@ A Fantasy Premier League companion app that enriches your squad view with live d
 ## Features
 
 - **Squad view** — XI + bench with player shirts, price, start probability, and next fixture (FDR colour-coded). Toggle between list and pitch layouts.
-- **Live points** — Real-time GW points for your squad (requires FPL bearer token, set via Settings).
+- **Live points** — Real-time GW points for your squad (log in via the Live tab).
 - **Captaincy picks** — Top 3 captain recommendations. Scored on FPL expected points (ep_next), fixture difficulty, home advantage, DGW/BGW detection, positional weighting, and start probability. Hidden for historical GW views where data would be stale.
 - **Team health** — Flags players under 60% start probability or carrying injuries.
 - **Player detail** — Click any player to see availability, injury news, next 3 fixtures, and quick stats.
@@ -53,7 +53,6 @@ Create `backend/.env` (copy from `backend/.env.example`):
 
 ```env
 # Optional — server-side fallback bearer token for Live Points.
-# Can also be set at runtime via the in-app Settings panel.
 FPL_BEARER_TOKEN=
 
 # Optional — enables the live Premier League standings widget.
@@ -63,16 +62,20 @@ FOOTBALL_DATA_API_KEY=
 # Optional — comma-separated allowed CORS origins.
 # Leave empty for local development.
 ALLOWED_ORIGINS=
+
+# Optional — shared secret for X-Api-Key header guard.
+# Leave empty to disable the guard.
+API_SECRET=
 ```
 
 **Entry ID**: entered directly in the app — no env var needed. Log in to the FPL website, go to the Points tab — the number in the URL (`/entry/XXXXXXX/`) is your entry ID.
 
-**Bearer token**: set via the in-app Settings panel. To extract it, use the included `FPL X-Api-Authorization Sniffer` browser extension, or open DevTools → Network → reload the FPL site → find a request to `https://fantasy.premierleague.com/api/` → copy the `Authorization` header value.
+**Live points**: log in via the Live tab in the app using your FPL credentials. The app handles authentication via an OAuth PKCE flow.
 
 ### Run
 
 ```bash
-# From the project root
+cd frontend
 npm run dev
 ```
 
