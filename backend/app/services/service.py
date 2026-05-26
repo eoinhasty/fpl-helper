@@ -4,6 +4,7 @@ import os
 import asyncio
 import hashlib
 import logging
+from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
@@ -320,7 +321,6 @@ class FPLService:
     @staticmethod
     def _position_ranks(boot: dict) -> dict:
         """Compute within-position stat ranks for active players (minutes > 0)."""
-        from collections import defaultdict
 
         by_pos: dict = defaultdict(list)
         for p in boot.get("elements", []):
@@ -354,7 +354,6 @@ class FPLService:
     @staticmethod
     def _transfer_ranks(boot: dict) -> dict:
         """Compute within-position rank by net transfers (in - out) for the current GW."""
-        from collections import defaultdict
 
         by_pos: dict = defaultdict(list)
         for p in boot.get("elements", []):

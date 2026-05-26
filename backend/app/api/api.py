@@ -127,7 +127,6 @@ async def squad(
         "team_value": team_value,
         "team_bank": team_bank,
         "players": enriched,
-        "debug_version": "squad-live-wired-1",
     }
 
 

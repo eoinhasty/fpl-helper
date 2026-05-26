@@ -3,8 +3,7 @@ import type { Player, PlayerRank } from "../../lib/types";
 import { statusToText, fdrClass } from "../../lib/utils";
 import { fmtKickoff, fmtPrice, pct } from "../../lib/format";
 import { useFetch } from "../../hooks/useFetch";
-
-const POS_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
+import { POSITION_LABEL } from "../../lib/constants";
 
 type TeamFixture = {
   event: number;
@@ -185,7 +184,7 @@ function FixturePill({ f }: { f: TeamFixture }) {
 }
 
 export default function PlayerDetailModal({ open, onClose, player }: Props) {
-  const fixtUrl = open && player?.team_id ? `/api/team-next/${player.team_id}?count=5` : null;
+  const fixtUrl = open && player.team_id ? `/api/team-next/${player.team_id}?count=5` : null;
   const { data: fixtData, loading, error: err } = useFetch<{ fixtures: TeamFixture[] }>(fixtUrl);
   const nextFixt = fixtData?.fixtures ?? null;
 
@@ -201,7 +200,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
 
   if (!open) return null;
 
-  const posLabel = player.position ? POS_LABEL[player.position] : null;
+  const posLabel = player.position ? POSITION_LABEL[player.position] : null;
   const hasGwPoints = player.gw_points != null;
   const costChange = fmtCostChange(player.cost_change_start);
   const xPts = player.ep_next ? Number(player.ep_next).toFixed(1) : "—";
@@ -396,7 +395,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
                 <SectionHeader label="Next fixtures" />
                 {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
                 {err && <div className="text-sm text-destructive">{err}</div>}
-                {!loading && !err && !player?.team_id && (
+                {!loading && !err && !player.team_id && (
                   <div className="text-sm text-muted-foreground">Not available.</div>
                 )}
                 {!loading && !err && nextFixt && nextFixt.length === 0 && (
@@ -444,7 +443,6 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
                 <div className="mt-2 text-xs text-muted-foreground">
                   {[
                     player.position === 3 && player.clean_sheets != null && `${player.clean_sheets} CS`,
-                    (player.position === 4 && player.clean_sheets) ? `${player.clean_sheets} CS` : null,
                     player.position === 2 && player.goals_scored ? `${player.goals_scored} G` : null,
                     player.bonus != null && `${player.bonus} bonus`,
                     player.minutes != null && `${player.minutes} mins`,
@@ -481,7 +479,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
               {player.fixtures != null && (
                 <section>
                   <SectionHeader
-                    label={`This GW${player.has_dgw ? "" : player.fixtures.length === 0 ? "" : ""}`}
+                    label="This GW"
                     right={
                       player.has_dgw
                         ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">DGW</span>
@@ -494,8 +492,8 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
                     ? <div className="text-sm text-muted-foreground">No fixture this gameweek.</div>
                     : (
                       <ul className="space-y-1">
-                        {player.fixtures.map((f, i) => (
-                          <li key={i} className="text-sm flex items-center justify-between border border-border rounded-md px-3 py-2">
+                        {player.fixtures.map((f) => (
+                          <li key={`${f.opp}-${f.kickoff ?? ""}`} className="text-sm flex items-center justify-between border border-border rounded-md px-3 py-2">
                             <div className="flex flex-col">
                               <span className="font-medium">{f.home ? "Home vs" : "Away at"} {f.opp}</span>
                               <span className="text-xs text-muted-foreground">
@@ -516,7 +514,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
                 <SectionHeader label="Next fixtures" />
                 {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
                 {err && <div className="text-sm text-destructive">{err}</div>}
-                {!loading && !err && !player?.team_id && (
+                {!loading && !err && !player.team_id && (
                   <div className="text-sm text-muted-foreground">Not available.</div>
                 )}
                 {!loading && !err && nextFixt && nextFixt.length === 0 && (

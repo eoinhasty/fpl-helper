@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hmac
 import os
 import time
 import collections
@@ -19,7 +20,7 @@ _API_SECRET = os.getenv("API_SECRET", "")
 
 
 async def verify_api_key(api_key: str = Security(_API_KEY_HEADER)):
-    if _API_SECRET and api_key != _API_SECRET:
+    if _API_SECRET and not hmac.compare_digest(api_key or "", _API_SECRET):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
