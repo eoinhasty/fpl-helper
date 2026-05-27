@@ -90,16 +90,15 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
 
   return (
     <div className={`w-full select-none relative ${className ?? ""}`}>
-      {(loading || error) && (
+      {loading && (
+        <div className="absolute inset-0 z-20 rounded-2xl animate-pulse bg-black/25" />
+      )}
+      {!loading && error && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/55 backdrop-blur-[3px] rounded-2xl">
-          {loading ? (
-            <p className="text-sm font-medium text-white/80 tracking-wide">Loading…</p>
-          ) : (
-            <div className="text-center px-10 space-y-2">
-              <p className="text-base font-semibold text-white">Live squad unavailable</p>
-              <p className="text-sm text-white/65 leading-snug">{error}</p>
-            </div>
-          )}
+          <div className="text-center px-10 space-y-2">
+            <p className="text-base font-semibold text-white">Live squad unavailable</p>
+            <p className="text-sm text-white/65 leading-snug">{error}</p>
+          </div>
         </div>
       )}
       <div className={`relative overflow-hidden w-full`}>

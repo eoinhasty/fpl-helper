@@ -60,6 +60,7 @@ export default function SquadDashboard() {
   const right = (
     <RightPanel
       players={data?.players}
+      loading={loading}
       isHistorical={isHistorical}
       onPlayerClick={openPlayer}
     />

@@ -4,6 +4,7 @@ import { isStarting } from "../../lib/utils";
 import { BENCH_LABEL } from "../../lib/constants";
 import PlayerCard from "./PlayerCard";
 import Card from "../ui/Card";
+import { Skeleton } from "../ui/Skeleton";
 
 
 export default function XIList({
@@ -29,9 +30,25 @@ export default function XIList({
     [players]
   );
 
+  if (loading && !players) {
+    return (
+      <Card className="p-3 space-y-2">
+        {[...Array(11)].map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-2 py-2 rounded-xl border border-border">
+            <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="h-2.5 w-1/3" />
+            </div>
+            <Skeleton className="h-3 w-10 shrink-0" />
+          </div>
+        ))}
+      </Card>
+    );
+  }
+
   return (
     <Card className="p-3 space-y-2">
-      {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
       {error && <div className="text-sm text-destructive">{error}</div>}
 
       {xi.length > 0 && (

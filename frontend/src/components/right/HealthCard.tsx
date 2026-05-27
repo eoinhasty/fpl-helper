@@ -1,7 +1,22 @@
 import Card from "../ui/Card";
+import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
 
-export default function HealthCard({ players }: { players?: Player[] | null }) {
+export default function HealthCard({ players, loading }: { players?: Player[] | null; loading?: boolean }) {
+  if (loading && !players) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Team Health</div>
+        <div className="space-y-2 mt-1">
+          <Skeleton className="h-3 w-1/2" />
+          <Skeleton className="h-8 w-full rounded-lg" />
+          <Skeleton className="h-8 w-full rounded-lg" />
+          <Skeleton className="h-8 w-full rounded-lg" />
+        </div>
+      </Card>
+    );
+  }
+
   if (!players || players.length === 0) {
     return (
       <Card className="p-4">

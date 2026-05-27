@@ -1,4 +1,5 @@
 import Card from "../ui/Card";
+import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
 import { isStarting } from "../../lib/utils";
 
@@ -104,12 +105,31 @@ function PlayerRow({
   );
 }
 
+function CaptaincySkeleton() {
+  return (
+    <div className="space-y-2">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5">
+          <Skeleton className="w-6 h-6 rounded shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-2.5 w-1/2" />
+          </div>
+          <Skeleton className="h-3 w-10 shrink-0" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function CaptaincyCard({
   players,
+  loading,
   isHistorical,
   onPlayerClick,
 }: {
   players?: Player[] | null;
+  loading?: boolean;
   isHistorical?: boolean;
   onPlayerClick?: (p: Player) => void;
 }) {
@@ -118,6 +138,15 @@ export default function CaptaincyCard({
       <Card className="p-4">
         <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
         <div className="text-sm text-muted-foreground">Captain picks use live data — not available for past GWs.</div>
+      </Card>
+    );
+  }
+
+  if (loading && !players) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
+        <CaptaincySkeleton />
       </Card>
     );
   }

@@ -11,10 +11,12 @@ type Tab = "squad" | "football";
 
 export default function RightPanel({
   players,
+  loading,
   isHistorical,
   onPlayerClick,
 }: {
   players?: Player[] | null;
+  loading?: boolean;
   isHistorical?: boolean;
   onPlayerClick?: (p: Player) => void;
 }) {
@@ -35,8 +37,8 @@ export default function RightPanel({
 
       {tab === "squad" && (
         <>
-          <CaptaincyCard players={players} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
-          <HealthCard players={players} />
+          <CaptaincyCard players={players} loading={loading} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
+          <HealthCard players={players} loading={loading} />
           <HotNewsCard />
         </>
       )}
