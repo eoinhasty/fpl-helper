@@ -41,7 +41,6 @@ export function baseHeaders(): Record<string, string> {
 }
 
 const TOKEN_KEY = "fpl_token";
-const REFRESH_KEY = "fpl_refresh_token";
 
 function tokenHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
@@ -54,36 +53,41 @@ export function isAuthenticated(): boolean {
 
 export function clearAuth(): void {
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+  // Also clear any legacy refresh token that may be in localStorage from older versions
+  localStorage.removeItem("fpl_refresh_token");
+  // Fire-and-forget: clear the HttpOnly refresh cookie server-side
+  fetch(new URL("/api/auth/logout", ORIGIN).toString(), {
+    method: "POST",
+    headers: baseHeaders(),
+    credentials: "include",
+  }).catch(() => {});
 }
 
 export async function fplLogin(email: string, password: string): Promise<void> {
-  const { json } = await fetchJSON<{ access_token: string; refresh_token: string }>(
+  const { json } = await fetchJSON<{ access_token: string }>(
     new URL("/api/auth/login", ORIGIN).toString(),
     {
       method: "POST",
       headers: { ...baseHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
+      credentials: "include",
     }
   );
   localStorage.setItem(TOKEN_KEY, `Bearer ${json.access_token}`);
-  localStorage.setItem(REFRESH_KEY, json.refresh_token);
 }
 
 async function tryRefresh(): Promise<boolean> {
-  const refreshToken = typeof window !== "undefined" ? localStorage.getItem(REFRESH_KEY) : null;
-  if (!refreshToken) return false;
   try {
-    const { json } = await fetchJSON<{ access_token: string; refresh_token: string }>(
+    // Refresh token is an HttpOnly cookie — browser sends it automatically with credentials: "include"
+    const { json } = await fetchJSON<{ access_token: string }>(
       new URL("/api/auth/refresh", ORIGIN).toString(),
       {
         method: "POST",
-        headers: { ...baseHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        headers: baseHeaders(),
+        credentials: "include",
       }
     );
     localStorage.setItem(TOKEN_KEY, `Bearer ${json.access_token}`);
-    localStorage.setItem(REFRESH_KEY, json.refresh_token);
     return true;
   } catch {
     clearAuth();

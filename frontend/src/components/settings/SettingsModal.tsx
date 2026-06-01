@@ -43,7 +43,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
         </div>
 
         {/* body */}
-        <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-4 pb-3">
           {/* Account & Token */}
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3">Account</div>
@@ -162,6 +162,12 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
             </div>
           </Card>
         </div>
+        <p className="col-span-full text-xs text-muted-foreground/60 text-center pt-1">
+          Not affiliated with Fantasy Premier League or the Premier League.{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">
+            Privacy policy
+          </a>
+        </p>
       </div>
     </div>
   );

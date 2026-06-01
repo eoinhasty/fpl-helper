@@ -5,12 +5,38 @@ import secrets
 import uuid
 
 import httpx
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from app.deps import limiter, verify_api_key
 
 router = APIRouter(prefix="/api/auth", dependencies=[Depends(verify_api_key)])
+
+_COOKIE_NAME = "fpl_refresh_token"
+_COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    response.set_cookie(
+        key=_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=_COOKIE_MAX_AGE,
+        path="/api/auth",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=_COOKIE_NAME,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/api/auth",
+    )
+
 
 _CLIENT_ID = "bfcbaf69-aade-4c1b-8f00-c1cb8a193030"
 _REDIRECT_URI = "https://fantasy.premierleague.com/"
@@ -191,24 +217,30 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
 class TokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
 
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
-async def login(request: Request, body: LoginRequest = Body(...)):
+async def login(request: Request, response: Response, body: LoginRequest = Body(...)):
     access_token, refresh_token = await _pkce_login(body.email, body.password)
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    _set_refresh_cookie(response, refresh_token)
+    return TokenResponse(access_token=access_token)
 
 
 @router.post("/refresh", response_model=TokenResponse)
 @limiter.limit("20/minute")
-async def refresh(request: Request, body: RefreshRequest = Body(...)):
-    access_token, refresh_token = await _pkce_refresh(body.refresh_token)
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+async def refresh(request: Request, response: Response):
+    refresh_token = request.cookies.get(_COOKIE_NAME)
+    if not refresh_token:
+        raise HTTPException(401, detail="refresh_expired")
+    access_token, new_refresh_token = await _pkce_refresh(refresh_token)
+    _set_refresh_cookie(response, new_refresh_token)
+    return TokenResponse(access_token=access_token)
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    _clear_refresh_cookie(response)
+    return {"ok": True}
