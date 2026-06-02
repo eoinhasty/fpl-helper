@@ -79,7 +79,9 @@ export function usePreferences() {
             if (JSON.stringify(parsed) !== JSON.stringify(current)) return parsed;
             return current;
           });
-        } catch { }
+        } catch {
+          // malformed localStorage value — ignore
+        }
       }
     };
     window.addEventListener("storage", onStorage);

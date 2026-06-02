@@ -19,8 +19,8 @@ export function useFetch<T>(url?: string | null) {
         const r = await fetch(prefixedUrl, { signal: ac.signal, headers });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         setData(await r.json());
-      } catch (e: any) {
-        if (e?.name !== "AbortError") setError(e?.message ?? "Failed");
+      } catch (e: unknown) {
+        if ((e as Error)?.name !== "AbortError") setError((e as Error)?.message ?? "Failed");
       } finally {
         setLoading(false);
       }

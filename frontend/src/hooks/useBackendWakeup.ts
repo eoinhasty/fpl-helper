@@ -16,7 +16,9 @@ export function useBackendWakeup() {
 
       try {
         await fetch(`${apiBase}/api/health`, { headers: baseHeaders() });
-      } catch {}
+      } catch {
+        // fetch failure is expected when the backend is cold-starting
+      }
 
       clearTimeout(timer);
       if (!cancelled) {

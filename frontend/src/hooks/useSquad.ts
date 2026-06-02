@@ -23,9 +23,9 @@ export function useSquad(entry: number | "") {
       const res = await getSquad(String(entry), { gw, forceRefresh });
       if (id !== reqId.current) return; // stale response
       setData(res.data as SquadResponse); setCache(res.cache);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (id !== reqId.current) return;
-      setError(e?.message ?? "Failed to load squad");
+      setError((e as Error)?.message ?? "Failed to load squad");
     } finally { if (id === reqId.current) setLoading(false); }
   }, [entry]);
 
@@ -37,9 +37,9 @@ export function useSquad(entry: number | "") {
       const res = await getLive(Number(entry), { forceRefresh });
       if (id !== reqId.current) return;
       setData(res.data as SquadResponse); setCache(res.cache);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (id !== reqId.current) return;
-      const msg: string = e?.message ?? "Failed to load live squad";
+      const msg: string = (e as Error)?.message ?? "Failed to load live squad";
       if (msg === "AUTH_EXPIRED") clearAuth();
       setError(msg);
     } finally { if (id === reqId.current) setLoading(false); }

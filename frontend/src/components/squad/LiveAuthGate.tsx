@@ -36,8 +36,8 @@ export default function LiveAuthGate({ children, onAuthenticated }: Props) {
       await fplLogin(email.trim(), password);
       setAuthed(true);
       onAuthenticated();
-    } catch (err: any) {
-      const msg: string = err?.message ?? "";
+    } catch (err: unknown) {
+      const msg: string = (err as Error)?.message ?? "";
       if (msg.startsWith("401")) {
         setError("Incorrect email or password.");
       } else {
@@ -53,7 +53,9 @@ export default function LiveAuthGate({ children, onAuthenticated }: Props) {
     if (checked) {
       try {
         localStorage.setItem(CONSENT_KEY, "1");
-      } catch {}
+      } catch {
+        // localStorage throws in some private browsing contexts
+      }
     }
   }
 

@@ -28,7 +28,9 @@ async function fetchJSON<T>(url: string, init?: RequestInit): Promise<{ json: T;
     try {
       const text = await r.text();
       if (text) reason = text.slice(0, 180);
-    } catch {}
+    } catch {
+      // r.text() can fail on certain error responses — fall back to statusText
+    }
     throw new Error(`${r.status} ${reason}`.trim());
   }
   return { json: await r.json(), resp: r };
@@ -102,12 +104,12 @@ export async function getLive(entry: number, opts?: { forceRefresh?: boolean }):
   try {
     const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
     return { data: json, cache: cacheFrom(resp) };
-  } catch (e: any) {
-    if (e?.message?.startsWith("401") && await tryRefresh()) {
+  } catch (e: unknown) {
+    if ((e as Error)?.message?.startsWith("401") && await tryRefresh()) {
       const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
       return { data: json, cache: cacheFrom(resp) };
     }
-    if (e?.message?.startsWith("401")) {
+    if ((e as Error)?.message?.startsWith("401")) {
       throw new Error("AUTH_EXPIRED");
     }
     throw e;

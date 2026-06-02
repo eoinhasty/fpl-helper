@@ -33,7 +33,6 @@ export default function SquadDashboard() {
   // mode is intentionally excluded — including it would reset the toggle on every click.
   useEffect(() => {
     setMode(prefs.defaultView as Mode);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefs.defaultView]);
 
   useEffect(() => {
