@@ -1,5 +1,4 @@
 import SquadDashboard from "../pages/SquadDashboard";
-import PrivacyPage from "../pages/PrivacyPage";
 import { ErrorBoundary } from "../components/ui/ErrorBoundary";
 import TopNav from "../components/layout/TopNav";
 import { WakeupBanner } from "../components/ui/WakeupBanner";
@@ -7,10 +6,6 @@ import { useBackendWakeup } from "../hooks/useBackendWakeup";
 
 export default function App() {
   const { waking } = useBackendWakeup();
-
-  if (typeof window !== "undefined" && window.location.pathname === "/privacy") {
-    return <PrivacyPage />;
-  }
 
   return (
     <div className="min-h-screen page-bg flex flex-col">
