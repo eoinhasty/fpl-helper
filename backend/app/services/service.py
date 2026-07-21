@@ -288,6 +288,15 @@ class FPLService:
 
     # ----------------- utilities for shaping data -----------------
     @staticmethod
+    def season_status(events: list) -> str:
+        """'in_season' once any GW is current or finished; 'pre_season' otherwise
+        (covers FPL's summer window where is_current/is_next can both be false)."""
+        for e in events:
+            if e.get("is_current") or e.get("finished"):
+                return "in_season"
+        return "pre_season"
+
+    @staticmethod
     def start_prob_from(player: dict, played_gws: int = 1) -> float:
         status = player.get("status", "a")
         news = (player.get("news") or "").lower()
@@ -641,8 +650,12 @@ class FPLService:
 
     async def picks_with_fallback(
         self, entry_id: int, next_gw: int, current_gw: int
-    ) -> Tuple[dict, int, str, str, float]:
-        """Try next GW; if 404, fall back to current GW. Return (picks, used_gw, label, cache_status, age)."""
+    ) -> Optional[Tuple[dict, int, str, str, float]]:
+        """Try next GW; if 404, fall back to current GW. Return (picks, used_gw, label, cache_status, age).
+
+        Returns None when both GWs 404 — the caller decides whether that means
+        pre-season (no picks exist yet) or a genuine error.
+        """
         for gw, label in ((next_gw, "next"), (current_gw, "current")):
             try:
                 data, status, age = await self.picks(entry_id, gw)
@@ -656,6 +669,4 @@ class FPLService:
                         detail="Team is private; make it public or log in with cookies.",
                     )
                 raise
-        raise HTTPException(
-            404, detail=f"No open picks for GW {next_gw} or {current_gw}."
-        )
+        return None

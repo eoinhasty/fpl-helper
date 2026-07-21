@@ -15,6 +15,7 @@ import { Segmented } from "../components/controls/Segmented";
 import type { Player } from "../lib/types";
 import PlayerDetailModal from "../components/squad/PlayerDetailModal";
 import LiveAuthGate from "../components/squad/LiveAuthGate";
+import PreSeasonNotice from "../components/squad/PreSeasonNotice";
 
 type Mode = "live" | "squad";
 
@@ -61,6 +62,7 @@ export default function SquadDashboard() {
   );
 
   const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
+  const isPreSeason = data?.season_status === "pre_season" && (data?.players?.length ?? 0) === 0;
 
   const right = (
     <RightPanel
@@ -124,9 +126,12 @@ export default function SquadDashboard() {
       <DashboardLayout
         left={left}
         right={right}
+        hideRight={isPreSeason}
         stickyOffsetPx={52}
       >
-        {mode === "live" ? (
+        {isPreSeason ? (
+          <PreSeasonNotice deadlineISO={data?.deadline} />
+        ) : mode === "live" ? (
           <LiveAuthGate key={error === "AUTH_EXPIRED" ? "expired" : "authed"} onAuthenticated={loadLive}>
             {prefs.squadLayout === "pitch" ? (
               <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error === "AUTH_EXPIRED" ? null : error} />

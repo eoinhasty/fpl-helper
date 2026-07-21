@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 from typing import Optional, List
+import httpx
 from fastapi import APIRouter, Response, Request, Depends, HTTPException
 from app.deps import limiter, verify_api_key, nocache_guard
 from app.services.service import (
@@ -54,12 +55,27 @@ async def squad(
     # bootstrap (cached)
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
+    season_status = FPLService.season_status(events)
     current_event = next((e for e in events if e["is_current"]), None)
     next_event = next((e for e in events if e["is_next"]), None)
     if not current_event and not next_event:
         raise HTTPException(404, detail="No active gameweek found.")
     current_gw_id = current_event["id"] if current_event else next_event["id"]
     next_gw_id = next_event["id"] if next_event else current_event["id"]
+
+    # entry info first (cached long) — validates the ID so a bad entry stays a
+    # genuine 404 even pre-season, when picks 404 for everyone
+    try:
+        entry_data, _, _ = await svc.entry(entry_id)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(
+                404, detail=f"FPL entry {entry_id} not found. Check your team ID."
+            )
+        raise
+    entry_name = entry_data.get("name")  # e.g. "ABC FC"
+    player_first_name = entry_data.get("player_first_name", "")
+    player_last_name = entry_data.get("player_last_name", "")
 
     # picks (cached with tiny TTL; allow bypass)
     if gw is not None:
@@ -68,24 +84,54 @@ async def squad(
         )
         used_gw, used_label = gw, "explicit"
     else:
-        (
-            picks_data,
-            used_gw,
-            used_label,
-            pick_status,
-            pick_age,
-        ) = await svc.picks_with_fallback(entry_id, next_gw_id, current_gw_id)
+        picks_result = await svc.picks_with_fallback(
+            entry_id, next_gw_id, current_gw_id
+        )
+        if picks_result is None:
+            if season_status != "pre_season":
+                raise HTTPException(
+                    404,
+                    detail=f"No open picks for GW {next_gw_id} or {current_gw_id}.",
+                )
+            # Pre-season: no picks exist for anyone yet — return a structured
+            # empty squad so the UI can show a countdown instead of an error.
+            fav_team = None
+            fav_team_id = entry_data.get("favourite_team")
+            if fav_team_id:
+                t = next((t for t in boot["teams"] if t["id"] == fav_team_id), None)
+                if t:
+                    fav_team = t.get("short_name")
+            deadline_event = next_event or current_event
+            set_cache_headers(response, "miss", 0.0, TTL_PICKS)
+            return {
+                "entry_id": entry_id,
+                "entry_name": entry_name,
+                "player_name": f"{player_first_name} {player_last_name}".strip(),
+                "overall_rank": None,
+                "favourite_team": fav_team,
+                "season_status": season_status,
+                "requested_gw": next_gw_id,
+                "used_gw": next_gw_id,
+                "current_gw": current_gw_id,
+                "used_label": "pre_season",
+                "deadline": deadline_event["deadline_time"],
+                "active_chip": None,
+                "team_value": None,
+                "team_bank": None,
+                "players": [],
+            }
+        picks_data, used_gw, used_label, pick_status, pick_age = picks_result
 
-    live_data, _, _ = await svc.live_event(used_gw)
+    try:
+        live_data, _, _ = await svc.live_event(used_gw)
+    except httpx.HTTPStatusError as e:
+        # /event/{gw}/live/ can 404 in the window before a season's first kickoff
+        if e.response.status_code != 404:
+            raise
+        live_data = {"elements": []}
 
     # fixtures (cached)
     fixtures_data, _, _ = await svc.fixtures(used_gw)
-
-    # entry info (cached long)
-    entry_data, _, _ = await svc.entry(entry_id)
-    entry_name = entry_data.get("name")  # e.g. "ABC FC"
-    player_first_name = entry_data.get("player_first_name", "")
-    player_last_name = entry_data.get("player_last_name", "")
 
     hist, _, _ = await svc.entry_history(entry_id)
     current = hist.get("current") or []
@@ -118,6 +164,7 @@ async def squad(
         "player_name": f"{player_first_name} {player_last_name}".strip(),
         "overall_rank": overall_rank,
         "favourite_team": fav_team,
+        "season_status": season_status,
         "requested_gw": gw or next_gw_id,
         "used_gw": used_gw,
         "current_gw": current_gw_id,
@@ -159,7 +206,13 @@ async def live(
     )
 
     fixtures_data, _, _ = await svc.fixtures(used_gw)
-    event_live, _, _ = await svc.live_event(used_gw)
+    try:
+        event_live, _, _ = await svc.live_event(used_gw)
+    except httpx.HTTPStatusError as e:
+        # /event/{gw}/live/ can 404 pre-season while /my-team/ already works
+        if e.response.status_code != 404:
+            raise
+        event_live = {"elements": []}
 
     enriched, _, _ = svc.enrich_picks(
         {"picks": live_data.get("picks", [])},
@@ -203,6 +256,7 @@ async def live(
         "player_name": f"{player_first_name} {player_last_name}".strip(),
         "overall_rank": overall_rank,
         "favourite_team": fav_team,
+        "season_status": FPLService.season_status(events),
         "requested_gw": used_gw,
         "used_gw": used_gw,
         "current_gw": current_gw_id,
