@@ -24,6 +24,7 @@
   --success:             #16a34a;    /* green-600 */
   --warning:             #d97706;    /* amber-600 */
   --danger:              #dc2626;    /* red-600 */
+  --fdr-good:            #0d9488;    /* teal-600 — FDR "easy fixture" accent; distinct from --color-primary so it doesn't read as a CTA */
 
   /* elevation & radius */
   --shadow-card:         0 4px 20px -4px rgb(2 6 23 / 0.12), 0 1px 4px -1px rgb(2 6 23 / 0.07);
@@ -48,6 +49,7 @@
   --color-destructive:           var(--danger);
   --color-destructive-foreground:#fff;
   --color-primary-foreground:    #ffffff;
+  --color-fdr-good:              var(--fdr-good);
 }
 
 /* DARK overrides */
@@ -71,4 +73,5 @@
   --success:             #4ade80; /* green-400 */
   --warning:             #fcd34d; /* amber-300 */
   --danger:              #fca5a5; /* red-300 */
+  --fdr-good:            #2dd4bf; /* teal-400 */
 }

@@ -14,6 +14,7 @@ from app.services.service import (
     TTL_NEXTMATCH,
     TTL_NEWS,
     TTL_STANDINGS,
+    TTL_FDR,
     SWR_NEXTMATCH,
     SWR_NEWS,
     SWR_STANDINGS,
@@ -325,6 +326,16 @@ async def team_next(request: Request, response: Response, team_id: int, count: i
 
     count = max(1, min(int(count or 3), 10))
     return {"team_id": team_id, "fixtures": upcoming[:count]}
+
+
+@router.get("/fixtures/grid")
+@limiter.limit("30/minute")
+async def fixtures_grid(request: Request, response: Response, horizon: int = 6):
+    svc: FPLService = request.app.state.svc
+    horizon = max(1, min(int(horizon or 6), 12))
+    data, status, age = await svc.fdr_grid(horizon)
+    set_cache_headers(response, status, age, TTL_FDR)
+    return data
 
 
 @router.get("/leagues/{entry_id}")
