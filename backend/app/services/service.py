@@ -34,6 +34,8 @@ TTL_NEWS = 30 * 60  # 30m fresh
 SWR_NEWS = 6 * 60 * 60
 TTL_STANDINGS = 60 * 60  # 1h fresh
 SWR_STANDINGS = 6 * 60 * 60
+TTL_FDR = 60 * 60  # 1h fresh
+SWR_FDR = 24 * 60 * 60  # +24h stale
 
 
 def _ua() -> Dict[str, str]:
@@ -107,6 +109,88 @@ class FPLService:
             TTL_FIXTURES,
             SWR_FIXTURES,
         )
+
+    async def fdr_grid(self, horizon: int) -> Tuple[dict, str, float]:
+        key = f"fdr:{horizon}"
+
+        async def _fetch():
+            boot, _, _ = await self.bootstrap()
+            events = boot["events"]
+            teams = boot["teams"]
+            team_names = {t["id"]: t for t in teams}
+
+            base_event = next((e for e in events if e["is_next"]), None) or next(
+                (e for e in events if e["is_current"]), None
+            )
+            base_gw = base_event["id"] if base_event else 1
+            gw_ids = list(range(base_gw, min(base_gw + horizon, 39)))
+
+            fixtures, _, _ = await self.fixtures(None)
+            grid: Dict[int, Dict[int, list]] = {
+                t["id"]: {g: [] for g in gw_ids} for t in teams
+            }
+            for fx in fixtures:
+                ev = fx.get("event")
+                if ev not in gw_ids:
+                    continue
+                h, a = fx["team_h"], fx["team_a"]
+                if h in grid:
+                    grid[h][ev].append(
+                        {
+                            "opp": team_names[a]["short_name"],
+                            "home": True,
+                            "difficulty": fx["team_h_difficulty"],
+                            "kickoff": fx.get("kickoff_time"),
+                        }
+                    )
+                if a in grid:
+                    grid[a][ev].append(
+                        {
+                            "opp": team_names[h]["short_name"],
+                            "home": False,
+                            "difficulty": fx["team_a_difficulty"],
+                            "kickoff": fx.get("kickoff_time"),
+                        }
+                    )
+
+            gw_meta = [
+                {
+                    "id": g,
+                    "name": next(
+                        (e["name"] for e in events if e["id"] == g), f"Gameweek {g}"
+                    ),
+                    "deadline": next(
+                        (e["deadline_time"] for e in events if e["id"] == g), None
+                    ),
+                }
+                for g in gw_ids
+            ]
+
+            team_rows = []
+            for t in teams:
+                tid = t["id"]
+                gws = [grid[tid][g] for g in gw_ids]
+                diffs = [f["difficulty"] for gw_fixtures in gws for f in gw_fixtures]
+                fixture_count = len(diffs)
+                avg_difficulty = (
+                    round(sum(diffs) / fixture_count, 2) if fixture_count else None
+                )
+                team_rows.append(
+                    {
+                        "id": tid,
+                        "name": t["name"],
+                        "short_name": t["short_name"],
+                        "code": t["code"],
+                        "badge_url": f"https://resources.premierleague.com/premierleague/badges/50/t{t['code']}.png",
+                        "gws": gws,
+                        "avg_difficulty": avg_difficulty,
+                        "fixture_count": fixture_count,
+                    }
+                )
+
+            return {"base_gw": base_gw, "gws": gw_meta, "teams": team_rows}
+
+        return await self.cache.get_or_set(key, _fetch, TTL_FDR, SWR_FDR)
 
     async def picks(
         self, entry_id: int, gw: int, *, no_cache: bool = False

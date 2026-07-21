@@ -2,16 +2,12 @@ import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import type { TransferSuggestion, TransferSuggestionsResponse } from "../../lib/types";
 import { fmtPrice, pct } from "../../lib/format";
+import { fdrDotClass } from "../../lib/utils";
 
 const POS_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
 function FdrDot({ d }: { d: number }) {
-  const cls =
-    d === 1 ? "bg-emerald-400" :
-    d === 2 ? "bg-green-400" :
-    d === 3 ? "bg-slate-400" :
-    d === 4 ? "bg-amber-400" : "bg-red-400";
-  return <span className={`inline-block w-2 h-2 rounded-full ${cls}`} title={`FDR ${d}`} />;
+  return <span className={`inline-block w-2 h-2 rounded-full ${fdrDotClass(d)}`} title={`FDR ${d}`} />;
 }
 
 function SuggestionRow({ p }: { p: TransferSuggestion }) {

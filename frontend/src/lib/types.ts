@@ -86,3 +86,22 @@ export type SquadResponse = {
     players: Player[];
     active_chip?: string | null;
 };
+
+export type FdrGwMeta = { id: number; name: string; deadline: string | null };
+
+export type FdrTeam = {
+    id: number;
+    name: string;
+    short_name: string;
+    code: number;
+    badge_url: string;
+    gws: FixtureLite[][];
+    avg_difficulty: number | null;
+    fixture_count: number;
+};
+
+export type FdrGridResponse = {
+    base_gw: number;
+    gws: FdrGwMeta[];
+    teams: FdrTeam[];
+};

@@ -1,5 +1,6 @@
 // components/layout/TopNav.tsx
 import * as React from "react";
+import { Link } from "@tanstack/react-router";
 import SettingsModal from "../settings/SettingsModal";
 import { useEntryId } from "../../hooks/useEntryID";
 
@@ -27,11 +28,11 @@ export default function TopNav({
         role="banner"
       >
         <div
-          className="mx-auto px-4 py-3 flex items-center justify-between"
+          className="mx-auto px-4 py-3 flex items-center"
           style={{ maxWidth: `${maxWidthPx}px` }}
         >
-          <a
-            href="/"
+          <Link
+            to="/"
             className="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg"
             aria-label={`${title} home`}
           >
@@ -39,7 +40,27 @@ export default function TopNav({
               ⚽
             </div>
             <div className="font-semibold text-foreground">{title}</div>
-          </a>
+          </Link>
+
+          <nav className="hidden sm:flex items-center gap-1 mx-4" aria-label="Primary">
+            <Link
+              to="/"
+              className="px-3 py-1.5 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+              activeProps={{ className: "px-3 py-1.5 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
+              activeOptions={{ exact: true }}
+            >
+              Dashboard
+            </Link>
+            <Link
+              to="/fixtures"
+              className="px-3 py-1.5 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+              activeProps={{ className: "px-3 py-1.5 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
+            >
+              Fixtures
+            </Link>
+          </nav>
+
+          <div className="flex-1" />
 
           <IconBtn
             label="Settings"
