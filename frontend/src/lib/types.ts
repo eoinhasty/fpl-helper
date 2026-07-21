@@ -74,13 +74,14 @@ export type SquadResponse = {
     entry_id: number;
     entry_name?: string;
     player_name?: string;
-    overall_rank?: number;
+    overall_rank?: number | null;
     favourite_team?: string;
+    season_status?: "pre_season" | "in_season";
     used_gw: number;
     current_gw: number;
-    used_label: "next" | "current" | "explicit" | "live";
+    used_label: "next" | "current" | "explicit" | "live" | "pre_season";
     deadline: string;
-    team_value: number;
+    team_value: number | null;
     team_bank?: number | null;
     players: Player[];
     active_chip?: string | null;
