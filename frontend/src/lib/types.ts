@@ -105,3 +105,51 @@ export type FdrGridResponse = {
     gws: FdrGwMeta[];
     teams: FdrTeam[];
 };
+
+export type PoolPosition = "GK" | "DEF" | "MID" | "FWD";
+
+export type PoolPlayer = {
+    id: number;
+    web_name: string;
+    full_name?: string;
+    team: number;
+    team_short?: string;
+    position: PoolPosition;
+    now_cost: number;
+    selected_by_percent?: string;
+    status?: string;
+    news?: string;
+    ep_next?: string;
+    total_points?: number;
+    form?: string;
+    penalties_order?: number;
+    corners_order?: number;
+    freekicks_order?: number;
+    shirt_url?: string;
+    fixtures?: FixtureLite[];
+};
+
+export type PoolTeam = { id: number; name: string; short_name: string };
+
+export type PlayersResponse = {
+    count: number;
+    teams: PoolTeam[];
+    players: PoolPlayer[];
+};
+
+export type PlayerSummaryHistoryPast = {
+    season_name: string;
+    total_points: number;
+    minutes: number;
+    goals_scored: number;
+    assists: number;
+    clean_sheets: number;
+    start_cost: number;
+    end_cost: number;
+};
+
+export type PlayerSummaryResponse = {
+    fixtures: unknown[];
+    history: unknown[];
+    history_past: PlayerSummaryHistoryPast[];
+};

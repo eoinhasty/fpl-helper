@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { Player, PlayerRank } from "../../lib/types";
+import type { Player, PlayerRank, PlayerSummaryResponse } from "../../lib/types";
 import { statusToText, fdrClass } from "../../lib/utils";
 import { fmtKickoff, fmtPrice, pct } from "../../lib/format";
 import { useFetch } from "../../hooks/useFetch";
@@ -13,12 +13,15 @@ type TeamFixture = {
   kickoff: string | null;
 };
 
-type Tab = "overview" | "stats" | "fixtures";
+type Tab = "overview" | "stats" | "fixtures" | "history";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   player: Player;
+  /** Planner squads set start_probability: 0 as a placeholder (required field,
+   * not a real estimate) — hide the "start prob" badge in that context. */
+  hideStartProbability?: boolean;
 };
 
 function TopNum({ label, value, delta, accent }: { label: string; value: React.ReactNode; delta?: string; accent?: boolean }) {
@@ -42,7 +45,7 @@ function SectionHeader({ label, right }: { label: string; right?: React.ReactNod
   );
 }
 
-function StatusBanner({ player }: { player: Player }) {
+function StatusBanner({ player, hideStartProbability }: { player: Player; hideStartProbability?: boolean }) {
   const s = player.status;
   const cfg =
     s === "d" ? { dot: "bg-warning", border: "border-warning/30", bg: "bg-warning/8", label: "text-warning" } :
@@ -57,9 +60,11 @@ function StatusBanner({ player }: { player: Player }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-sm font-medium ${cfg.label}`}>{statusToText(s)}</span>
-          <span className="text-xs text-muted-foreground">
-            {pct(player.start_probability)} start prob
-          </span>
+          {!hideStartProbability && (
+            <span className="text-xs text-muted-foreground">
+              {pct(player.start_probability)} start prob
+            </span>
+          )}
         </div>
         {player.news && (
           <p className="text-xs text-muted-foreground mt-1 leading-snug">{player.news}</p>
@@ -183,13 +188,17 @@ function FixturePill({ f }: { f: TeamFixture }) {
   );
 }
 
-export default function PlayerDetailModal({ open, onClose, player }: Props) {
+export default function PlayerDetailModal({ open, onClose, player, hideStartProbability }: Props) {
   const fixtUrl = open && player.team_id ? `/api/team-next/${player.team_id}?count=5` : null;
   const { data: fixtData, loading, error: err } = useFetch<{ fixtures: TeamFixture[] }>(fixtUrl);
   const nextFixt = fixtData?.fixtures ?? null;
 
   const [tab, setTab] = React.useState<Tab>("overview");
   const [statsOpen, setStatsOpen] = React.useState(false);
+
+  const historyUrl = open && tab === "history" ? `/api/player/${player.element}/summary` : null;
+  const { data: historyData, loading: historyLoading, error: historyErr } =
+    useFetch<PlayerSummaryResponse>(historyUrl);
 
   React.useEffect(() => {
     if (!open) return;
@@ -316,7 +325,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
 
         {/* tab bar */}
         <div className="flex gap-6 px-4 border-b border-border shrink-0">
-          {(["overview", "stats", "fixtures"] as const).map((t) => (
+          {(["overview", "stats", "fixtures", "history"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -338,7 +347,7 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
           {/* ── OVERVIEW TAB ── */}
           {tab === "overview" && (
             <div className="space-y-4">
-              <StatusBanner player={player} />
+              <StatusBanner player={player} hideStartProbability={hideStartProbability} />
 
               {/* Market */}
               <section>
@@ -524,6 +533,38 @@ export default function PlayerDetailModal({ open, onClose, player }: Props) {
                   <div className="flex gap-1.5">
                     {nextFixt.map((f) => (
                       <FixturePill key={`${f.event}-${f.kickoff ?? ""}`} f={f} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* ── HISTORY TAB ── */}
+          {tab === "history" && (
+            <div className="space-y-4">
+              <section>
+                <SectionHeader label="Past seasons" />
+                {historyLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+                {historyErr && <div className="text-sm text-destructive">{historyErr}</div>}
+                {!historyLoading && !historyErr && (!historyData || historyData.history_past.length === 0) && (
+                  <div className="text-sm text-muted-foreground">No prior-season history.</div>
+                )}
+                {!historyLoading && !historyErr && historyData && historyData.history_past.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {historyData.history_past.map((h) => (
+                      <div
+                        key={h.season_name}
+                        className="flex items-center justify-between border border-border rounded-xl px-4 py-3 bg-muted/30"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-foreground">{h.season_name}</span>
+                          <span className="text-xs text-muted-foreground mt-0.5">
+                            {h.minutes} mins · {h.goals_scored}G {h.assists}A
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold tabular-nums text-foreground">{h.total_points} pts</span>
+                      </div>
                     ))}
                   </div>
                 )}
