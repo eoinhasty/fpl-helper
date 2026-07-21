@@ -1,5 +1,5 @@
 // lib/api.ts
-import type { SquadResponse } from "./types";
+import type { SquadResponse, TransferSuggestionsResponse } from "./types";
 
 export type CacheStatus = "hit" | "miss" | "stale-serve" | "bypass-refresh" | null;
 export type CacheMeta = { status: CacheStatus; ageSeconds: number | null };
@@ -114,6 +114,12 @@ export async function getLive(entry: number, opts?: { forceRefresh?: boolean }):
     }
     throw e;
   }
+}
+
+export async function getTransferSuggestions(entry: number): Promise<TransferSuggestionsResponse> {
+  const u = new URL(`/api/transfer-suggestions/${entry}`, ORIGIN);
+  const { json } = await fetchJSON<TransferSuggestionsResponse>(u.toString(), { headers: baseHeaders() });
+  return json;
 }
 
 export async function getSquad(entry: string, opts?: { gw?: number; forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {
