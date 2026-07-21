@@ -36,6 +36,10 @@ TTL_STANDINGS = 60 * 60  # 1h fresh
 SWR_STANDINGS = 6 * 60 * 60
 TTL_FDR = 60 * 60  # 1h fresh
 SWR_FDR = 24 * 60 * 60  # +24h stale
+TTL_PLAYERS = 30 * 60  # 30m fresh
+SWR_PLAYERS = 6 * 60 * 60  # +6h stale
+TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
+SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
 
 
 def _ua() -> Dict[str, str]:
@@ -191,6 +195,124 @@ class FPLService:
             return {"base_gw": base_gw, "gws": gw_meta, "teams": team_rows}
 
         return await self.cache.get_or_set(key, _fetch, TTL_FDR, SWR_FDR)
+
+    @staticmethod
+    def _upcoming_by_team(
+        boot: dict, fixtures: list, n_fixtures: int = 3
+    ) -> Dict[int, List[dict]]:
+        """Next n_fixtures per team (FixtureLite shape), from the current/next GW onward."""
+        events = boot["events"]
+        teams = {t["id"]: t for t in boot["teams"]}
+        base_event = next((e for e in events if e["is_next"]), None) or next(
+            (e for e in events if e["is_current"]), None
+        )
+        base_gw = base_event["id"] if base_event else 1
+
+        by_team: Dict[int, List[dict]] = defaultdict(list)
+        for fx in fixtures:
+            ev = fx.get("event")
+            if ev is None or ev < base_gw:
+                continue
+            h, a = fx["team_h"], fx["team_a"]
+            if h in teams:
+                by_team[h].append(
+                    {
+                        "opp": teams[a]["short_name"],
+                        "home": True,
+                        "difficulty": fx["team_h_difficulty"],
+                        "kickoff": fx.get("kickoff_time"),
+                    }
+                )
+            if a in teams:
+                by_team[a].append(
+                    {
+                        "opp": teams[h]["short_name"],
+                        "home": False,
+                        "difficulty": fx["team_a_difficulty"],
+                        "kickoff": fx.get("kickoff_time"),
+                    }
+                )
+
+        for tid in by_team:
+            by_team[tid].sort(key=lambda f: f.get("kickoff") or "")
+            by_team[tid] = by_team[tid][:n_fixtures]
+
+        return by_team
+
+    async def player_pool(self) -> Tuple[dict, str, float]:
+        key = "playerpool"
+
+        async def _fetch():
+            boot, _, _ = await self.bootstrap()
+            fixtures_data, _, _ = await self.fixtures(None)
+            teams = {t["id"]: t for t in boot["teams"]}
+            upcoming = self._upcoming_by_team(boot, fixtures_data, 3)
+            positions = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
+
+            players = []
+            for p in boot["elements"]:
+                # status "u" = unavailable for the club they're listed under —
+                # permanently transferred out, out on loan elsewhere, or a departed
+                # free agent. FPL keeps them in bootstrap-static regardless, but
+                # they can't meaningfully be drafted.
+                if p.get("status") == "u":
+                    continue
+                t = teams.get(p.get("team", 0), {})
+                team_code = t.get("code")
+                is_gk = p.get("element_type") == 1
+                suffix = "_1" if is_gk else ""
+                shirt_url = (
+                    f"https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_{team_code}{suffix}-220.webp"
+                    if team_code
+                    else None
+                )
+                full_name = (
+                    f"{p.get('first_name', '')} {p.get('second_name', '')}".strip()
+                )
+                raw = {
+                    "id": p["id"],
+                    "code": p.get("code"),
+                    "web_name": p.get("web_name"),
+                    "full_name": full_name or None,
+                    "team": p.get("team"),
+                    "team_short": t.get("short_name"),
+                    "position": positions.get(p.get("element_type")),
+                    "now_cost": p.get("now_cost"),
+                    "selected_by_percent": p.get("selected_by_percent"),
+                    "status": p.get("status"),
+                    "news": p.get("news") or None,
+                    "ep_next": p.get("ep_next"),
+                    "total_points": p.get("total_points"),
+                    "form": p.get("form"),
+                    "penalties_order": p.get("penalties_order"),
+                    "corners_order": p.get("corners_and_indirect_freekicks_order"),
+                    "freekicks_order": p.get("direct_freekicks_order"),
+                    "shirt_url": shirt_url,
+                    "fixtures": upcoming.get(p.get("team"), []),
+                }
+                players.append(
+                    {
+                        k: v
+                        for k, v in raw.items()
+                        if v is not None and v != "" and v != []
+                    }
+                )
+
+            team_rows = [
+                {"id": t["id"], "name": t["name"], "short_name": t["short_name"]}
+                for t in boot["teams"]
+            ]
+
+            return {"count": len(players), "teams": team_rows, "players": players}
+
+        return await self.cache.get_or_set(key, _fetch, TTL_PLAYERS, SWR_PLAYERS)
+
+    async def player_summary(self, player_id: int) -> Tuple[dict, str, float]:
+        key = f"elsum:{player_id}"
+        fetch = lambda: self._get_json(f"/element-summary/{player_id}/")
+        return await self.cache.get_or_set(
+            key, fetch, TTL_PLAYER_SUMMARY, SWR_PLAYER_SUMMARY
+        )
 
     async def picks(
         self, entry_id: int, gw: int, *, no_cache: bool = False

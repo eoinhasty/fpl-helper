@@ -105,7 +105,7 @@ function BenchOrderBadge({ label }: { label: string }) {
 }
 
 
-export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => void }) {
+export default function PlayerChip({ p, onClick, hideStartMeter }: { p: Player; onClick?: () => void; hideStartMeter?: boolean }) {
   const isBench = (p.slot ?? 99) >= 12 || (p.multiplier ?? 1) === 0;
 
   const benchLabel = BENCH_LABEL[p.slot ?? 0];
@@ -156,7 +156,7 @@ export default function PlayerChip({ p, onClick }: { p: Player; onClick?: () => 
               </div>
             </div>
           </div>
-          {!isBench && p.start_probability != null && (
+          {!isBench && !hideStartMeter && p.start_probability != null && (
             <StartMeter probability={p.start_probability} showLabel className="justify-center mt-1 w-14 mx-auto" />
           )}
         </div>

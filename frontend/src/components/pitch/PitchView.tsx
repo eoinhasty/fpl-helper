@@ -15,6 +15,9 @@ type Props = {
   onPlayerClick?: (p: Player) => void;
   loading?: boolean;
   error?: string | null;
+  /** Suppress the start-probability meter under each XI chip — for planner
+   * squads, where start_probability is a meaningless placeholder (0). */
+  hideStartMeter?: boolean;
 };
 
 // SVG viewBox
@@ -25,7 +28,7 @@ const VB_H = 788;
 const CHIP_W_PX = 128;
 const CHIP_MARGIN_PX = 14;
 
-export default function PitchView({ players, brand = "YOUR BRAND", className, onPlayerClick, loading, error }: Props) {
+export default function PitchView({ players, brand = "YOUR BRAND", className, onPlayerClick, loading, error, hideStartMeter }: Props) {
   const all = players ?? [];
 
   const xi = all.filter(isStarting);
@@ -118,7 +121,7 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
                       className="absolute -translate-x-1/2 -translate-y-1/2"
                       style={{ left: `${leftPct}%`, top: `${topPct}%` }}
                     >
-                      <PlayerChip p={p} onClick={() => onPlayerClick?.(p)} />
+                      <PlayerChip p={p} onClick={() => onPlayerClick?.(p)} hideStartMeter={hideStartMeter} />
                     </div>
                   );
                 });

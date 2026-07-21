@@ -15,6 +15,8 @@ from app.services.service import (
     TTL_NEWS,
     TTL_STANDINGS,
     TTL_FDR,
+    TTL_PLAYERS,
+    TTL_PLAYER_SUMMARY,
     SWR_NEXTMATCH,
     SWR_NEWS,
     SWR_STANDINGS,
@@ -439,6 +441,27 @@ async def transfer_suggestions(
     response.headers["cache-control"] = (
         f"public, max-age=0, stale-while-revalidate={TTL_PICKS}"
     )
+    return data
+
+
+@router.get("/players")
+@limiter.limit("30/minute")
+async def players(request: Request, response: Response):
+    svc: FPLService = request.app.state.svc
+    data, status, age = await svc.player_pool()
+    set_cache_headers(response, status, age, TTL_PLAYERS)
+    return data
+
+
+@router.get("/player/{player_id}/summary")
+@limiter.limit("60/minute")
+async def player_summary(request: Request, response: Response, player_id: int):
+    svc: FPLService = request.app.state.svc
+    boot, _, _ = await svc.bootstrap()
+    if not any(p["id"] == player_id for p in boot["elements"]):
+        raise HTTPException(404, detail=f"Player {player_id} not found.")
+    data, status, age = await svc.player_summary(player_id)
+    set_cache_headers(response, status, age, TTL_PLAYER_SUMMARY)
     return data
 
 
