@@ -43,6 +43,33 @@ export type Player = {
     ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
 };
 
+export type TransferSuggestion = {
+    element: number;
+    name: string;
+    team: string | null;
+    price: number;
+    ep_next: string | null;
+    form: string | null;
+    score: number;
+    start_probability: number;
+    selected_by_percent: string | null;
+    fixture: FixtureLite | null;
+    has_dgw: boolean;
+    shirt_url: string | null;
+};
+
+export type TransferSuggestionGroup = {
+    position: 1 | 2 | 3 | 4;
+    budget: number;
+    players: TransferSuggestion[];
+};
+
+export type TransferSuggestionsResponse = {
+    entry_id: number;
+    bank: number;
+    suggestions: TransferSuggestionGroup[];
+};
+
 export type SquadResponse = {
     entry_id: number;
     entry_name?: string;

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import LeaguesCard from "../components/left/LeaguesCard";
+import TransferSuggestionsCard from "../components/left/TransferSuggestionsCard";
 import XIList from "../components/squad/XIList";
 import PitchView from "../components/pitch/PitchView";
 import SquadStatusBar from "../components/squad/SquadStatusBar";
@@ -52,7 +53,12 @@ export default function SquadDashboard() {
     [cap]
   );
 
-  const left = <LeaguesCard entry={entry} />;
+  const left = (
+    <>
+      <LeaguesCard entry={entry} />
+      <TransferSuggestionsCard entry={entry} />
+    </>
+  );
 
   const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
 

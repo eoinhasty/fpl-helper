@@ -358,6 +358,25 @@ async def news_hot(
     return data
 
 
+@router.get("/transfer-suggestions/{entry_id}")
+@limiter.limit("30/minute")
+async def transfer_suggestions(
+    request: Request,
+    response: Response,
+    entry_id: int,
+    top_n: int = 3,
+):
+    svc: FPLService = request.app.state.svc
+    top_n = max(1, min(int(top_n), 5))
+    data = await svc.transfer_suggestions(entry_id, top_n=top_n)
+    # suggestions are derived from bootstrap (6h) + picks (60s); use the shorter TTL
+    response.headers["x-cache-status"] = "live"
+    response.headers["cache-control"] = (
+        f"public, max-age=0, stale-while-revalidate={TTL_PICKS}"
+    )
+    return data
+
+
 @router.get("/pl/standings")
 @limiter.limit("30/minute")
 async def pl_standings(request: Request, response: Response):

@@ -497,6 +497,148 @@ class FPLService:
         eh = picks.get("entry_history") or {}
         return enriched, eh.get("value"), eh.get("bank")
 
+    @staticmethod
+    def _score_player(player: dict, fdr_by_team: dict, candidates: List[dict]) -> float:
+        """Score a player for transfer suggestions using the captaincy blend formula."""
+
+        def _norm(vals: List[float], v: float) -> float:
+            mn, mx = min(vals), max(vals)
+            return 0.5 if mx == mn else (v - mn) / (mx - mn)
+
+        pos = player.get("element_type", 4)
+
+        ep_vals = [float(c.get("ep_next") or 0) for c in candidates]
+        form_vals = [float(c.get("form") or 0) for c in candidates]
+        ict_vals = [float(c.get("ict_index") or 0) for c in candidates]
+
+        ep = float(player.get("ep_next") or 0)
+        if any(v > 0 for v in ep_vals):
+            base = _norm(ep_vals, ep)
+        else:
+            base = (
+                _norm(form_vals, float(player.get("form") or 0)) * 0.5
+                + _norm(ict_vals, float(player.get("ict_index") or 0)) * 0.5
+            )
+
+        team_fixtures = fdr_by_team.get(player.get("team", 0), [])
+        if not team_fixtures:
+            return 0.0  # BGW
+
+        avg_fdr = sum(f["difficulty"] for f in team_fixtures) / len(team_fixtures)
+        fdr_factor = 1 - (avg_fdr - 1) / 4
+        home_ratio = sum(1 for f in team_fixtures if f["home"]) / len(team_fixtures)
+        home_boost = 1 + home_ratio * 0.08
+        dgw_boost = 1.8 if len(team_fixtures) > 1 else 1.0
+        pos_mult = {1: 0.65, 2: 0.72, 3: 0.92, 4: 1.0}.get(pos, 1.0)
+        start_prob = FPLService.start_prob_from(player)
+
+        return base * fdr_factor * home_boost * dgw_boost * start_prob * pos_mult
+
+    async def transfer_suggestions(self, entry_id: int, top_n: int = 3) -> dict:
+        boot, _, _ = await self.bootstrap()
+        events = boot["events"]
+        current_event = next((e for e in events if e["is_current"]), None)
+        next_event = next((e for e in events if e["is_next"]), None)
+        if not current_event and not next_event:
+            raise HTTPException(404, detail="No active gameweek found.")
+        current_gw = current_event["id"] if current_event else next_event["id"]
+        next_gw = next_event["id"] if next_event else current_event["id"]
+
+        picks_data, used_gw, _, _, _ = await self.picks_with_fallback(
+            entry_id, next_gw, current_gw
+        )
+        bank = (picks_data.get("entry_history") or {}).get("bank", 0)
+
+        players_dict = {p["id"]: p for p in boot["elements"]}
+        owned_ids: set = {p["element"] for p in picks_data.get("picks", [])}
+        owned_by_pos: Dict[int, List[dict]] = {}
+        for pick in picks_data.get("picks", []):
+            pl = players_dict.get(pick["element"], {})
+            pos = pl.get("element_type", 4)
+            owned_by_pos.setdefault(pos, []).append(pl)
+
+        fixtures_data, _, _ = await self.fixtures(used_gw)
+        teams = {t["id"]: t for t in boot["teams"]}
+        fdr_by_team: Dict[int, list] = {}
+        for fx in fixtures_data:
+            h, a = fx["team_h"], fx["team_a"]
+            fdr_by_team.setdefault(h, []).append(
+                {
+                    "opp": teams[a]["short_name"],
+                    "home": True,
+                    "difficulty": fx["team_h_difficulty"],
+                    "kickoff": fx.get("kickoff_time"),
+                }
+            )
+            fdr_by_team.setdefault(a, []).append(
+                {
+                    "opp": teams[h]["short_name"],
+                    "home": False,
+                    "difficulty": fx["team_a_difficulty"],
+                    "kickoff": fx.get("kickoff_time"),
+                }
+            )
+
+        suggestions = []
+        for pos in [1, 2, 3, 4]:
+            owned_in_pos = owned_by_pos.get(pos, [])
+            if not owned_in_pos:
+                continue
+            max_sell = max((p.get("now_cost", 0) for p in owned_in_pos), default=0)
+            budget = bank + max_sell
+
+            candidates = [
+                p
+                for p in boot["elements"]
+                if p["id"] not in owned_ids
+                and p.get("element_type") == pos
+                and p.get("now_cost", 0) <= budget
+                and (p.get("minutes") or 0) > 0
+            ]
+            if not candidates:
+                continue
+
+            scored = sorted(
+                (
+                    (p, self._score_player(p, fdr_by_team, candidates))
+                    for p in candidates
+                ),
+                key=lambda x: x[1],
+                reverse=True,
+            )
+
+            shaped = []
+            for p, score in scored[:top_n]:
+                t = teams.get(p.get("team", 0), {})
+                team_code = t.get("code")
+                suffix = "_1" if pos == 1 else ""
+                shirt_url = (
+                    f"https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_{team_code}{suffix}-220.webp"
+                    if team_code
+                    else None
+                )
+                team_fixtures = fdr_by_team.get(p.get("team", 0), [])
+                shaped.append(
+                    {
+                        "element": p["id"],
+                        "name": p.get("web_name"),
+                        "team": t.get("short_name"),
+                        "price": p.get("now_cost"),
+                        "ep_next": p.get("ep_next"),
+                        "form": p.get("form"),
+                        "score": round(score, 4),
+                        "start_probability": self.start_prob_from(p),
+                        "selected_by_percent": p.get("selected_by_percent"),
+                        "fixture": team_fixtures[0] if team_fixtures else None,
+                        "has_dgw": len(team_fixtures) > 1,
+                        "shirt_url": shirt_url,
+                    }
+                )
+
+            suggestions.append({"position": pos, "budget": budget, "players": shaped})
+
+        return {"entry_id": entry_id, "bank": bank, "suggestions": suggestions}
+
     async def picks_with_fallback(
         self, entry_id: int, next_gw: int, current_gw: int
     ) -> Tuple[dict, int, str, str, float]:
