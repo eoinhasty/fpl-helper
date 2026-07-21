@@ -251,6 +251,12 @@ class FPLService:
 
             players = []
             for p in boot["elements"]:
+                # status "u" = unavailable for the club they're listed under —
+                # permanently transferred out, out on loan elsewhere, or a departed
+                # free agent. FPL keeps them in bootstrap-static regardless, but
+                # they can't meaningfully be drafted.
+                if p.get("status") == "u":
+                    continue
                 t = teams.get(p.get("team", 0), {})
                 team_code = t.get("code")
                 is_gk = p.get("element_type") == 1
@@ -265,6 +271,7 @@ class FPLService:
                 )
                 raw = {
                     "id": p["id"],
+                    "code": p.get("code"),
                     "web_name": p.get("web_name"),
                     "full_name": full_name or None,
                     "team": p.get("team"),

@@ -2,8 +2,18 @@
 import * as React from "react";
 import type { PoolPlayer, PoolPosition, PoolTeam } from "../../lib/types";
 import { fmtPrice } from "../../lib/format";
-import { fdrClass } from "../../lib/utils";
+import { fdrClass, statusToText } from "../../lib/utils";
 import { Segmented } from "../controls/Segmented";
+
+/** Semantic-token badge styling for a player's status — mirrors the cfg object
+ * in PlayerDetailModal's StatusBanner (dark-mode safe), not the unused/dead
+ * `statusClass` helper in lib/utils.ts (hardcoded hex, doesn't adapt to dark mode). */
+function statusBadgeClass(s: string | undefined): string | null {
+  if (!s || s === "a") return null;
+  if (s === "d") return "bg-warning/10 text-warning border-warning/30";
+  if (s === "i" || s === "s") return "bg-destructive/10 text-destructive border-destructive/30";
+  return "bg-muted/60 text-muted-foreground border-border";
+}
 
 type SortKey = "now_cost" | "selected_by_percent" | "ep_next" | "form";
 
@@ -149,6 +159,14 @@ export default function PlayerTable({
                     <span className="text-[10px] font-semibold text-muted-foreground border border-border/60 rounded-full px-1.5 py-0.5">
                       {p.position}
                     </span>
+                    {statusBadgeClass(p.status) && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full border ${statusBadgeClass(p.status)}`}
+                        title={p.news || statusToText(p.status)}
+                      >
+                        {statusToText(p.status)}
+                      </span>
+                    )}
                     {(p.penalties_order ?? 99) <= 2 && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/30" title="Penalty taker">
                         PK{p.penalties_order}

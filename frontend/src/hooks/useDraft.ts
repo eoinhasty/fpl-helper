@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { PoolPlayer, PoolPosition } from "../lib/types";
 
-const KEY = "fpl-draft-v1";
+const KEY = "fpl-draft-v2";
 const EVT = "fpl:draft:update";
 
 export const BUDGET = 1000; // £100.0m in tenths
@@ -9,16 +9,20 @@ export const QUOTAS: Record<PoolPosition, number> = { GK: 2, DEF: 5, MID: 5, FWD
 export const MAX_PER_CLUB = 3;
 const SQUAD_SIZE = 15;
 
-type DraftState = { version: 1; picks: number[] };
+// Picks are stored as `code` (FPL's stable per-player identifier), not `id`
+// (which FPL recycles/reassigns to a different player each season) — so a
+// saved draft can't silently resolve to the wrong player after a season
+// rollover reassigns `id`s.
+type DraftState = { version: 2; picks: number[] };
 
-const DEFAULTS: DraftState = { version: 1, picks: [] };
+const DEFAULTS: DraftState = { version: 2, picks: [] };
 
 function parseDraft(raw: string | null): DraftState | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (parsed?.version === 1 && Array.isArray(parsed.picks)) {
-      return { version: 1, picks: parsed.picks };
+    if (parsed?.version === 2 && Array.isArray(parsed.picks)) {
+      return { version: 2, picks: parsed.picks };
     }
     return null;
   } catch {
@@ -60,20 +64,21 @@ export function useDraft(pool: PoolPlayer[] | undefined) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // drop any stored ID no longer in the pool (player transferred out) once the
-  // pool has actually landed — can't do this at init since the pool is async
+  // drop any stored code no longer in the pool (player transferred out of the
+  // league entirely) once the pool has actually landed — can't do this at
+  // init since the pool is async
   useEffect(() => {
     if (!pool) return;
-    const ids = new Set(pool.map((p) => p.id));
+    const codes = new Set(pool.map((p) => p.code));
     setState((cur) => {
-      const filtered = cur.picks.filter((id) => ids.has(id));
+      const filtered = cur.picks.filter((code) => codes.has(code));
       return filtered.length === cur.picks.length ? cur : { ...cur, picks: filtered };
     });
   }, [pool]);
 
-  const byId = new Map((pool ?? []).map((p) => [p.id, p]));
+  const byCode = new Map((pool ?? []).map((p) => [p.code, p]));
   const picks = state.picks
-    .map((id) => byId.get(id))
+    .map((code) => byCode.get(code))
     .filter((p): p is PoolPlayer => !!p);
 
   const counts: Record<PoolPosition, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
@@ -106,7 +111,7 @@ export function useDraft(pool: PoolPlayer[] | undefined) {
   }
 
   function canAdd(p: PoolPlayer): { ok: boolean; reason?: string } {
-    if (state.picks.includes(p.id)) return { ok: false, reason: "Already in squad" };
+    if (state.picks.includes(p.code)) return { ok: false, reason: "Already in squad" };
     if (state.picks.length >= SQUAD_SIZE) return { ok: false, reason: "Squad full (15/15)" };
     if (counts[p.position] >= QUOTAS[p.position]) {
       return { ok: false, reason: `${p.position} slots full (${QUOTAS[p.position]}/${QUOTAS[p.position]})` };
@@ -124,15 +129,15 @@ export function useDraft(pool: PoolPlayer[] | undefined) {
   }
 
   function add(p: PoolPlayer) {
-    setState((cur) => (cur.picks.includes(p.id) ? cur : { ...cur, picks: [...cur.picks, p.id] }));
+    setState((cur) => (cur.picks.includes(p.code) ? cur : { ...cur, picks: [...cur.picks, p.code] }));
   }
 
-  function remove(id: number) {
-    setState((cur) => ({ ...cur, picks: cur.picks.filter((x) => x !== id) }));
+  function remove(code: number) {
+    setState((cur) => ({ ...cur, picks: cur.picks.filter((x) => x !== code) }));
   }
 
   function clear() {
-    setState({ version: 1, picks: [] });
+    setState({ version: 2, picks: [] });
   }
 
   return {

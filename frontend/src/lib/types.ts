@@ -110,6 +110,10 @@ export type PoolPosition = "GK" | "DEF" | "MID" | "FWD";
 
 export type PoolPlayer = {
     id: number;
+    /** Stable per-player identifier that persists across seasons (unlike `id`,
+     * which FPL recycles/reassigns to different players each season) — use this,
+     * not `id`, for anything persisted across time (e.g. localStorage). */
+    code: number;
     web_name: string;
     full_name?: string;
     team: number;

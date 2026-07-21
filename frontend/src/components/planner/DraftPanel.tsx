@@ -18,7 +18,7 @@ export default function DraftPanel({
   budget: { spent: number; bank: number };
   clubCounts: Map<number, number>;
   violations: string[];
-  onRemove: (id: number) => void;
+  onRemove: (code: number) => void;
   onSelect?: (p: PoolPlayer) => void;
   onClear: () => void;
 }) {
@@ -103,7 +103,7 @@ export default function DraftPanel({
                       <span className="text-xs text-muted-foreground tabular-nums shrink-0">{fmtPrice(p.now_cost)}</span>
                       <button
                         type="button"
-                        onClick={() => onRemove(p.id)}
+                        onClick={() => onRemove(p.code)}
                         className="shrink-0 text-xs text-muted-foreground hover:text-destructive px-1.5 cursor-pointer transition"
                         aria-label={`Remove ${p.web_name}`}
                         title="Remove"
