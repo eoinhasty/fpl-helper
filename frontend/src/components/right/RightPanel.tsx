@@ -10,13 +10,17 @@ import type { Player } from "../../lib/types";
 type Tab = "squad" | "football";
 
 export default function RightPanel({
+  entry,
   players,
   loading,
+  error,
   isHistorical,
   onPlayerClick,
 }: {
+  entry?: number | "";
   players?: Player[] | null;
   loading?: boolean;
+  error?: string | null;
   isHistorical?: boolean;
   onPlayerClick?: (p: Player) => void;
 }) {
@@ -37,8 +41,8 @@ export default function RightPanel({
 
       {tab === "squad" && (
         <>
-          <CaptaincyCard players={players} loading={loading} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
-          <HealthCard players={players} loading={loading} />
+          <CaptaincyCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
+          <HealthCard entry={entry} players={players} loading={loading} error={error} />
           <HotNewsCard />
         </>
       )}

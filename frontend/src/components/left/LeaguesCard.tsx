@@ -4,6 +4,10 @@ import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import { num, delta } from "../../lib/format";
 
+// FPL returns 0 (not null) for entry_rank before a league has any played
+// gameweeks — 0 is never a real rank, so treat it the same as "no rank yet".
+const rank = (n: number | null) => (n ? n : null);
+
 type LeagueRow = { id: number; name: string; rank: number | null; last_rank: number | null };
 type LeaguesResp = {
   entry_id: number;
@@ -13,9 +17,11 @@ type LeaguesResp = {
   h2h: LeagueRow[];
 };
 
-export default function LeaguesCard({ entry }: { entry: number | "" }) {
+export default function LeaguesCard({ entry, preSeason }: { entry: number | ""; preSeason?: boolean }) {
   const url = entry ? `/api/leagues/${entry}` : null;
   const { data, loading, error } = useFetch<LeaguesResp>(url);
+
+  const ranksPending = Boolean(preSeason && data);
 
   return (
     <DataCard
@@ -23,19 +29,20 @@ export default function LeaguesCard({ entry }: { entry: number | "" }) {
       loading={loading}
       error={error}
       empty={!entry || !data}
+      emptyMessage={!entry ? "Set your entry id to see leagues." : undefined}
     >
-      {!entry && (
-        <div className="text-sm text-muted-foreground">
-          Set your entry id to see leagues.
-        </div>
-      )}
-
       {data && (
         <>
+          {ranksPending && (
+            <div className="text-xs text-muted-foreground mb-3">
+              Ranks appear once the season begins.
+            </div>
+          )}
+
           {/* Summary tiles */}
           <div className="grid grid-cols-2 gap-2 mb-3">
-            <Tile label="Overall Rank" value={num(data.overall_rank)} />
-            <Tile label="GW Rank" value={num(data.event_rank)} />
+            <Tile label="Overall Rank" value={num(rank(data.overall_rank))} />
+            <Tile label="GW Rank" value={num(rank(data.event_rank))} />
           </div>
 
           <Section title="Classic" rows={data.classic} />
@@ -80,11 +87,10 @@ function Section({ title, rows }: { title: string; rows: LeagueRow[] }) {
 }
 
 function LeagueItem({ row }: { row: LeagueRow }) {
-  const d = delta(row.rank, row.last_rank);
-  const improved =
-    row.rank != null &&
-    row.last_rank != null &&
-    row.last_rank - row.rank > 0;
+  const r = rank(row.rank);
+  const lr = rank(row.last_rank);
+  const d = delta(r, lr);
+  const improved = r != null && lr != null && lr - r > 0;
 
   return (
     <li className="flex items-center justify-between rounded-md border border-border bg-card px-2 py-1.5">
@@ -97,7 +103,7 @@ function LeagueItem({ row }: { row: LeagueRow }) {
           </span>
         )}
         <span className="text-xs rounded-full border border-border px-2 py-0.5 bg-card text-foreground">
-          {num(row.rank)}
+          {num(r)}
         </span>
       </span>
     </li>

@@ -3,12 +3,13 @@ import Card from "./Card";
 import { Skeleton } from "./Skeleton";
 
 export default function DataCard({
-  title, loading, error, empty, children, right
+  title, loading, error, empty, emptyMessage, children, right
 }: {
   title: string;
   loading?: boolean;
   error?: string | null;
   empty?: boolean;
+  emptyMessage?: React.ReactNode;
   right?: React.ReactNode;
   children?: React.ReactNode;
 }) {
@@ -27,7 +28,9 @@ export default function DataCard({
           <Skeleton className="h-3 w-2/3" />
         </div>
       )}
-      {!loading && !error && empty && <div className="text-sm text-muted-foreground">No data.</div>}
+      {!loading && !error && empty && (
+        <div className="text-sm text-muted-foreground">{emptyMessage ?? "No data."}</div>
+      )}
       {!loading && !error && !empty && children}
     </Card>
   );

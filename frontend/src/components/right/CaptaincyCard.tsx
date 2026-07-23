@@ -123,13 +123,17 @@ function CaptaincySkeleton() {
 }
 
 export default function CaptaincyCard({
+  entry,
   players,
   loading,
+  error,
   isHistorical,
   onPlayerClick,
 }: {
+  entry?: number | "";
   players?: Player[] | null;
   loading?: boolean;
+  error?: string | null;
   isHistorical?: boolean;
   onPlayerClick?: (p: Player) => void;
 }) {
@@ -142,11 +146,29 @@ export default function CaptaincyCard({
     );
   }
 
+  if (!entry) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
+        <div className="text-sm text-muted-foreground">Set your entry id to see captain picks.</div>
+      </Card>
+    );
+  }
+
   if (loading && !players) {
     return (
       <Card className="p-4">
         <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
         <CaptaincySkeleton />
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
+        <div className="text-sm text-destructive">{error}</div>
       </Card>
     );
   }
@@ -165,7 +187,7 @@ export default function CaptaincyCard({
     <Card className="p-4">
       <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
       {picks.length === 0 ? (
-        <div className="text-sm text-muted-foreground">No XI loaded yet.</div>
+        <div className="text-sm text-muted-foreground">Captain picks appear once your squad is loaded.</div>
       ) : (
         <>
           <ul className="space-y-2">
