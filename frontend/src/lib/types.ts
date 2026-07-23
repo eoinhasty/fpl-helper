@@ -68,6 +68,7 @@ export type TransferSuggestionsResponse = {
     entry_id: number;
     bank: number;
     suggestions: TransferSuggestionGroup[];
+    season_status?: "pre_season" | "in_season";
 };
 
 export type SquadResponse = {

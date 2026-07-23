@@ -412,7 +412,7 @@ class FPLService:
         if token:
             async with httpx.AsyncClient(timeout=20.0) as fd_client:
                 r = await fd_client.get(
-                    "https://api.football-data.org/v4/competitions/2021/standings",
+                    "https://api.football-data.org/v4/competitions/PL/standings",
                     headers={"X-Auth-Token": token, **_ua()},
                 )
             r.raise_for_status()
@@ -426,8 +426,25 @@ class FPLService:
                     detail="Unexpected standings shape from football-data.org",
                 )
             table = standing["table"]
+
+            # football-data.org rolls its "current season" pointer over to the
+            # new season months before a ball is kicked, but the standings
+            # table itself keeps showing the just-finished season's final
+            # table (full playedGames counts) until matchday 1 is played. Flag
+            # that case so the UI can label it instead of presenting a stale
+            # table as if it were live.
+            season_start = js.get("season", {}).get("startDate")
+            is_previous_season_table = False
+            if season_start:
+                start_date = datetime.fromisoformat(season_start).replace(
+                    tzinfo=timezone.utc
+                )
+                is_previous_season_table = datetime.now(timezone.utc) < start_date
+
             return {
                 "source": "football-data.org",
+                "season_start_date": season_start,
+                "is_previous_season_table": is_previous_season_table,
                 "rows": [
                     {
                         "pos": row["position"],
@@ -759,9 +776,22 @@ class FPLService:
         current_gw = current_event["id"] if current_event else next_event["id"]
         next_gw = next_event["id"] if next_event else current_event["id"]
 
-        picks_data, used_gw, _, _, _ = await self.picks_with_fallback(
-            entry_id, next_gw, current_gw
-        )
+        picks_result = await self.picks_with_fallback(entry_id, next_gw, current_gw)
+        if picks_result is None:
+            season_status = self.season_status(events)
+            if season_status != "pre_season":
+                raise HTTPException(
+                    404, detail=f"No open picks for GW {next_gw} or {current_gw}."
+                )
+            # Pre-season: no picks exist for anyone yet — nothing to base
+            # suggestions on, so return an empty (not error) response.
+            return {
+                "entry_id": entry_id,
+                "bank": 0,
+                "suggestions": [],
+                "season_status": season_status,
+            }
+        picks_data, used_gw, _, _, _ = picks_result
         bank = (picks_data.get("entry_history") or {}).get("bank", 0)
 
         players_dict = {p["id"]: p for p in boot["elements"]}

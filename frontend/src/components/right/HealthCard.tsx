@@ -2,7 +2,26 @@ import Card from "../ui/Card";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
 
-export default function HealthCard({ players, loading }: { players?: Player[] | null; loading?: boolean }) {
+export default function HealthCard({
+  entry,
+  players,
+  loading,
+  error,
+}: {
+  entry?: number | "";
+  players?: Player[] | null;
+  loading?: boolean;
+  error?: string | null;
+}) {
+  if (!entry) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Team Health</div>
+        <div className="text-sm text-muted-foreground">Set your entry id to see team health.</div>
+      </Card>
+    );
+  }
+
   if (loading && !players) {
     return (
       <Card className="p-4">
@@ -17,11 +36,20 @@ export default function HealthCard({ players, loading }: { players?: Player[] | 
     );
   }
 
+  if (error) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Team Health</div>
+        <div className="text-sm text-destructive">{error}</div>
+      </Card>
+    );
+  }
+
   if (!players || players.length === 0) {
     return (
       <Card className="p-4">
         <div className="text-sm font-semibold text-foreground mb-2">Team Health</div>
-        <div className="text-sm text-muted-foreground">No squad yet.</div>
+        <div className="text-sm text-muted-foreground">Team health appears once your squad is loaded.</div>
       </Card>
     );
   }

@@ -54,20 +54,22 @@ export default function SquadDashboard() {
     [cap]
   );
 
+  const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
+  const isPreSeason = data?.season_status === "pre_season" && (data?.players?.length ?? 0) === 0;
+
   const left = (
     <>
-      <LeaguesCard entry={entry} />
+      <LeaguesCard entry={entry} preSeason={isPreSeason} />
       <TransferSuggestionsCard entry={entry} />
     </>
   );
 
-  const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
-  const isPreSeason = data?.season_status === "pre_season" && (data?.players?.length ?? 0) === 0;
-
   const right = (
     <RightPanel
+      entry={entry}
       players={data?.players}
       loading={loading}
+      error={error === "AUTH_EXPIRED" ? null : error}
       isHistorical={isHistorical}
       onPlayerClick={openPlayer}
     />
@@ -126,7 +128,6 @@ export default function SquadDashboard() {
       <DashboardLayout
         left={left}
         right={right}
-        hideRight={isPreSeason}
         stickyOffsetPx={52}
       >
         {isPreSeason ? (

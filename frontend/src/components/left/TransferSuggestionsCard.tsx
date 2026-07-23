@@ -63,11 +63,14 @@ export default function TransferSuggestionsCard({ entry }: { entry: number | "" 
       loading={loading}
       error={error}
       empty={!entry || !data}
+      emptyMessage={!entry ? "Set your entry id to see suggestions." : undefined}
     >
-      {!entry && (
-        <div className="text-sm text-muted-foreground">Set your entry id to see suggestions.</div>
+      {data && data.season_status === "pre_season" && (
+        <div className="text-sm text-muted-foreground">
+          Suggestions appear once you've confirmed your GW1 picks.
+        </div>
       )}
-      {data && data.suggestions.length === 0 && (
+      {data && data.season_status !== "pre_season" && data.suggestions.length === 0 && (
         <div className="text-sm text-muted-foreground">No suggestions available.</div>
       )}
       {data && data.suggestions.map((group) => (
