@@ -11,6 +11,7 @@ import { useEntryId } from "../hooks/useEntryID";
 import { useSquad } from "../hooks/useSquad";
 import { usePreferences } from "../hooks/usePreferences";
 import { Segmented } from "../components/controls/Segmented";
+import { GwSelect } from "../components/controls/GwSelect";
 
 import type { Player } from "../lib/types";
 import PlayerDetailModal from "../components/squad/PlayerDetailModal";
@@ -99,16 +100,12 @@ export default function SquadDashboard() {
             { label: "Live", value: "live" },
           ]}
         />
-        <select
-          className="bg-background text-foreground border border-border rounded-xl px-3 py-1.5 text-sm disabled:opacity-60"
-          value={gw ?? data?.used_gw ?? ""}
-          onChange={(e) => setGw(Number(e.target.value))}
+        <GwSelect
+          value={gw ?? data?.used_gw}
+          options={gwOptions}
+          onChange={setGw}
           disabled={mode === "live"}
-        >
-          {gwOptions.map((g) => (
-            <option key={g} value={g}>GW {g}</option>
-          ))}
-        </select>
+        />
         <button
           className="btn"
           onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
