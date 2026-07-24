@@ -16,46 +16,51 @@ export function useSquad(entry: number | "") {
   // just because the other mode's fetch failed (e.g. Live while unauthenticated).
   const [seasonStatus, setSeasonStatus] = useState<SquadResponse["season_status"] | null>(null);
 
-  // avoid race conditions when switching fast
-  const reqId = useRef(0);
+  // Separate counters per mode — loadSquad and loadLive can be in flight at
+  // the same time (e.g. rapid mode switching), and a shared counter would let
+  // one silently cancel the other.
+  const squadReqId = useRef(0);
+  const liveReqId = useRef(0);
 
-  const loadSquad = useCallback(async (opts: LoadSquadOpts = {}) => {
-    if (!entry) return;
-    const id = ++reqId.current;
-    const { gw, forceRefresh } = opts;
+  const _load = useCallback(async (
+    reqIdRef: React.MutableRefObject<number>,
+    fetcher: () => Promise<{ data: SquadResponse; cache: CacheMeta }>,
+    fallbackMsg: string,
+    onError?: (msg: string) => void,
+  ) => {
+    const id = ++reqIdRef.current;
     try {
       setLoading(true); setError(null);
-      const res = await getSquad(String(entry), { gw, forceRefresh });
-      if (id !== reqId.current) return; // stale response
-      setData(res.data as SquadResponse); setCache(res.cache);
+      const res = await fetcher();
+      if (id !== reqIdRef.current) return; // stale response
+      setData(res.data); setCache(res.cache);
       if (res.data.season_status) setSeasonStatus(res.data.season_status);
     } catch (e: unknown) {
-      if (id !== reqId.current) return;
-      setError((e as Error)?.message ?? "Failed to load squad");
-    } finally { if (id === reqId.current) setLoading(false); }
-  }, [entry]);
-
-  const loadLive = useCallback(async (forceRefresh = false) => {
-    if (!entry) return;
-    const id = ++reqId.current;
-    try {
-      setLoading(true); setError(null);
-      const res = await getLive(Number(entry), { forceRefresh });
-      if (id !== reqId.current) return;
-      setData(res.data as SquadResponse); setCache(res.cache);
-      if (res.data.season_status) setSeasonStatus(res.data.season_status);
-    } catch (e: unknown) {
-      if (id !== reqId.current) return;
-      const msg: string = (e as Error)?.message ?? "Failed to load live squad";
-      if (msg === "AUTH_EXPIRED") clearAuth();
+      if (id !== reqIdRef.current) return;
+      const msg = (e as Error)?.message ?? fallbackMsg;
+      onError?.(msg);
       setError(msg);
-    } finally { if (id === reqId.current) setLoading(false); }
-  }, [entry]);
+    } finally { if (id === reqIdRef.current) setLoading(false); }
+  }, []);
+
+  const loadSquad = useCallback((opts: LoadSquadOpts = {}) => {
+    if (!entry) return;
+    const { gw, forceRefresh } = opts;
+    return _load(squadReqId, () => getSquad(String(entry), { gw, forceRefresh }), "Failed to load squad");
+  }, [entry, _load]);
+
+  const loadLive = useCallback((forceRefresh = false) => {
+    if (!entry) return;
+    return _load(liveReqId, () => getLive(Number(entry), { forceRefresh }), "Failed to load live squad", (msg) => {
+      if (msg === "AUTH_EXPIRED") clearAuth();
+    });
+  }, [entry, _load]);
 
   // Drop stale cross-mode data (e.g. a "pre_season" squad snapshot lingering
   // after switching to Live) so mode-dependent UI doesn't render off it.
   const clearData = useCallback(() => {
-    reqId.current++; // invalidate any in-flight request from the previous mode
+    squadReqId.current++; // invalidate any in-flight request from the previous mode
+    liveReqId.current++;
     setData(null);
     setError(null);
     setCache({ status: null, ageSeconds: null });
