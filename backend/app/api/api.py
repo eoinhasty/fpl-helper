@@ -98,7 +98,10 @@ async def squad(
                 if t:
                     fav_team = t.get("short_name")
             deadline_event = next_event or current_event
-            set_cache_headers(response, "miss", 0.0, TTL_PICKS)
+            # No cache headers here — this response is hand-built from bootstrap
+            # data, not the product of a real (cached) picks fetch, so there's
+            # nothing honest to report. Omitting the header makes the frontend
+            # hide the cache indicator instead of claiming a fake "just fetched".
             return {
                 "entry_id": entry_id,
                 "entry_name": entry_name,
@@ -136,7 +139,10 @@ async def squad(
                 if t:
                     fav_team = t.get("short_name")
             deadline_event = next_event or current_event
-            set_cache_headers(response, "miss", 0.0, TTL_PICKS)
+            # No cache headers here — this response is hand-built from bootstrap
+            # data, not the product of a real (cached) picks fetch, so there's
+            # nothing honest to report. Omitting the header makes the frontend
+            # hide the cache indicator instead of claiming a fake "just fetched".
             return {
                 "entry_id": entry_id,
                 "entry_name": entry_name,
