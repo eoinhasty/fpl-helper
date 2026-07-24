@@ -57,13 +57,15 @@ export function useSquad(entry: number | "") {
   }, [entry, _load]);
 
   // Drop stale cross-mode data (e.g. a "pre_season" squad snapshot lingering
-  // after switching to Live) so mode-dependent UI doesn't render off it.
+  // after switching to Live) so mode-dependent UI doesn't render off it. Cache
+  // meta is deliberately left alone — it's not part of that correctness
+  // concern, and nulling it just makes CacheIndicators flicker off and back
+  // on every switch; the upcoming fetch's setCache() replaces it a moment later.
   const clearData = useCallback(() => {
     squadReqId.current++; // invalidate any in-flight request from the previous mode
     liveReqId.current++;
     setData(null);
     setError(null);
-    setCache({ status: null, ageSeconds: null });
   }, []);
 
   return { data, loading, error, cache, seasonStatus, loadSquad, loadLive, clearData };
