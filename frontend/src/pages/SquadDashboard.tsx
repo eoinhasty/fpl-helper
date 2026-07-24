@@ -1,5 +1,5 @@
 // pages/SquadDashboard.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import LeaguesCard from "../components/left/LeaguesCard";
 import TransferSuggestionsCard from "../components/left/TransferSuggestionsCard";
@@ -23,10 +23,11 @@ type Mode = "live" | "squad";
 export default function SquadDashboard() {
   const { entry } = useEntryId();
   const { prefs } = usePreferences();
-  const { data, loading, error, cache, loadSquad, loadLive } = useSquad(entry);
+  const { data, loading, error, cache, seasonStatus, loadSquad, loadLive, clearData } = useSquad(entry);
 
   const [mode, setMode] = useState<Mode>(prefs.defaultView);
   const [gw, setGw] = useState<number | undefined>(undefined); // undefined => server fallback
+  const prevMode = useRef(mode);
 
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const openPlayer = (p: Player) => setSelectedPlayer(p);
@@ -40,13 +41,20 @@ export default function SquadDashboard() {
 
   useEffect(() => {
     if (!entry) return;
+    // Discard the other mode's data on an actual mode switch — otherwise a
+    // stale squad-mode snapshot (e.g. pre-season, empty players) can linger
+    // and get misread as this mode's state (masking LiveAuthGate, etc.).
+    if (prevMode.current !== mode) {
+      clearData();
+      prevMode.current = mode;
+    }
     if (mode === "live") {
       loadLive();
       setGw(undefined); // lock gw for live
     } else {
       loadSquad({ gw });
     }
-  }, [mode, gw, entry, loadSquad, loadLive]);
+  }, [mode, gw, entry, loadSquad, loadLive, clearData]);
 
   // create GW options up to whichever GW we’ve seen
   const cap = data?.current_gw ?? 1;
@@ -60,7 +68,7 @@ export default function SquadDashboard() {
 
   const left = (
     <>
-      <LeaguesCard entry={entry} preSeason={isPreSeason} />
+      <LeaguesCard entry={entry} preSeason={seasonStatus === "pre_season"} />
       <TransferSuggestionsCard entry={entry} />
     </>
   );
@@ -127,11 +135,11 @@ export default function SquadDashboard() {
         right={right}
         stickyOffsetPx={52}
       >
-        {isPreSeason ? (
-          <PreSeasonNotice deadlineISO={data?.deadline} />
-        ) : mode === "live" ? (
+        {mode === "live" ? (
           <LiveAuthGate key={error === "AUTH_EXPIRED" ? "expired" : "authed"} onAuthenticated={loadLive}>
-            {prefs.squadLayout === "pitch" ? (
+            {isPreSeason ? (
+              <PreSeasonNotice deadlineISO={data?.deadline} />
+            ) : prefs.squadLayout === "pitch" ? (
               <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error === "AUTH_EXPIRED" ? null : error} />
             ) : (
               <XIList
@@ -143,6 +151,8 @@ export default function SquadDashboard() {
               />
             )}
           </LiveAuthGate>
+        ) : isPreSeason ? (
+          <PreSeasonNotice deadlineISO={data?.deadline} />
         ) : (
           prefs.squadLayout === "pitch" ? (
             <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error} />
