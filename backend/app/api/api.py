@@ -10,6 +10,7 @@ from app.services.service import (
     TTL_FIXTURES,
     TTL_PICKS,
     TTL_MYTEAM,
+    SWR_MYTEAM,
     TTL_ENTRY,
     TTL_NEXTMATCH,
     TTL_NEWS,
@@ -36,6 +37,21 @@ def set_cache_headers(resp: Response, status: str, age: float, ttl: int):
     resp.headers["x-cache-status"] = status
     resp.headers["x-cache-age"] = f"{age:.1f}"
     resp.headers["cache-control"] = f"public, max-age=0, stale-while-revalidate={ttl}"
+
+
+_CACHE_STATUS_SEVERITY = {"hit": 0, "bypass-refresh": 1, "miss": 2, "stale-serve": 3}
+
+
+def combine_cache(*readings: tuple[str, float]) -> tuple[str, float]:
+    """Combine multiple (status, age) readings from the fetches that actually
+    feed a response into one honest composite: the oldest age (a true upper
+    bound on how stale anything shown could be) and the most severe status.
+    Long-lived, rarely-changing fetches (fixtures, entry, entry history)
+    should be excluded — their age is expected and reporting it would just
+    make the badge pessimistic without being useful."""
+    status = max(readings, key=lambda r: _CACHE_STATUS_SEVERITY.get(r[0], 0))[0]
+    age = max(age for _, age in readings)
+    return status, age
 
 
 @health_router.get("/health")
@@ -163,12 +179,13 @@ async def squad(
         picks_data, used_gw, used_label, pick_status, pick_age = picks_result
 
     try:
-        live_data, _, _ = await svc.live_event(used_gw)
+        live_data, live_status, live_age = await svc.live_event(used_gw)
     except httpx.HTTPStatusError as e:
         # /event/{gw}/live/ can 404 in the window before a season's first kickoff
         if e.response.status_code != 404:
             raise
         live_data = {"elements": []}
+        live_status, live_age = "miss", 0.0
 
     # fixtures (cached)
     fixtures_data, _, _ = await svc.fixtures(used_gw)
@@ -197,7 +214,12 @@ async def squad(
     if used_event is None:
         raise HTTPException(404, detail=f"Gameweek {used_gw} not found.")
 
-    set_cache_headers(response, pick_status, pick_age, TTL_PICKS)
+    # Report the older/worse of picks vs. live scoring — picks alone would
+    # understate staleness if live_event hasn't revalidated as recently.
+    combined_status, combined_age = combine_cache(
+        (pick_status, pick_age), (live_status, live_age)
+    )
+    set_cache_headers(response, combined_status, combined_age, TTL_PICKS)
     return {
         "entry_id": entry_id,
         "entry_name": entry_name,
@@ -247,12 +269,17 @@ async def live(
 
     fixtures_data, _, _ = await svc.fixtures(used_gw)
     try:
-        event_live, _, _ = await svc.live_event(used_gw)
+        # Tighter TTL than the default (matches my_team's 30s cadence) — Live
+        # mode is exactly the time-sensitive case this endpoint exists for.
+        event_live, ev_status, ev_age = await svc.live_event(
+            used_gw, ttl=TTL_MYTEAM, stale_ttl=SWR_MYTEAM
+        )
     except httpx.HTTPStatusError as e:
         # /event/{gw}/live/ can 404 pre-season while /my-team/ already works
         if e.response.status_code != 404:
             raise
         event_live = {"elements": []}
+        ev_status, ev_age = "miss", 0.0
 
     enriched, _, _ = svc.enrich_picks(
         {"picks": live_data.get("picks", [])},
@@ -289,7 +316,13 @@ async def live(
     current_event = next((e for e in events if e["is_current"]), None)
     current_gw_id = current_event["id"] if current_event else used_gw
 
-    set_cache_headers(response, mt_status, mt_age, TTL_MYTEAM)
+    # Report the older/worse of team data vs. live scoring — the badge should
+    # reflect whichever is staler, not just whichever this endpoint happens
+    # to name first in the response headers.
+    combined_status, combined_age = combine_cache(
+        (mt_status, mt_age), (ev_status, ev_age)
+    )
+    set_cache_headers(response, combined_status, combined_age, TTL_MYTEAM)
     return {
         "entry_id": entry_id,
         "entry_name": entry_name,

@@ -500,13 +500,18 @@ class FPLService:
             ],
         }
 
-    async def live_event(self, gw: int) -> Tuple[dict, str, float]:
+    async def live_event(
+        self, gw: int, ttl: float = TTL_PICKS, stale_ttl: float = SWR_PICKS
+    ) -> Tuple[dict, str, float]:
+        # ttl/stale_ttl are overridable so Live mode (genuinely time-sensitive
+        # scoring) can poll tighter than a historical squad view of a finished
+        # GW, which never needs to re-check this often.
         key = f"live:{gw}"
         return await self.cache.get_or_set(
             key,
             lambda: self._get_json(f"/event/{gw}/live/"),
-            TTL_PICKS,
-            SWR_PICKS,
+            ttl,
+            stale_ttl,
         )
 
     # ----------------- utilities for shaping data -----------------
