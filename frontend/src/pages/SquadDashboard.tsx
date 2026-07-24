@@ -23,7 +23,7 @@ type Mode = "live" | "squad";
 export default function SquadDashboard() {
   const { entry } = useEntryId();
   const { prefs } = usePreferences();
-  const { data, loading, error, cache, seasonStatus, loadSquad, loadLive, clearData } = useSquad(entry);
+  const { data, loading, error, cache, seasonStatus, isSwitching, loadSquad, loadLive, clearData } = useSquad(entry);
 
   const [mode, setMode] = useState<Mode>(prefs.defaultView);
   const [gw, setGw] = useState<number | undefined>(undefined); // undefined => server fallback
@@ -98,6 +98,7 @@ export default function SquadDashboard() {
         activeChip={data?.active_chip ?? null}
         cache={cache ?? { status: null, ageSeconds: null }}
         isLive={mode === "live"}
+        isSwitching={isSwitching}
       />
       <div className="flex items-center gap-2 shrink-0">
         <Segmented<Mode>
@@ -125,7 +126,7 @@ export default function SquadDashboard() {
       </div>
     </div>
     </div>
-  ), [data?.used_gw, data?.deadline, data?.team_value, data?.team_bank, data?.active_chip, cache, mode, setMode, gw, gwOptions, loadLive, loadSquad]);
+  ), [data?.used_gw, data?.deadline, data?.team_value, data?.team_bank, data?.active_chip, cache, isSwitching, mode, setMode, gw, gwOptions, loadLive, loadSquad]);
 
   return (
     <>

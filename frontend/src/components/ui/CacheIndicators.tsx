@@ -4,15 +4,18 @@ import type { CacheStatus } from '../../lib/api';
 type Props = {
   status: CacheStatus;
   ageSeconds: number | null;
+  isSwitching?: boolean;
 };
 
-export default function CacheIndicators({ status, ageSeconds }: Props) {
+export default function CacheIndicators({ status, ageSeconds, isSwitching }: Props) {
   const liveAge = useAgeTicker(ageSeconds);
 
-  const isRefreshing = status === 'stale-serve';
+  // Suppress during a mode switch — cache meta briefly still belongs to the
+  // mode just left, so a leftover 'stale-serve' shouldn't badge the new mode.
+  const isRefreshing = status === 'stale-serve' && !isSwitching;
   const label =
     liveAge == null ? 'Updated just now' :
-    liveAge < 60     ? `Updated ${liveAge}s ago` :
+    liveAge < 60     ? `Updated ${Math.floor(liveAge)}s ago` :
     `Updated ${Math.floor(liveAge / 60)}m ago`;
 
   return (

@@ -11,6 +11,7 @@ export default function SquadStatusBar({
   cache,
   activeChip,
   isLive,
+  isSwitching,
 }: {
   gw?: number;
   deadlineISO?: string | null;
@@ -19,6 +20,7 @@ export default function SquadStatusBar({
   activeChip?: string | null;
   cache: CacheMeta;
   isLive?: boolean;
+  isSwitching?: boolean;
 }) {
   const { text, ended } = useCountdown(deadlineISO);
 
@@ -56,7 +58,7 @@ export default function SquadStatusBar({
       {cache?.status !== null && (
         <div className="hidden xl:flex items-center gap-2.5">
           <span className="w-px h-4 bg-border shrink-0" />
-          <CacheIndicators status={cache.status} ageSeconds={cache.ageSeconds} />
+          <CacheIndicators status={cache.status} ageSeconds={cache.ageSeconds} isSwitching={isSwitching} />
         </div>
       )}
     </div>
