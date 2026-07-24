@@ -82,9 +82,40 @@ async def squad(
 
     # picks (cached with tiny TTL; allow bypass)
     if gw is not None:
-        picks_data, pick_status, pick_age = await svc.picks(
-            entry_id, gw, no_cache=bool(noCache)
-        )
+        try:
+            picks_data, pick_status, pick_age = await svc.picks(
+                entry_id, gw, no_cache=bool(noCache)
+            )
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code != 404 or season_status != "pre_season":
+                raise
+            # Pre-season: picks 404 for everyone — return a structured
+            # empty squad so the UI can show a countdown instead of an error.
+            fav_team = None
+            fav_team_id = entry_data.get("favourite_team")
+            if fav_team_id:
+                t = next((t for t in boot["teams"] if t["id"] == fav_team_id), None)
+                if t:
+                    fav_team = t.get("short_name")
+            deadline_event = next_event or current_event
+            set_cache_headers(response, "miss", 0.0, TTL_PICKS)
+            return {
+                "entry_id": entry_id,
+                "entry_name": entry_name,
+                "player_name": f"{player_first_name} {player_last_name}".strip(),
+                "overall_rank": None,
+                "favourite_team": fav_team,
+                "season_status": season_status,
+                "requested_gw": gw,
+                "used_gw": gw,
+                "current_gw": current_gw_id,
+                "used_label": "pre_season",
+                "deadline": deadline_event["deadline_time"],
+                "active_chip": None,
+                "team_value": None,
+                "team_bank": None,
+                "players": [],
+            }
         used_gw, used_label = gw, "explicit"
     else:
         picks_result = await svc.picks_with_fallback(
