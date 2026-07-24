@@ -49,7 +49,7 @@ def _ua() -> Dict[str, str]:
 def _auth_headers_from(token: Optional[str]) -> Dict[str, str]:
     if not token:
         raise HTTPException(
-            400, detail="No FPL token provided. Enter your bearer token in Settings."
+            401, detail="Not authenticated. Please log in to view live data."
         )
     return {"X-Api-Authorization": token}
 
@@ -68,7 +68,7 @@ class FPLService:
         if r.status_code in (401, 403):
             raise HTTPException(
                 r.status_code,
-                detail="Unauthorized for /my-team. Check your bearer token in Settings.",
+                detail="Your FPL session has expired. Please log in again.",
             )
         r.raise_for_status()
         return r.json()
