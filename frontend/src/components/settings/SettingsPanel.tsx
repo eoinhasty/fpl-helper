@@ -1,5 +1,5 @@
 import React from "react";
-import { isAuthenticated, clearAuth } from "../lib/api";
+import { isAuthenticated, clearAuth } from "../../lib/api";
 
 export default function SettingsPanel() {
   const [authed, setAuthed] = React.useState(isAuthenticated);
