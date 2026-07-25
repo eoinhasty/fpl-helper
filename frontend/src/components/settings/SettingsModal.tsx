@@ -1,6 +1,8 @@
 import * as React from "react";
-import SettingsPanel from "../SettingsPanel";
+import SettingsPanel from "./SettingsPanel";
 import Card from "../ui/Card";
+import { Toggle } from "../ui/Toggle";
+import { Segmented } from "../controls/Segmented";
 import { usePreferences, type Theme, type DefaultView, type SquadLayout } from "../../hooks/usePreferences";
 
 type Props = {
@@ -73,24 +75,16 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
 
             {/* Theme */}
             <label className="block text-sm mb-1">Theme</label>
-            <div className="flex gap-2 mb-3">
-              {(["system", "light", "dark"] as Theme[]).map((t) => {
-                const active = prefs.theme === t;
-                return (
-                  <button
-                    key={t}
-                    onClick={() => set("theme", t)}
-                    className={`px-3 py-1.5 rounded-lg border border-border transition
-                      ${active ? "bg-primary text-primary-foreground border-0" : "bg-card text-foreground border-border hover:bg-accent"}
-                      focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background
-                    `}
-                    aria-pressed={active}
-                  >
-                    {t[0].toUpperCase() + t.slice(1)}
-                  </button>
-                );
-              })}
-            </div>
+            <Segmented<Theme>
+              value={prefs.theme}
+              onChange={(v) => set("theme", v)}
+              options={(["system", "light", "dark"] as Theme[]).map((t) => ({
+                value: t,
+                label: t[0].toUpperCase() + t.slice(1),
+              }))}
+              className="mb-3"
+              ariaLabel="Theme"
+            />
 
             {/* Toggles */}
             <Toggle
@@ -107,46 +101,22 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
             {/* Defaults */}
             <div className="mt-4">
               <label className="block text-sm mb-1">Default view</label>
-              <div className="flex gap-2">
-                {(["squad", "live"] as DefaultView[]).map((v) => {
-                  const active = prefs.defaultView === v;
-                  return (
-                    <button
-                      key={v}
-                      onClick={() => set("defaultView", v)}
-                      className={`px-3 py-1.5 rounded-lg border border-border transition
-                        ${active ? "bg-primary text-primary-foreground border-0" : "bg-card text-foreground border-border hover:bg-accent"}
-                        focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background
-                      `}
-                      aria-pressed={active}
-                    >
-                      {v}
-                    </button>
-                  );
-                })}
-              </div>
+              <Segmented<DefaultView>
+                value={prefs.defaultView}
+                onChange={(v) => set("defaultView", v)}
+                options={(["squad", "live"] as DefaultView[]).map((v) => ({ value: v, label: v }))}
+                ariaLabel="Default view"
+              />
             </div>
 
             <div className="mt-4">
               <label className="block text-sm mb-1">Squad layout</label>
-              <div className="flex gap-2">
-                {(["list", "pitch"] as SquadLayout[]).map((v) => {
-                  const active = prefs.squadLayout === v;
-                  return (
-                    <button
-                      key={v}
-                      onClick={() => set("squadLayout", v)}
-                      className={`px-3 py-1.5 rounded-lg border border-border transition
-                        ${active ? "bg-primary text-primary-foreground border-0" : "bg-card text-foreground border-border hover:bg-accent"}
-                        focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background
-                      `}
-                      aria-pressed={active}
-                    >
-                      {v}
-                    </button>
-                  );
-                })}
-              </div>
+              <Segmented<SquadLayout>
+                value={prefs.squadLayout}
+                onChange={(v) => set("squadLayout", v)}
+                options={(["list", "pitch"] as SquadLayout[]).map((v) => ({ value: v, label: v }))}
+                ariaLabel="Squad layout"
+              />
             </div>
 
             {/* Reset */}
@@ -170,37 +140,5 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
         </p>
       </div>
     </div>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex items-center justify-between gap-3 py-2">
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        className={`w-10 h-6 rounded-full border border-border relative transition
-          ${checked ? "bg-primary border-transparent" : "bg-muted border-border"}
-          focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background
-        `}
-        aria-pressed={checked}
-        aria-label={label}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-card border border-border transition-transform
-            ${checked ? "translate-x-4" : ""}
-          `}
-        />
-      </button>
-    </label>
   );
 }
