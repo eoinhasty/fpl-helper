@@ -583,13 +583,6 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
           >
             ⇄ Compare
           </button>
-          <button
-            className="bg-primary/40 text-primary-foreground/50 rounded-[10px] px-4 py-[11px] text-[13px] font-semibold cursor-not-allowed"
-            disabled
-            title="Open in FPL — coming soon"
-          >
-            Open in FPL ↗
-          </button>
         </div>
       </div>
     </div>
