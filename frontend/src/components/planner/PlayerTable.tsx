@@ -4,6 +4,7 @@ import type { PoolPlayer, PoolPosition, PoolTeam } from "../../lib/types";
 import { fmtPrice } from "../../lib/format";
 import { fdrClass, statusToText } from "../../lib/utils";
 import { Segmented } from "../controls/Segmented";
+import { SelectMenu } from "../controls/SelectMenu";
 
 /** Semantic-token badge styling for a player's status — mirrors the cfg object
  * in PlayerDetailModal's StatusBanner (dark-mode safe), not the unused/dead
@@ -91,17 +92,16 @@ export default function PlayerTable({
           onChange={setPosition}
           options={POSITION_OPTIONS}
         />
-        <select
+        <SelectMenu
           value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}
-          className="h-9 px-3 rounded-xl border border-border bg-card text-sm text-foreground"
-          aria-label="Filter by team"
-        >
-          <option value="ALL">All teams</option>
-          {teams.map((t) => (
-            <option key={t.id} value={String(t.id)}>{t.short_name}</option>
-          ))}
-        </select>
+          onChange={setTeamId}
+          ariaLabel="Filter by team"
+          className="w-32"
+          options={[
+            { label: "All teams", value: "ALL" },
+            ...teams.map((t) => ({ label: t.short_name, value: String(t.id) })),
+          ]}
+        />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -109,16 +109,13 @@ export default function PlayerTable({
           className="h-9 px-3 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground flex-1 min-w-[160px]"
           aria-label="Search players"
         />
-        <select
+        <SelectMenu
           value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as SortKey)}
-          className="h-9 px-3 rounded-xl border border-border bg-card text-sm text-foreground"
-          aria-label="Sort by"
-        >
-          {SORT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>Sort: {o.label}</option>
-          ))}
-        </select>
+          onChange={setSortKey}
+          ariaLabel="Sort by"
+          className="w-40"
+          options={SORT_OPTIONS.map((o) => ({ label: `Sort: ${o.label}`, value: o.value }))}
+        />
         <button
           type="button"
           onClick={() => setSortDesc((v) => !v)}
