@@ -8,7 +8,13 @@ import { num, delta } from "../../lib/format";
 // gameweeks — 0 is never a real rank, so treat it the same as "no rank yet".
 const rank = (n: number | null) => (n ? n : null);
 
-type LeagueRow = { id: number; name: string; rank: number | null; last_rank: number | null };
+type LeagueRow = {
+  id: number;
+  name: string;
+  rank: number | null;
+  last_rank: number | null;
+  league_type: "s" | "x" | null;
+};
 type LeaguesResp = {
   entry_id: number;
   overall_rank: number | null;
@@ -22,6 +28,9 @@ export default function LeaguesCard({ entry, preSeason }: { entry: number | ""; 
   const { data, loading, error } = useFetch<LeaguesResp>(url);
 
   const ranksPending = Boolean(preSeason && data);
+
+  const myClassic = data?.classic.filter((l) => l.league_type !== "s") ?? [];
+  const globalClassic = data?.classic.filter((l) => l.league_type === "s") ?? [];
 
   return (
     <DataCard
@@ -45,8 +54,17 @@ export default function LeaguesCard({ entry, preSeason }: { entry: number | ""; 
             <Tile label="GW Rank" value={num(rank(data.event_rank))} />
           </div>
 
-          <Section title="Classic" rows={data.classic} />
+          <Section
+            title="My Leagues"
+            rows={myClassic}
+            emptyText="No private leagues joined."
+          />
           <Section title="Head-to-Head" rows={data.h2h} />
+          <Section
+            title="Global"
+            rows={globalClassic}
+            emptyText="No global leagues."
+          />
         </>
       )}
     </DataCard>
@@ -64,9 +82,17 @@ function Tile({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function Section({ title, rows }: { title: string; rows: LeagueRow[] }) {
+function Section({
+  title,
+  rows,
+  emptyText,
+}: {
+  title: string;
+  rows: LeagueRow[];
+  emptyText?: string;
+}) {
   const items = React.useMemo(() => rows ?? [], [rows]);
-  const emptyText = `No ${title.toLowerCase()} leagues.`;
+  const empty = emptyText ?? `No ${title.toLowerCase()} leagues.`;
 
   return (
     <>
@@ -76,7 +102,7 @@ function Section({ title, rows }: { title: string; rows: LeagueRow[] }) {
 
       <ul role="list" aria-label={title} className="space-y-1 mb-3">
         {items.length === 0 && (
-          <li className="text-sm text-muted-foreground">{emptyText}</li>
+          <li className="text-sm text-muted-foreground">{empty}</li>
         )}
         {items.map((l) => (
           <LeagueItem key={l.id} row={l} />

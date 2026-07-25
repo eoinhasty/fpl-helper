@@ -426,6 +426,7 @@ async def leagues(request: Request, response: Response, entry_id: int):
             "name": x.get("name"),
             "rank": x.get("entry_rank"),
             "last_rank": x.get("entry_last_rank"),
+            "league_type": x.get("league_type"),
         }
 
     def map_h2h(x):
@@ -434,6 +435,7 @@ async def leagues(request: Request, response: Response, entry_id: int):
             "name": x.get("name"),
             "rank": x.get("entry_rank"),
             "last_rank": x.get("entry_last_rank"),
+            "league_type": x.get("league_type"),
         }
 
     set_cache_headers(response, status, age, TTL_ENTRY)
