@@ -3,7 +3,7 @@
 import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 
-type Row = { pos: number; team: string; played: number; w: number; d: number; l: number; pts: number; };
+type Row = { pos: number; team: string; crest?: string | null; played: number; w: number; d: number; l: number; pts: number; };
 type Resp = {
   source: string;
   rows: Row[];
@@ -35,7 +35,12 @@ export default function StandingsCard() {
               {data.rows.map((r) => (
                 <tr key={r.pos} className="odd:bg-card even:bg-muted/60">
                   <td className="px-3 py-2">{r.pos}</td>
-                  <td className="px-2">{r.team}</td>
+                  <td className="px-2">
+                    <div className="flex items-center gap-1.5">
+                      {r.crest && <img src={r.crest} alt="" className="w-4 h-4 object-contain" loading="lazy" />}
+                      {r.team}
+                    </div>
+                  </td>
                   <td className="text-center">{r.played}</td>
                   <td className="text-center">{r.w}</td>
                   <td className="text-center">{r.d}</td>

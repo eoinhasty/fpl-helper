@@ -449,6 +449,7 @@ class FPLService:
                     {
                         "pos": row["position"],
                         "team": row["team"]["shortName"] or row["team"]["name"],
+                        "crest": row["team"].get("crest"),
                         "played": row["playedGames"],
                         "w": row["won"],
                         "d": row["draw"],

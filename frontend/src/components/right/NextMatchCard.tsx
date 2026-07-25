@@ -4,15 +4,21 @@ import * as React from "react";
 import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 
-type Fx = { home: string; away: string; home_difficulty: number | null; away_difficulty: number | null; kickoff: string | null; };
+type Fx = { home: string; away: string; home_badge: string | null; away_badge: string | null; home_difficulty: number | null; away_difficulty: number | null; kickoff: string | null; };
 type Payload = { gw: number; first: Fx | null; fixtures: Fx[] };
 
 function Row({ f }: { f: Fx }) {
   return (
     <div className="flex items-center justify-between py-1">
-      <div className="font-medium text-foreground">{f.home}</div>
+      <div className="flex items-center gap-1.5 font-medium text-foreground">
+        {f.home_badge && <img src={f.home_badge} alt="" className="w-5 h-5 object-contain" loading="lazy" />}
+        {f.home}
+      </div>
       <span className="text-muted-foreground">vs</span>
-      <div className="font-medium text-foreground">{f.away}</div>
+      <div className="flex items-center gap-1.5 font-medium text-foreground">
+        {f.away_badge && <img src={f.away_badge} alt="" className="w-5 h-5 object-contain" loading="lazy" />}
+        {f.away}
+      </div>
       <div className="text-xs text-muted-foreground">
         {f.kickoff
           ? new Date(f.kickoff).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })

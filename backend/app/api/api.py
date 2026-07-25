@@ -455,14 +455,28 @@ async def pl_next_match(request: Request, response: Response):
     async def _fetch():
         first, fixtures, gw = await svc.next_match_and_gw()
         boot, _, _ = await svc.bootstrap()
-        teams = {t["id"]: t["short_name"] for t in boot["teams"]}
+        teams = {t["id"]: t for t in boot["teams"]}
+
+        def badge(team_id: int) -> str | None:
+            code = teams.get(team_id, {}).get("code")
+            return (
+                f"https://resources.premierleague.com/premierleague/badges/50/t{code}.png"
+                if code
+                else None
+            )
 
         def shape(fx: dict | None):
             if not fx:
                 return None
             return {
-                "home": teams.get(fx["team_h"], str(fx["team_h"])),
-                "away": teams.get(fx["team_a"], str(fx["team_a"])),
+                "home": teams.get(fx["team_h"], {}).get(
+                    "short_name", str(fx["team_h"])
+                ),
+                "away": teams.get(fx["team_a"], {}).get(
+                    "short_name", str(fx["team_a"])
+                ),
+                "home_badge": badge(fx["team_h"]),
+                "away_badge": badge(fx["team_a"]),
                 "home_difficulty": fx.get("team_h_difficulty"),
                 "away_difficulty": fx.get("team_a_difficulty"),
                 "kickoff": fx.get("kickoff_time"),
