@@ -100,7 +100,7 @@ export function useSquad(entry: number | "") {
   const loadSquad = useCallback((opts: LoadSquadOpts = {}) => {
     if (!entry) return;
     const { gw, forceRefresh } = opts;
-    return _load(squadReqId, () => getSquad(String(entry), { gw, forceRefresh }), "Failed to load squad", squadStaleTimer);
+    return _load(squadReqId, () => getSquad(Number(entry), { gw, forceRefresh }), "Failed to load squad", squadStaleTimer);
   }, [entry, _load]);
 
   const loadLive = useCallback((forceRefresh = false) => {
