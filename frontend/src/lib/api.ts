@@ -110,7 +110,7 @@ export async function getLive(entry: number, opts?: { forceRefresh?: boolean }):
       return { data: json, cache: cacheFrom(resp) };
     }
     if ((e as Error)?.message?.startsWith("401")) {
-      throw new Error("AUTH_EXPIRED");
+      throw new Error("AUTH_EXPIRED", { cause: e });
     }
     throw e;
   }

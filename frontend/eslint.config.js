@@ -13,7 +13,20 @@ export default tseslint.config([
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,
-      reactHooks.configs['recommended-latest'],
+      {
+        // eslint-plugin-react-hooks@7 merged in the React Compiler rule set
+        // (immutability/purity/set-state-in-effect/etc.) under its
+        // `recommended`/`recommended-latest` configs — much stricter than
+        // the rules-of-hooks + exhaustive-deps pair this project has always
+        // used. Pin just those two explicitly rather than adopting the full
+        // new rule set (and its config's `plugins` array, which is the
+        // legacy eslintrc shape ESLint 10's flat config rejects outright).
+        plugins: { 'react-hooks': reactHooks },
+        rules: {
+          'react-hooks/rules-of-hooks': 'error',
+          'react-hooks/exhaustive-deps': 'warn',
+        },
+      },
       reactRefresh.configs.vite,
       eslintConfigPrettier,
     ],
