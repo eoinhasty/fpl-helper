@@ -1,7 +1,6 @@
 import * as React from "react";
 import SettingsPanel from "./SettingsPanel";
 import Card from "../ui/Card";
-import { Toggle } from "../ui/Toggle";
 import { Segmented } from "../controls/Segmented";
 import { usePreferences, type Theme, type DefaultView, type SquadLayout } from "../../hooks/usePreferences";
 
@@ -14,6 +13,7 @@ type Props = {
 
 export default function SettingsModal({ open, onClose, entry, setEntry }: Props) {
   const { prefs, set, reset } = usePreferences();
+  const [confirmingReset, setConfirmingReset] = React.useState(false);
 
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -22,6 +22,10 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
     if (open) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  React.useEffect(() => {
+    if (!open) setConfirmingReset(false);
+  }, [open]);
 
   if (!open) return null;
 
@@ -64,6 +68,9 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
                 Clear
               </button>
             </div>
+            {entry !== "" && (!Number.isInteger(entry) || entry <= 0) && (
+              <p className="text-xs text-destructive mt-1">Entry ID must be a positive whole number.</p>
+            )}
 
             <div className="text-sm font-semibold mt-5 mb-2">FPL Account</div>
             <SettingsPanel />
@@ -84,18 +91,6 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
               }))}
               className="mb-3"
               ariaLabel="Theme"
-            />
-
-            {/* Toggles */}
-            <Toggle
-              checked={prefs.compactCards}
-              onChange={(v) => set("compactCards", v)}
-              label="Compact player cards"
-            />
-            <Toggle
-              checked={prefs.showXBadges}
-              onChange={(v) => set("showXBadges", v)}
-              label="Show xGI/xCS badges"
             />
 
             {/* Defaults */}
@@ -121,14 +116,38 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
 
             {/* Reset */}
             <div className="mt-6 pt-4 border-t border-border">
-              <button
-                onClick={reset}
-                className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
-                           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                type="button"
-              >
-                Reset preferences
-              </button>
+              {confirmingReset ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Reset theme, default view, and squad layout?</span>
+                  <button
+                    onClick={() => {
+                      reset();
+                      setConfirmingReset(false);
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
+                               focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                    type="button"
+                  >
+                    Confirm reset
+                  </button>
+                  <button
+                    onClick={() => setConfirmingReset(false)}
+                    className="btn"
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingReset(true)}
+                  className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
+                             focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                  type="button"
+                >
+                  Reset preferences
+                </button>
+              )}
             </div>
           </Card>
         </div>

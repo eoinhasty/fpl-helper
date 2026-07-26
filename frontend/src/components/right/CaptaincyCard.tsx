@@ -3,8 +3,11 @@ import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
 import { isStarting } from "../../lib/utils";
 
-function norm(v: number, arr: number[]) {
-  const mn = Math.min(...arr), mx = Math.max(...arr);
+function range(arr: number[]) {
+  return { mn: Math.min(...arr), mx: Math.max(...arr) };
+}
+
+function norm(v: number, { mn, mx }: { mn: number; mx: number }) {
   return mx === mn ? 0.5 : (v - mn) / (mx - mn);
 }
 
@@ -32,14 +35,14 @@ function score(players: Player[]) {
     };
   });
 
-  const forms = raw.map((r) => r.form);
-  const icts = raw.map((r) => r.ict);
-  const epDisplays = raw.map((r) => r.epDisplay);
-  const hasEp = epDisplays.some((e) => e > 0);
+  const formRange = range(raw.map((r) => r.form));
+  const ictRange = range(raw.map((r) => r.ict));
+  const epRange = range(raw.map((r) => r.epDisplay));
+  const hasEp = raw.some((r) => r.epDisplay > 0);
 
   return raw
     .map((r) => {
-      const base = hasEp ? norm(r.epDisplay, epDisplays) : norm(r.form, forms) * 0.5 + norm(r.ict, icts) * 0.5;
+      const base = hasEp ? norm(r.epDisplay, epRange) : norm(r.form, formRange) * 0.5 + norm(r.ict, ictRange) * 0.5;
       const fdrFactor = 1 - (r.fdr - 1) / 4;
       const homeBoost = 1 + r.home * 0.08;
       const dgwBoost = r.dgw ? 1.8 : 1.0;

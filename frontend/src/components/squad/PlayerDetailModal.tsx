@@ -1,7 +1,7 @@
 import * as React from "react";
 import type { Player, PlayerRank, PlayerSummaryResponse } from "../../lib/types";
 import { statusToText, fdrClass } from "../../lib/utils";
-import { fmtKickoff, fmtPrice, pct } from "../../lib/format";
+import { fmtKickoff, fmtPrice, pct, fmtCompact, fmtPriceDelta } from "../../lib/format";
 import { useFetch } from "../../hooks/useFetch";
 import { POSITION_LABEL } from "../../lib/constants";
 
@@ -45,14 +45,20 @@ function SectionHeader({ label, right }: { label: string; right?: React.ReactNod
   );
 }
 
+type StatusCfg = { dot: string; border: string; bg: string; label: string };
+
+const STATUS_CFG: Record<string, StatusCfg> = {
+  d: { dot: "bg-warning", border: "border-warning/30", bg: "bg-warning/8", label: "text-warning" },
+  i: { dot: "bg-destructive", border: "border-destructive/30", bg: "bg-destructive/8", label: "text-destructive" },
+  s: { dot: "bg-destructive", border: "border-destructive/30", bg: "bg-destructive/8", label: "text-destructive" },
+  n: { dot: "bg-muted-foreground", border: "border-border", bg: "bg-muted/40", label: "text-muted-foreground" },
+};
+
+const STATUS_CFG_DEFAULT: StatusCfg = { dot: "bg-success", border: "border-success/25", bg: "bg-success/5", label: "text-success" };
+
 function StatusBanner({ player, hideStartProbability }: { player: Player; hideStartProbability?: boolean }) {
   const s = player.status;
-  const cfg =
-    s === "d" ? { dot: "bg-warning", border: "border-warning/30", bg: "bg-warning/8", label: "text-warning" } :
-    s === "i" ? { dot: "bg-destructive", border: "border-destructive/30", bg: "bg-destructive/8", label: "text-destructive" } :
-    s === "s" ? { dot: "bg-destructive", border: "border-destructive/30", bg: "bg-destructive/8", label: "text-destructive" } :
-    s === "n" ? { dot: "bg-muted-foreground", border: "border-border", bg: "bg-muted/40", label: "text-muted-foreground" } :
-    { dot: "bg-success", border: "border-success/25", bg: "bg-success/5", label: "text-success" };
+  const cfg = (s ? STATUS_CFG[s] : undefined) ?? STATUS_CFG_DEFAULT;
 
   return (
     <div className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${cfg.border} ${cfg.bg}`}>
@@ -72,20 +78,6 @@ function StatusBanner({ player, hideStartProbability }: { player: Player; hideSt
       </div>
     </div>
   );
-}
-
-function fmtTransfers(n?: number): string {
-  if (n == null) return "—";
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${(abs / 1_000_000).toFixed(1)}m`;
-  if (abs >= 1_000) return `${Math.round(abs / 1_000)}k`;
-  return String(abs);
-}
-
-function fmtCostChange(n?: number): string | null {
-  if (n == null || n === 0) return null;
-  const arrow = n > 0 ? "↑" : "↓";
-  return `${arrow} £${Math.abs(n / 10).toFixed(1)}`;
 }
 
 function isPlayed(kickoff: string | null | undefined): boolean {
@@ -176,7 +168,7 @@ function OverviewFixtureCard({ f }: { f: TeamFixture }) {
   );
 }
 
-function FixturePill({ f }: { f: TeamFixture }) {
+function FixtureCompactPill({ f }: { f: TeamFixture }) {
   return (
     <div className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border border-border bg-muted/30 text-center min-w-0">
       <span className="text-[10px] text-muted-foreground tracking-wide font-mono">GW{f.event}</span>
@@ -194,7 +186,6 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
   const nextFixt = fixtData?.fixtures ?? null;
 
   const [tab, setTab] = React.useState<Tab>("overview");
-  const [statsOpen, setStatsOpen] = React.useState(false);
 
   const historyUrl = open && tab === "history" ? `/api/player/${player.element}/summary` : null;
   const { data: historyData, loading: historyLoading, error: historyErr } =
@@ -211,7 +202,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
 
   const posLabel = player.position ? POSITION_LABEL[player.position] : null;
   const hasGwPoints = player.gw_points != null;
-  const costChange = fmtCostChange(player.cost_change_start);
+  const costChange = fmtPriceDelta(player.cost_change_start);
   const xPts = player.ep_next ? Number(player.ep_next).toFixed(1) : "—";
   const ppg = player.points_per_game ? Number(player.points_per_game).toFixed(1) : "—";
   const form = player.form ? Number(player.form).toFixed(1) : "—";
@@ -226,10 +217,10 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
   const netTransfers = (player.transfers_in_event ?? 0) - (player.transfers_out_event ?? 0);
   const hasTransferData = player.transfers_in_event != null || player.transfers_out_event != null;
   const netSign = netTransfers > 0 ? "+" : netTransfers < 0 ? "−" : "";
-  const netStr = netTransfers !== 0 ? `${netSign}${fmtTransfers(netTransfers)}` : "0";
+  const netStr = netTransfers !== 0 ? `${netSign}${fmtCompact(netTransfers)}` : "0";
   const transferSub = [
-    player.transfers_in_event != null && `▲ ${fmtTransfers(player.transfers_in_event)} in`,
-    player.transfers_out_event != null && `▼ ${fmtTransfers(player.transfers_out_event)} out`,
+    player.transfers_in_event != null && `▲ ${fmtCompact(player.transfers_in_event)} in`,
+    player.transfers_out_event != null && `▼ ${fmtCompact(player.transfers_out_event)} out`,
   ].filter(Boolean).join(" · ");
 
   return (
@@ -459,24 +450,16 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
                 </div>
               </section>
 
-              {/* Per 90 (collapsed by default) */}
+              {/* Per 90 */}
               <section>
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="text-xs font-bold text-foreground/80 tracking-[-0.005em]">
                     Per 90 · vs {posLabel ?? "pos"}
                   </div>
-                  <button
-                    onClick={() => setStatsOpen((v) => !v)}
-                    className="text-[11px] font-semibold text-muted-foreground tracking-[0.08em] hover:text-foreground transition-colors"
-                  >
-                    {statsOpen ? "Hide" : "Show"} ▾
-                  </button>
                 </div>
-                {statsOpen && (
-                  <div className="px-4 py-4 rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
-                    Per-90 data not yet available.
-                  </div>
-                )}
+                <div className="px-4 py-4 rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
+                  Per-90 data not yet available.
+                </div>
               </section>
             </div>
           )}
@@ -532,7 +515,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
                 {!loading && !err && nextFixt && nextFixt.length > 0 && (
                   <div className="flex gap-1.5">
                     {nextFixt.map((f) => (
-                      <FixturePill key={`${f.event}-${f.kickoff ?? ""}`} f={f} />
+                      <FixtureCompactPill key={`${f.event}-${f.kickoff ?? ""}`} f={f} />
                     ))}
                   </div>
                 )}

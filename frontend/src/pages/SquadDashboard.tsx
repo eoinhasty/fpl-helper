@@ -84,7 +84,7 @@ export default function SquadDashboard() {
     />
   );
 
-  const contentHeader = useMemo(() => (
+  const contentHeader = (
     <div
       className="sticky z-30 border-b border-border bg-background/80 backdrop-blur"
       style={{ top: 0 }}
@@ -126,7 +126,7 @@ export default function SquadDashboard() {
       </div>
     </div>
     </div>
-  ), [data?.used_gw, data?.deadline, data?.team_value, data?.team_bank, data?.active_chip, cache, isSwitching, mode, setMode, gw, gwOptions, loadLive, loadSquad]);
+  );
 
   return (
     <>

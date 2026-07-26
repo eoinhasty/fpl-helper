@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type Theme = "system" | "light" | "dark";
 export type DefaultView = "squad" | "live";
@@ -6,8 +6,6 @@ export type SquadLayout = "list" | "pitch";
 
 export type Preferences = {
   theme: Theme;
-  compactCards: boolean;
-  showXBadges: boolean;
   defaultView: DefaultView;
   squadLayout: SquadLayout;
 };
@@ -16,8 +14,6 @@ const KEY = "fpl-prefs-v1";
 
 const DEFAULTS: Preferences = {
   theme: "system",
-  compactCards: false,
-  showXBadges: false,
   defaultView: "squad",
   squadLayout: "list",
 };
@@ -41,10 +37,14 @@ export function usePreferences() {
     }
   });
 
-  // save, apply theme, tell other instances on this tab
+  // save, apply theme (only when it actually changed), tell other instances on this tab
+  const prevTheme = useRef<Theme | undefined>(undefined);
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(prefs));
-    applyTheme(prefs.theme);
+    if (prefs.theme !== prevTheme.current) {
+      applyTheme(prefs.theme);
+      prevTheme.current = prefs.theme;
+    }
     window.dispatchEvent(new CustomEvent(EVT, { detail: prefs }));
   }, [prefs]);
 

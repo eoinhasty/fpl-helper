@@ -15,6 +15,20 @@ export const delta = (curr: number | null, prev: number | null) => {
 export const pct = (p?: number | null) =>
   p == null ? "—" : `${Math.round(p * 100)}%`;
 
+export function fmtCompact(n?: number): string {
+  if (n == null) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `${(abs / 1_000_000).toFixed(1)}m`;
+  if (abs >= 1_000) return `${Math.round(abs / 1_000)}k`;
+  return String(abs);
+}
+
+export function fmtPriceDelta(n?: number): string | null {
+  if (n == null || n === 0) return null;
+  const arrow = n > 0 ? "↑" : "↓";
+  return `${arrow} £${Math.abs(n / 10).toFixed(1)}`;
+}
+
 export function fmtRelTime(iso: string | null | undefined): string {
   if (!iso) return "recently";
   const diffMs = Date.now() - new Date(iso).getTime();

@@ -122,7 +122,7 @@ export async function getTransferSuggestions(entry: number): Promise<TransferSug
   return json;
 }
 
-export async function getSquad(entry: string, opts?: { gw?: number; forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {
+export async function getSquad(entry: number, opts?: { gw?: number; forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {
   const u = new URL(`/api/squad/${entry}`, ORIGIN);
   if (opts?.gw != null) u.searchParams.set("gw", String(opts.gw));
   if (opts?.forceRefresh) u.searchParams.set("noCache", "1");

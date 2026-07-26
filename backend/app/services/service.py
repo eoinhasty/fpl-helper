@@ -666,69 +666,44 @@ class FPLService:
             )
             enriched.append(
                 {
-                    "element": el,  # player ID (e.g. 254)
-                    "name": p.get("web_name"),  # player short name (e.g. "Salah")
-                    "team": t.get("short_name"),  # team short name (e.g. "LIV")
-                    "team_id": p.get("team"),  # team ID (e.g. 14)
-                    "position": p.get(
-                        "element_type"
-                    ),  # position ID (1=GK, 2=DEF, 3=MID, 4=FWD)
-                    "price": p.get("now_cost"),  # current price (e.g. 125 = £12.5m)
+                    "element": el,
+                    "name": p.get("web_name"),
+                    "team": t.get("short_name"),
+                    "team_id": p.get("team"),
+                    "position": p.get("element_type"),  # 1=GK, 2=DEF, 3=MID, 4=FWD
+                    "price": p.get("now_cost"),  # 0.1m units (125 = £12.5m)
                     "status": p.get("status"),  # "a", "d", "i", "s", "n"
-                    "news": p.get(
-                        "news"
-                    ),  # injury news (e.g. "" or "Knee Injury - Expected back 01 Jan")
-                    "total_points": p.get("total_points"),  # total points this season
-                    "gw_points": live_points.get(el),  # points this GW (live)
-                    "selected_by_percent": p.get("selected_by_percent"),  # e.g. "28.5"
-                    "start_probability": FPLService.start_prob_from(
-                        p, played_gws
-                    ),  # estimated start probability
-                    "form": p.get("form"),  # rolling avg points last 3 GWs (e.g. "6.5")
-                    "ict_index": p.get(
-                        "ict_index"
-                    ),  # influence/creativity/threat index
-                    "minutes": p.get("minutes"),  # total minutes played this season
-                    "ep_next": p.get(
-                        "ep_next"
-                    ),  # FPL expected points next GW (e.g. "5.2" or None)
-                    "points_per_game": p.get(
-                        "points_per_game"
-                    ),  # season avg pts per game (e.g. "6.1")
+                    "news": p.get("news"),
+                    "total_points": p.get("total_points"),
+                    "gw_points": live_points.get(el),
+                    "selected_by_percent": p.get("selected_by_percent"),
+                    "start_probability": FPLService.start_prob_from(p, played_gws),
+                    "form": p.get("form"),
+                    "ict_index": p.get("ict_index"),
+                    "minutes": p.get("minutes"),
+                    "ep_next": p.get("ep_next"),
+                    "points_per_game": p.get("points_per_game"),
                     "goals_scored": p.get("goals_scored"),
                     "assists": p.get("assists"),
                     "clean_sheets": p.get("clean_sheets"),
                     "saves": p.get("saves"),
-                    "bonus": p.get("bonus"),  # bonus points this season
-                    "transfers_in_event": p.get(
-                        "transfers_in_event"
-                    ),  # transfers in this GW
-                    "transfers_out_event": p.get(
-                        "transfers_out_event"
-                    ),  # transfers out this GW
-                    "cost_change_start": p.get(
-                        "cost_change_start"
-                    ),  # price change since season start (0.1m units)
-                    "is_captain": pick.get(
-                        "is_captain"
-                    ),  # is captain this GW? (e.g. True/False)
-                    "is_vice_captain": pick.get(
-                        "is_vice_captain"
-                    ),  # is vice-captain this GW? (e.g. True/False)
-                    "fixture": fdr,  # next fixture or None (e.g. {"opp": "CHE", "home": True, "difficulty": 3, "kickoff": "..."})
-                    "has_dgw": len(team_fixtures)
-                    > 1,  # True if player has 2+ fixtures this GW
-                    "fixtures": team_fixtures,  # all fixtures this GW (list)
+                    "bonus": p.get("bonus"),
+                    "transfers_in_event": p.get("transfers_in_event"),
+                    "transfers_out_event": p.get("transfers_out_event"),
+                    "cost_change_start": p.get("cost_change_start"),  # 0.1m units
+                    "is_captain": pick.get("is_captain"),
+                    "is_vice_captain": pick.get("is_vice_captain"),
+                    "fixture": fdr,
+                    "has_dgw": len(team_fixtures) > 1,
+                    "fixtures": team_fixtures,
                     "slot": pick.get(
                         "position"
                     ),  # squad slot 1-15 (starting 1-11, bench 12-15)
-                    "multiplier": pick.get(
-                        "multiplier"
-                    ),  # points multiplier (2 if captain, 1 otherwise)
-                    "shirt_url": shirt_url,  # shirt image URL
+                    "multiplier": pick.get("multiplier"),  # 2 if captain, 1 otherwise
+                    "shirt_url": shirt_url,
                     "cost_change_event": p.get("cost_change_event"),
                     "transfer_rank": transfer_ranks.get(el),
-                    "ranks": pos_ranks.get(el),  # within-position stat ranks
+                    "ranks": pos_ranks.get(el),
                 }
             )
 
@@ -786,9 +761,7 @@ class FPLService:
         if picks_result is None:
             season_status = self.season_status(events)
             if season_status != "pre_season":
-                raise HTTPException(
-                    404, detail=f"No open picks for GW {next_gw} or {current_gw}."
-                )
+                raise HTTPException(404, detail="No picks found for this entry.")
             # Pre-season: no picks exist for anyone yet — nothing to base
             # suggestions on, so return an empty (not error) response.
             return {

@@ -10,8 +10,6 @@ type Props = {
   maxWidthPx?: number;
   gap?: number;
   stickyOffsetPx?: number;
-  hideLeft?: boolean;
-  hideRight?: boolean;
   sidebarBreakpoint?: "lg" | "xl";
   containerClassName?: string;
   contentClassName?: string;
@@ -26,8 +24,6 @@ export default function DashboardLayout({
   maxWidthPx = 1400,
   gap = 5,
   stickyOffsetPx = 64,
-  hideLeft = false,
-  hideRight = false,
   sidebarBreakpoint = "lg",
   containerClassName = "",
   contentClassName = "",
@@ -53,15 +49,13 @@ export default function DashboardLayout({
     >
       {top && <div className="col-span-12">{top}</div>}
 
-      {!hideLeft && (
-        <aside
-          className={`${hide} ${leftCol} space-y-4 self-start`}
-          style={{ position: "sticky", top: stickyOffsetPx }}
-          aria-label="Left sidebar"
-        >
-          {left}
-        </aside>
-      )}
+      <aside
+        className={`${hide} ${leftCol} space-y-4 self-start`}
+        style={{ position: "sticky", top: stickyOffsetPx }}
+        aria-label="Left sidebar"
+      >
+        {left}
+      </aside>
 
       <main
         id="main-content"
@@ -71,15 +65,13 @@ export default function DashboardLayout({
         {children}
       </main>
 
-      {!hideRight && (
-        <aside
-          className={`${hide} ${rightCol} space-y-4 self-start`}
-          style={{ position: "sticky", top: stickyOffsetPx }}
-          aria-label="Right sidebar"
-        >
-          {right}
-        </aside>
-      )}
+      <aside
+        className={`${hide} ${rightCol} space-y-4 self-start`}
+        style={{ position: "sticky", top: stickyOffsetPx }}
+        aria-label="Right sidebar"
+      >
+        {right}
+      </aside>
 
       {footer && <div className="col-span-12">{footer}</div>}
     </div>
