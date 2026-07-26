@@ -6,7 +6,7 @@ export function useFetch<T>(url?: string | null) {
   const prefixedUrl = url ? `${apiBase}${url}` : url;
 
   const [data, setData] = React.useState<T | null>(null);
-  const [loading, setLoading] = React.useState(Boolean(url));
+  const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -14,7 +14,7 @@ export function useFetch<T>(url?: string | null) {
     const ac = new AbortController();
     (async () => {
       try {
-        setLoading(true); setError(null);
+        setLoading(true); setError(null); setData(null);
         const headers = baseHeaders();
         const r = await fetch(prefixedUrl, { signal: ac.signal, headers });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
