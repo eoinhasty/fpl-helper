@@ -58,6 +58,12 @@ class FPLService:
     def __init__(self) -> None:
         self.public = httpx.AsyncClient(base_url=FPL_BASE, headers=_ua(), timeout=20.0)
         self.cache = AsyncCache()
+        # _position_ranks/_transfer_ranks are pure functions of `boot`, which only
+        # changes when the bootstrap cache actually refetches — cache by object
+        # identity so repeated squad/live requests within the same 6h window don't
+        # redo the same sort on every load.
+        self._rank_cache_boot_id: Optional[int] = None
+        self._rank_cache: Optional[Tuple[dict, dict]] = None
 
     async def _get_json_auth(
         self, path: str, token: Optional[str], params: Optional[dict] = None
@@ -87,9 +93,10 @@ class FPLService:
                 if attempt > 4:
                     r.raise_for_status()
                 ra = r.headers.get("Retry-After")
-                delay = (
-                    float(ra) if (ra and ra.isdigit()) else (0.6 * (2 ** (attempt - 1)))
-                )
+                try:
+                    delay = min(float(ra), 60) if ra else (0.6 * (2 ** (attempt - 1)))
+                except ValueError:
+                    delay = 0.6 * (2 ** (attempt - 1))
                 await asyncio.sleep(delay)
                 continue
             r.raise_for_status()
@@ -410,11 +417,10 @@ class FPLService:
         Option B: stub data if no key (so the card still renders).
         """
         if token:
-            async with httpx.AsyncClient(timeout=20.0) as fd_client:
-                r = await fd_client.get(
-                    "https://api.football-data.org/v4/competitions/PL/standings",
-                    headers={"X-Auth-Token": token, **_ua()},
-                )
+            r = await self.public.get(
+                "https://api.football-data.org/v4/competitions/PL/standings",
+                headers={"X-Auth-Token": token, **_ua()},
+            )
             r.raise_for_status()
             logger.info("Fetched real PL standings from football-data.org")
             js = r.json()
@@ -612,9 +618,18 @@ class FPLService:
 
         return result
 
-    @staticmethod
+    def _cached_ranks(self, boot: dict) -> Tuple[dict, dict]:
+        boot_id = id(boot)
+        if self._rank_cache_boot_id != boot_id:
+            self._rank_cache = (
+                FPLService._position_ranks(boot),
+                FPLService._transfer_ranks(boot),
+            )
+            self._rank_cache_boot_id = boot_id
+        return self._rank_cache
+
     def enrich_picks(
-        picks: dict, boot: dict, fixtures: list, live: dict
+        self, picks: dict, boot: dict, fixtures: list, live: dict
     ) -> Tuple[List[dict], Optional[int], Optional[int]]:
 
         live_points = {
@@ -626,8 +641,7 @@ class FPLService:
 
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
-        pos_ranks = FPLService._position_ranks(boot)
-        transfer_ranks = FPLService._transfer_ranks(boot)
+        pos_ranks, transfer_ranks = self._cached_ranks(boot)
 
         fdr_by_team: Dict[int, list] = {}
         for fx in fixtures:

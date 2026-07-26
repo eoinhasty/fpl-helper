@@ -2,6 +2,11 @@
 
 export type PlayerRank = { rank: number; of: number; pct: number };
 
+/** FPL's own status codes: a=available, d=doubtful, i=injured, s=suspended,
+ * n=not available (loan/departed elsewhere). "u" (permanently unavailable)
+ * is filtered out server-side before reaching the frontend. */
+export type PlayerStatus = "a" | "d" | "i" | "s" | "n";
+
 export type FixtureLite = {
     opp: string; home: boolean; difficulty: 1 | 2 | 3 | 4 | 5; kickoff?: string;
 };
@@ -13,7 +18,7 @@ export type Player = {
     team_id?: number;
     position: 1 | 2 | 3 | 4;
     price: number;
-    status?: string;
+    status?: PlayerStatus;
     news?: string | null;
     total_points?: number;
     form?: string;
@@ -122,7 +127,7 @@ export type PoolPlayer = {
     position: PoolPosition;
     now_cost: number;
     selected_by_percent?: string;
-    status?: string;
+    status?: PlayerStatus;
     news?: string;
     ep_next?: string;
     total_points?: number;

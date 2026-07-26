@@ -42,6 +42,48 @@ def set_cache_headers(resp: Response, status: str, age: float, ttl: int):
 _CACHE_STATUS_SEVERITY = {"hit": 0, "bypass-refresh": 1, "miss": 2, "stale-serve": 3}
 
 
+def _favourite_team_short_name(entry_data: dict, boot: dict) -> Optional[str]:
+    fav_team_id = entry_data.get("favourite_team")
+    if not fav_team_id:
+        return None
+    t = next((t for t in boot["teams"] if t["id"] == fav_team_id), None)
+    return t.get("short_name") if t else None
+
+
+async def _entry_summary(
+    svc: FPLService,
+    entry_id: int,
+    boot: dict,
+    entry_data: Optional[dict] = None,
+) -> dict:
+    """Shape the entry_name/player_name/overall_rank/favourite_team fields
+    shared by /squad and /live. Pass an already-fetched entry_data to avoid
+    refetching it when the caller already has one (e.g. for 404 validation)."""
+    if entry_data is None:
+        entry_data, _, _ = await svc.entry(entry_id)
+
+    player_name = (
+        f"{entry_data.get('player_first_name', '')} "
+        f"{entry_data.get('player_last_name', '')}"
+    ).strip()
+
+    hist, _, _ = await svc.entry_history(entry_id)
+    current = hist.get("current") or []
+    overall_rank = None
+    for row in reversed(current):
+        if row.get("overall_rank"):
+            overall_rank = row["overall_rank"]
+            break
+
+    return {
+        "entry_data": entry_data,
+        "entry_name": entry_data.get("name"),
+        "player_name": player_name,
+        "overall_rank": overall_rank,
+        "favourite_team": _favourite_team_short_name(entry_data, boot),
+    }
+
+
 def combine_cache(*readings: tuple[str, float]) -> tuple[str, float]:
     """Combine multiple (status, age) readings from the fetches that actually
     feed a response into one honest composite: the oldest age (a true upper
@@ -107,12 +149,7 @@ async def squad(
                 raise
             # Pre-season: picks 404 for everyone — return a structured
             # empty squad so the UI can show a countdown instead of an error.
-            fav_team = None
-            fav_team_id = entry_data.get("favourite_team")
-            if fav_team_id:
-                t = next((t for t in boot["teams"] if t["id"] == fav_team_id), None)
-                if t:
-                    fav_team = t.get("short_name")
+            fav_team = _favourite_team_short_name(entry_data, boot)
             deadline_event = next_event or current_event
             # No cache headers here — this response is hand-built from bootstrap
             # data, not the product of a real (cached) picks fetch, so there's
@@ -148,12 +185,7 @@ async def squad(
                 )
             # Pre-season: no picks exist for anyone yet — return a structured
             # empty squad so the UI can show a countdown instead of an error.
-            fav_team = None
-            fav_team_id = entry_data.get("favourite_team")
-            if fav_team_id:
-                t = next((t for t in boot["teams"] if t["id"] == fav_team_id), None)
-                if t:
-                    fav_team = t.get("short_name")
+            fav_team = _favourite_team_short_name(entry_data, boot)
             deadline_event = next_event or current_event
             # No cache headers here — this response is hand-built from bootstrap
             # data, not the product of a real (cached) picks fetch, so there's
@@ -190,21 +222,9 @@ async def squad(
     # fixtures (cached)
     fixtures_data, _, _ = await svc.fixtures(used_gw)
 
-    hist, _, _ = await svc.entry_history(entry_id)
-    current = hist.get("current") or []
-    overall_rank = None
-    if current:
-        for row in reversed(current):
-            if row.get("overall_rank"):
-                overall_rank = row["overall_rank"]
-                break
-
-    fav_team = None
-    fav_team_id = entry_data.get("favourite_team")
-    if fav_team_id:
-        t = next((t for t in boot["teams"] if t["id"] == fav_team_id), None)
-        if t:
-            fav_team = t.get("short_name")
+    summary = await _entry_summary(svc, entry_id, boot, entry_data=entry_data)
+    overall_rank = summary["overall_rank"]
+    fav_team = summary["favourite_team"]
 
     # shape for UI
     enriched, team_value, team_bank = svc.enrich_picks(
@@ -288,26 +308,11 @@ async def live(
         event_live,
     )
 
-    entry_data, _, _ = await svc.entry(entry_id)
-    entry_name = entry_data.get("name")
-    player_first_name = entry_data.get("player_first_name", "")
-    player_last_name = entry_data.get("player_last_name", "")
-
-    hist, _, _ = await svc.entry_history(entry_id)
-    current = hist.get("current") or []
-    overall_rank = None
-    if current:
-        for row in reversed(current):
-            if row.get("overall_rank"):
-                overall_rank = row["overall_rank"]
-                break
-
-    fav_team = None
-    fav_team_id = entry_data.get("favourite_team")
-    if fav_team_id:
-        t = next((t for t in boot["teams"] if t["id"] == fav_team_id), None)
-        if t:
-            fav_team = t.get("short_name")
+    summary = await _entry_summary(svc, entry_id, boot)
+    entry_name = summary["entry_name"]
+    player_name = summary["player_name"]
+    overall_rank = summary["overall_rank"]
+    fav_team = summary["favourite_team"]
 
     transfers = live_data.get("transfers", {}) or {}
     team_value = transfers.get("value")
@@ -326,7 +331,7 @@ async def live(
     return {
         "entry_id": entry_id,
         "entry_name": entry_name,
-        "player_name": f"{player_first_name} {player_last_name}".strip(),
+        "player_name": player_name,
         "overall_rank": overall_rank,
         "favourite_team": fav_team,
         "season_status": FPLService.season_status(events),
@@ -501,6 +506,8 @@ async def news_hot(
     request: Request, response: Response, days: int = 7, limit: int = 12
 ):
     svc: FPLService = request.app.state.svc
+    days = max(1, min(int(days or 7), 30))
+    limit = max(1, min(int(limit or 12), 50))
     key = f"hot:{days}:{limit}"
 
     async def _fetch():
