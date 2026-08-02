@@ -117,6 +117,7 @@ async def squad(
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
     season_status = FPLService.season_status(events)
+    season = FPLService.season_label(events)
     current_event = next((e for e in events if e["is_current"]), None)
     next_event = next((e for e in events if e["is_next"]), None)
     if not current_event and not next_event:
@@ -162,6 +163,7 @@ async def squad(
                 "overall_rank": None,
                 "favourite_team": fav_team,
                 "season_status": season_status,
+                "season": season,
                 "requested_gw": gw,
                 "used_gw": gw,
                 "current_gw": current_gw_id,
@@ -198,6 +200,7 @@ async def squad(
                 "overall_rank": None,
                 "favourite_team": fav_team,
                 "season_status": season_status,
+                "season": season,
                 "requested_gw": next_gw_id,
                 "used_gw": next_gw_id,
                 "current_gw": current_gw_id,
@@ -335,6 +338,7 @@ async def live(
         "overall_rank": overall_rank,
         "favourite_team": fav_team,
         "season_status": FPLService.season_status(events),
+        "season": FPLService.season_label(events),
         "requested_gw": used_gw,
         "used_gw": used_gw,
         "current_gw": current_gw_id,

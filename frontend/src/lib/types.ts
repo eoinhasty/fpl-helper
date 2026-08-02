@@ -83,6 +83,8 @@ export type SquadResponse = {
     overall_rank?: number | null;
     favourite_team?: string;
     season_status?: "pre_season" | "in_season";
+    /** e.g. "2026/27" — current FPL season, derived from GW1's deadline year. */
+    season?: string | null;
     used_gw: number;
     current_gw: number;
     used_label: "next" | "current" | "explicit" | "live" | "pre_season";
@@ -137,6 +139,16 @@ export type PoolPlayer = {
     freekicks_order?: number;
     shirt_url?: string;
     fixtures?: FixtureLite[];
+    ict_index?: string;
+    minutes?: number;
+    points_per_game?: string;
+    goals_scored?: number;
+    assists?: number;
+    clean_sheets?: number;
+    saves?: number;
+    bonus?: number;
+    ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
+    transfer_rank?: { rank: number; of: number };
 };
 
 export type PoolTeam = { id: number; name: string; short_name: string };
@@ -145,6 +157,8 @@ export type PlayersResponse = {
     count: number;
     teams: PoolTeam[];
     players: PoolPlayer[];
+    /** e.g. "2026/27" — current FPL season, derived from GW1's deadline year. */
+    season?: string | null;
 };
 
 export type PlayerSummaryHistoryPast = {

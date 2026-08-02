@@ -22,6 +22,10 @@ type Props = {
   /** Planner squads set start_probability: 0 as a placeholder (required field,
    * not a real estimate) — hide the "start prob" badge in that context. */
   hideStartProbability?: boolean;
+  /** e.g. "2026/27" — current FPL season, shown alongside "Season highlights"
+   * so the current-season stats aren't confused with the History tab's past
+   * seasons. Optional since older callers may not have it wired through yet. */
+  season?: string | null;
 };
 
 function TopNum({ label, value, delta, accent }: { label: string; value: React.ReactNode; delta?: string; accent?: boolean }) {
@@ -180,7 +184,7 @@ function FixtureCompactPill({ f }: { f: TeamFixture }) {
   );
 }
 
-export default function PlayerDetailModal({ open, onClose, player, hideStartProbability }: Props) {
+export default function PlayerDetailModal({ open, onClose, player, hideStartProbability, season }: Props) {
   const fixtUrl = open && player.team_id ? `/api/team-next/${player.team_id}?count=5` : null;
   const { data: fixtData, loading, error: err } = useFetch<{ fixtures: TeamFixture[] }>(fixtUrl);
   const nextFixt = fixtData?.fixtures ?? null;
@@ -418,7 +422,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
               {/* Season highlights */}
               <section>
                 <SectionHeader
-                  label="Season highlights"
+                  label={season ? `Season highlights · ${season}` : "Season highlights"}
                   right={posLabel && (
                     <span className="text-[10px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 tracking-widest">
                       vs {posLabel}

@@ -255,6 +255,7 @@ class FPLService:
             teams = {t["id"]: t for t in boot["teams"]}
             upcoming = self._upcoming_by_team(boot, fixtures_data, 3)
             positions = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
+            pos_ranks, transfer_ranks = self._cached_ranks(boot)
 
             players = []
             for p in boot["elements"]:
@@ -296,6 +297,16 @@ class FPLService:
                     "freekicks_order": p.get("direct_freekicks_order"),
                     "shirt_url": shirt_url,
                     "fixtures": upcoming.get(p.get("team"), []),
+                    "ict_index": p.get("ict_index"),
+                    "minutes": p.get("minutes"),
+                    "points_per_game": p.get("points_per_game"),
+                    "goals_scored": p.get("goals_scored"),
+                    "assists": p.get("assists"),
+                    "clean_sheets": p.get("clean_sheets"),
+                    "saves": p.get("saves"),
+                    "bonus": p.get("bonus"),
+                    "ranks": pos_ranks.get(p["id"]),
+                    "transfer_rank": transfer_ranks.get(p["id"]),
                 }
                 players.append(
                     {
@@ -310,7 +321,12 @@ class FPLService:
                 for t in boot["teams"]
             ]
 
-            return {"count": len(players), "teams": team_rows, "players": players}
+            return {
+                "count": len(players),
+                "teams": team_rows,
+                "players": players,
+                "season": self.season_label(boot.get("events", [])),
+            }
 
         return await self.cache.get_or_set(key, _fetch, TTL_PLAYERS, SWR_PLAYERS)
 
@@ -530,6 +546,28 @@ class FPLService:
             if e.get("is_current") or e.get("finished"):
                 return "in_season"
         return "pre_season"
+
+    @staticmethod
+    def season_label(events: list) -> Optional[str]:
+        """e.g. '2026/27', derived from GW1's deadline year — bootstrap-static has
+        no explicit season name field, but the season always starts (GW1 deadline)
+        in the calendar year it's named after.
+
+        Pre-season, bootstrap's per-element season totals (goals_scored,
+        points_per_game, etc.) haven't reset yet — they're still last season's
+        final numbers until GW1 actually kicks off, same rollover-lag as
+        StandingsCard's is_previous_season_table. So the label reported here
+        must lag by one season too, or it would claim e.g. "2026/27" next to
+        stats that are actually 2025/26's."""
+        if not events:
+            return None
+        deadline = events[0].get("deadline_time")
+        if not deadline:
+            return None
+        year = int(deadline[:4])
+        if FPLService.season_status(events) == "pre_season":
+            year -= 1
+        return f"{year}/{(year + 1) % 100:02d}"
 
     @staticmethod
     def start_prob_from(player: dict, played_gws: int = 1) -> float:

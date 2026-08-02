@@ -170,7 +170,7 @@ export default function SquadDashboard() {
       </DashboardLayout>
 
       {selectedPlayer && (
-        <PlayerDetailModal key={selectedPlayer.element} open={true} onClose={closePlayer} player={selectedPlayer} />
+        <PlayerDetailModal key={selectedPlayer.element} open={true} onClose={closePlayer} player={selectedPlayer} season={data?.season} />
       )}
     </>
   );

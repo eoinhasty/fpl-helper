@@ -110,6 +110,7 @@ export default function PlannerPage() {
           onClose={() => setSelected(null)}
           player={poolPlayerToPlayer(selected, 1)}
           hideStartProbability
+          season={data?.season}
         />
       )}
 

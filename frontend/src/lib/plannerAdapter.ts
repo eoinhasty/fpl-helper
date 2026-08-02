@@ -28,6 +28,16 @@ export function poolPlayerToPlayer(p: PoolPlayer, slot: number): Player {
     slot,
     multiplier: slot <= 11 ? 1 : 0,
     shirt_url: p.shirt_url,
+    ict_index: p.ict_index,
+    minutes: p.minutes,
+    points_per_game: p.points_per_game,
+    goals_scored: p.goals_scored,
+    assists: p.assists,
+    clean_sheets: p.clean_sheets,
+    saves: p.saves,
+    bonus: p.bonus,
+    ranks: p.ranks,
+    transfer_rank: p.transfer_rank,
   };
 }
 
