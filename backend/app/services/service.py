@@ -312,7 +312,7 @@ class FPLService:
                     {
                         k: v
                         for k, v in raw.items()
-                        if v is not None and v != "" and v != []
+                        if v is not None and v != "" and (v != [] or k == "fixtures")
                     }
                 )
 
