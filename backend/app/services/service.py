@@ -799,8 +799,10 @@ class FPLService:
 
         return base * fdr_factor * home_boost * dgw_boost * start_prob * pos_mult
 
-    async def transfer_suggestions(self, entry_id: int, top_n: int = 3) -> dict:
-        boot, _, _ = await self.bootstrap()
+    async def transfer_suggestions(
+        self, entry_id: int, top_n: int = 3
+    ) -> Tuple[dict, List[Tuple[str, float]]]:
+        boot, boot_status, boot_age = await self.bootstrap()
         events = boot["events"]
         current_event = next((e for e in events if e["is_current"]), None)
         next_event = next((e for e in events if e["is_next"]), None)
@@ -816,13 +818,19 @@ class FPLService:
                 raise HTTPException(404, detail="No picks found for this entry.")
             # Pre-season: no picks exist for anyone yet — nothing to base
             # suggestions on, so return an empty (not error) response.
-            return {
-                "entry_id": entry_id,
-                "bank": 0,
-                "suggestions": [],
-                "season_status": season_status,
-            }
-        picks_data, used_gw, _, _, _ = picks_result
+            # No short-lived fetch happened (picks 404s for everyone
+            # pre-season) — bootstrap is the only signal available, even
+            # though it's normally excluded as long-lived.
+            return (
+                {
+                    "entry_id": entry_id,
+                    "bank": 0,
+                    "suggestions": [],
+                    "season_status": season_status,
+                },
+                [(boot_status, boot_age)],
+            )
+        picks_data, used_gw, _, pick_status, pick_age = picks_result
         bank = (picks_data.get("entry_history") or {}).get("bank", 0)
 
         players_dict = {p["id"]: p for p in boot["elements"]}
@@ -870,6 +878,7 @@ class FPLService:
                 and p.get("element_type") == pos
                 and p.get("now_cost", 0) <= budget
                 and (p.get("minutes") or 0) > 0
+                and fdr_by_team.get(p.get("team", 0))
             ]
             if not candidates:
                 continue
@@ -913,7 +922,13 @@ class FPLService:
 
             suggestions.append({"position": pos, "budget": budget, "players": shaped})
 
-        return {"entry_id": entry_id, "bank": bank, "suggestions": suggestions}
+        # Bootstrap (6h/12h TTL) is excluded from the reading set — it's
+        # long-lived like /squad and /live exclude fixtures/entry, and
+        # including it would make the badge pessimistic without being useful.
+        return (
+            {"entry_id": entry_id, "bank": bank, "suggestions": suggestions},
+            [(pick_status, pick_age)],
+        )
 
     async def picks_with_fallback(
         self, entry_id: int, next_gw: int, current_gw: int

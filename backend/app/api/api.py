@@ -532,12 +532,10 @@ async def transfer_suggestions(
 ):
     svc: FPLService = request.app.state.svc
     top_n = max(1, min(int(top_n), 5))
-    data = await svc.transfer_suggestions(entry_id, top_n=top_n)
+    data, readings = await svc.transfer_suggestions(entry_id, top_n=top_n)
+    combined_status, combined_age = combine_cache(*readings)
     # suggestions are derived from bootstrap (6h) + picks (60s); use the shorter TTL
-    response.headers["x-cache-status"] = "live"
-    response.headers["cache-control"] = (
-        f"public, max-age=0, stale-while-revalidate={TTL_PICKS}"
-    )
+    set_cache_headers(response, combined_status, combined_age, TTL_PICKS)
     return data
 
 
