@@ -148,7 +148,7 @@ class FPLService:
                 if h in grid:
                     grid[h][ev].append(
                         {
-                            "opp": team_names[a]["short_name"],
+                            "opp": team_names.get(a, {}).get("short_name", "UNK"),
                             "home": True,
                             "difficulty": fx["team_h_difficulty"],
                             "kickoff": fx.get("kickoff_time"),
@@ -157,7 +157,7 @@ class FPLService:
                 if a in grid:
                     grid[a][ev].append(
                         {
-                            "opp": team_names[h]["short_name"],
+                            "opp": team_names.get(h, {}).get("short_name", "UNK"),
                             "home": False,
                             "difficulty": fx["team_a_difficulty"],
                             "kickoff": fx.get("kickoff_time"),
@@ -224,7 +224,7 @@ class FPLService:
             if h in teams:
                 by_team[h].append(
                     {
-                        "opp": teams[a]["short_name"],
+                        "opp": teams.get(a, {}).get("short_name", "UNK"),
                         "home": True,
                         "difficulty": fx["team_h_difficulty"],
                         "kickoff": fx.get("kickoff_time"),
@@ -233,7 +233,7 @@ class FPLService:
             if a in teams:
                 by_team[a].append(
                     {
-                        "opp": teams[h]["short_name"],
+                        "opp": teams.get(h, {}).get("short_name", "UNK"),
                         "home": False,
                         "difficulty": fx["team_a_difficulty"],
                         "kickoff": fx.get("kickoff_time"),
@@ -686,7 +686,7 @@ class FPLService:
             h, a = fx["team_h"], fx["team_a"]
             fdr_by_team.setdefault(h, []).append(
                 {
-                    "opp": teams[a]["short_name"],
+                    "opp": teams.get(a, {}).get("short_name", "UNK"),
                     "home": True,
                     "difficulty": fx["team_h_difficulty"],
                     "kickoff": fx["kickoff_time"],
@@ -694,7 +694,7 @@ class FPLService:
             )
             fdr_by_team.setdefault(a, []).append(
                 {
-                    "opp": teams[h]["short_name"],
+                    "opp": teams.get(h, {}).get("short_name", "UNK"),
                     "home": False,
                     "difficulty": fx["team_a_difficulty"],
                     "kickoff": fx["kickoff_time"],
@@ -840,7 +840,7 @@ class FPLService:
             h, a = fx["team_h"], fx["team_a"]
             fdr_by_team.setdefault(h, []).append(
                 {
-                    "opp": teams[a]["short_name"],
+                    "opp": teams.get(a, {}).get("short_name", "UNK"),
                     "home": True,
                     "difficulty": fx["team_h_difficulty"],
                     "kickoff": fx.get("kickoff_time"),
@@ -848,7 +848,7 @@ class FPLService:
             )
             fdr_by_team.setdefault(a, []).append(
                 {
-                    "opp": teams[h]["short_name"],
+                    "opp": teams.get(h, {}).get("short_name", "UNK"),
                     "home": False,
                     "difficulty": fx["team_a_difficulty"],
                     "kickoff": fx.get("kickoff_time"),
