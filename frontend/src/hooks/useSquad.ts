@@ -15,8 +15,14 @@ function clearTimer(ref: React.MutableRefObject<Timer | null>) {
 
 export function useSquad(entry: number | "") {
   const [data, setData] = useState<SquadResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Separate loading/error per mode — loadSquad and loadLive can be in flight
+  // at the same time (e.g. rapid mode switching via squadReqId/liveReqId
+  // below), and a shared loading/error would let whichever settles first
+  // flip state that the other, currently-visible, mode is still waiting on.
+  const [squadLoading, setSquadLoading] = useState(false);
+  const [squadError, setSquadError] = useState<string | null>(null);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
   const [cache, setCache] = useState<CacheMeta>({ status: null, ageSeconds: null });
   // Season status is a global fact (from bootstrap), not per-mode — once learned
   // from either a squad or live fetch, it should survive clearData() so UI that
@@ -74,12 +80,14 @@ export function useSquad(entry: number | "") {
     fetcher: Fetcher,
     fallbackMsg: string,
     staleTimerRef: React.MutableRefObject<Timer | null>,
+    setLoadingFn: (v: boolean) => void,
+    setErrorFn: (v: string | null) => void,
     onError?: (msg: string) => void,
   ) => {
     clearTimer(staleTimerRef);
     const id = ++reqIdRef.current;
     try {
-      setLoading(true); setError(null);
+      setLoadingFn(true); setErrorFn(null);
       const res = await fetcher();
       if (id !== reqIdRef.current) return; // stale response
       setData(res.data); setCache(res.cache);
@@ -91,21 +99,21 @@ export function useSquad(entry: number | "") {
       if (id !== reqIdRef.current) return;
       const msg = (e as Error)?.message ?? fallbackMsg;
       onError?.(msg);
-      setError(msg);
+      setErrorFn(msg);
     } finally {
-      if (id === reqIdRef.current) { setLoading(false); setIsSwitching(false); }
+      if (id === reqIdRef.current) { setLoadingFn(false); setIsSwitching(false); }
     }
   }, [_pollIfStale]);
 
   const loadSquad = useCallback((opts: LoadSquadOpts = {}) => {
     if (!entry) return;
     const { gw, forceRefresh } = opts;
-    return _load(squadReqId, () => getSquad(Number(entry), { gw, forceRefresh }), "Failed to load squad", squadStaleTimer);
+    return _load(squadReqId, () => getSquad(Number(entry), { gw, forceRefresh }), "Failed to load squad", squadStaleTimer, setSquadLoading, setSquadError);
   }, [entry, _load]);
 
   const loadLive = useCallback((forceRefresh = false) => {
     if (!entry) return;
-    return _load(liveReqId, () => getLive(Number(entry), { forceRefresh }), "Failed to load live squad", liveStaleTimer, (msg) => {
+    return _load(liveReqId, () => getLive(Number(entry), { forceRefresh }), "Failed to load live squad", liveStaleTimer, setLiveLoading, setLiveError, (msg) => {
       if (msg === "AUTH_EXPIRED") clearAuth();
     });
   }, [entry, _load]);
@@ -122,7 +130,6 @@ export function useSquad(entry: number | "") {
     clearTimer(liveStaleTimer);
     setIsSwitching(true);
     setData(null);
-    setError(null);
   }, []);
 
   useEffect(() => () => {
@@ -130,5 +137,9 @@ export function useSquad(entry: number | "") {
     clearTimer(liveStaleTimer);
   }, []);
 
-  return { data, loading, error, cache, seasonStatus, isSwitching, loadSquad, loadLive, clearData };
+  return {
+    data, cache, seasonStatus, isSwitching,
+    squadLoading, squadError, liveLoading, liveError,
+    loadSquad, loadLive, clearData,
+  };
 }
