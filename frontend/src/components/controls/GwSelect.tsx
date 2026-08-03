@@ -15,8 +15,8 @@ export function GwSelect({
   ariaLabel?: string;
 }) {
   return (
-    <SelectMenu<number | undefined>
-      value={value}
+    <SelectMenu<number | null>
+      value={value ?? null}
       onChange={(gw) => gw != null && onChange(gw)}
       disabled={disabled}
       ariaLabel={ariaLabel}
