@@ -106,6 +106,7 @@ export default function PlannerPage() {
 
       {selected && (
         <PlayerDetailModal
+          key={selected.id}
           open={!!selected}
           onClose={() => setSelected(null)}
           player={poolPlayerToPlayer(selected, 1)}
