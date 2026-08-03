@@ -23,11 +23,18 @@ type Mode = "live" | "squad";
 export default function SquadDashboard() {
   const { entry } = useEntryId();
   const { prefs } = usePreferences();
-  const { data, loading, error, cache, seasonStatus, isSwitching, loadSquad, loadLive, clearData } = useSquad(entry);
+  const {
+    data, cache, seasonStatus, isSwitching,
+    squadLoading, squadError, liveLoading, liveError,
+    loadSquad, loadLive, clearData,
+  } = useSquad(entry);
 
   const [mode, setMode] = useState<Mode>(prefs.defaultView);
   const [gw, setGw] = useState<number | undefined>(undefined); // undefined => server fallback
   const prevMode = useRef(mode);
+
+  const loading = mode === "live" ? liveLoading : squadLoading;
+  const error = mode === "live" ? liveError : squadError;
 
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const openPlayer = (p: Player) => setSelectedPlayer(p);
@@ -39,22 +46,28 @@ export default function SquadDashboard() {
     setMode(prefs.defaultView as Mode);
   }, [prefs.defaultView]);
 
+  // Discard the other mode's data on an actual mode switch — otherwise a
+  // stale squad-mode snapshot (e.g. pre-season, empty players) can linger
+  // and get misread as this mode's state (masking LiveAuthGate, etc.). Kept
+  // as its own effect (rather than folded into the load effects below) so
+  // that setGw(undefined) doesn't sit in the live-load effect's dependency
+  // list — it would otherwise re-trigger that effect and double-fetch.
   useEffect(() => {
-    if (!entry) return;
-    // Discard the other mode's data on an actual mode switch — otherwise a
-    // stale squad-mode snapshot (e.g. pre-season, empty players) can linger
-    // and get misread as this mode's state (masking LiveAuthGate, etc.).
-    if (prevMode.current !== mode) {
-      clearData();
-      prevMode.current = mode;
-    }
-    if (mode === "live") {
-      loadLive();
-      setGw(undefined); // lock gw for live
-    } else {
-      loadSquad({ gw });
-    }
-  }, [mode, gw, entry, loadSquad, loadLive, clearData]);
+    if (prevMode.current === mode) return;
+    prevMode.current = mode;
+    clearData();
+    if (mode === "live") setGw(undefined); // lock gw for live
+  }, [mode, clearData]);
+
+  useEffect(() => {
+    if (!entry || mode !== "live") return;
+    loadLive();
+  }, [entry, mode, loadLive]);
+
+  useEffect(() => {
+    if (!entry || mode !== "squad") return;
+    loadSquad({ gw });
+  }, [entry, mode, gw, loadSquad]);
 
   // create GW options up to whichever GW we’ve seen
   const cap = data?.current_gw ?? 1;
