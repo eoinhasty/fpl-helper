@@ -1,5 +1,5 @@
 // lib/api.ts
-import type { SquadResponse, TransferSuggestionsResponse } from "./types";
+import type { SquadResponse } from "./types";
 
 export type CacheStatus = "hit" | "miss" | "stale-serve" | "bypass-refresh" | null;
 export type CacheMeta = { status: CacheStatus; ageSeconds: number | null };
@@ -44,7 +44,7 @@ export function baseHeaders(): Record<string, string> {
 
 const TOKEN_KEY = "fpl_token";
 
-function tokenHeaders(): Record<string, string> {
+export function tokenHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
   return token ? { ...baseHeaders(), "X-Fpl-Token": token } : baseHeaders();
 }
@@ -114,12 +114,6 @@ export async function getLive(entry: number, opts?: { forceRefresh?: boolean }):
     }
     throw e;
   }
-}
-
-export async function getTransferSuggestions(entry: number): Promise<TransferSuggestionsResponse> {
-  const u = new URL(`/api/transfer-suggestions/${entry}`, ORIGIN);
-  const { json } = await fetchJSON<TransferSuggestionsResponse>(u.toString(), { headers: baseHeaders() });
-  return json;
 }
 
 export async function getSquad(entry: number, opts?: { gw?: number; forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {

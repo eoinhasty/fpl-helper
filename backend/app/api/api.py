@@ -532,10 +532,15 @@ async def transfer_suggestions(
 ):
     svc: FPLService = request.app.state.svc
     top_n = max(1, min(int(top_n), 5))
-    data, readings = await svc.transfer_suggestions(entry_id, top_n=top_n)
+    # token: prefer per-request header, fall back to server env var — same
+    # pattern as /live, since my_team is auth-gated (see transfer_suggestions
+    # docstring for why my_team is preferred over picks when available).
+    token = request.headers.get("x-fpl-token") or os.getenv("FPL_BEARER_TOKEN")
+    data, readings, ttl = await svc.transfer_suggestions(
+        entry_id, top_n=top_n, token=token
+    )
     combined_status, combined_age = combine_cache(*readings)
-    # suggestions are derived from bootstrap (6h) + picks (60s); use the shorter TTL
-    set_cache_headers(response, combined_status, combined_age, TTL_PICKS)
+    set_cache_headers(response, combined_status, combined_age, ttl)
     return data
 
 
