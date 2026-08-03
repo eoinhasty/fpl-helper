@@ -800,8 +800,8 @@ class FPLService:
         return base * fdr_factor * home_boost * dgw_boost * start_prob * pos_mult
 
     async def transfer_suggestions(
-        self, entry_id: int, top_n: int = 3
-    ) -> Tuple[dict, List[Tuple[str, float]]]:
+        self, entry_id: int, top_n: int = 3, *, token: Optional[str] = None
+    ) -> Tuple[dict, List[Tuple[str, float]], int]:
         boot, boot_status, boot_age = await self.bootstrap()
         events = boot["events"]
         current_event = next((e for e in events if e["is_current"]), None)
@@ -811,32 +811,64 @@ class FPLService:
         current_gw = current_event["id"] if current_event else next_event["id"]
         next_gw = next_event["id"] if next_event else current_event["id"]
 
-        picks_result = await self.picks_with_fallback(entry_id, next_gw, current_gw)
-        if picks_result is None:
-            season_status = self.season_status(events)
-            if season_status != "pre_season":
-                raise HTTPException(404, detail="No picks found for this entry.")
-            # Pre-season: no picks exist for anyone yet — nothing to base
-            # suggestions on, so return an empty (not error) response.
-            # No short-lived fetch happened (picks 404s for everyone
-            # pre-season) — bootstrap is the only signal available, even
-            # though it's normally excluded as long-lived.
-            return (
-                {
-                    "entry_id": entry_id,
-                    "bank": 0,
-                    "suggestions": [],
-                    "season_status": season_status,
-                },
-                [(boot_status, boot_age)],
-            )
-        picks_data, used_gw, _, pick_status, pick_age = picks_result
-        bank = (picks_data.get("entry_history") or {}).get("bank", 0)
+        # Prefer my_team when a token is available — it's auth-gated but (1)
+        # already reflects the drafted GW1 squad before picks exist for
+        # anyone (unlocks suggestions pre-season, matching how Live mode
+        # already sources from my_team) and (2) reflects transfers made
+        # since the last picks snapshot, so suggestions don't go stale right
+        # after a Live-mode transfer. Falls back to picks (no auth required)
+        # if there's no token, or the token is rejected.
+        picks_list: List[dict] = []
+        bank = 0
+        reading_status: Optional[str] = None
+        reading_age: Optional[float] = None
+        used_gw = next_gw
+
+        if token:
+            try:
+                my_team_data, mt_status, mt_age = await self.my_team(
+                    entry_id, token=token
+                )
+                picks_list = my_team_data.get("picks", [])
+                bank = (my_team_data.get("transfers") or {}).get("bank", 0)
+                reading_status, reading_age = mt_status, mt_age
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code not in (401, 403):
+                    raise
+                token = None  # rejected token — fall through to picks below
+
+        if reading_status is None:
+            picks_result = await self.picks_with_fallback(entry_id, next_gw, current_gw)
+            if picks_result is None:
+                season_status = self.season_status(events)
+                if season_status != "pre_season":
+                    raise HTTPException(404, detail="No picks found for this entry.")
+                # Pre-season, no token: no picks exist for anyone yet —
+                # nothing to base suggestions on, so return an empty (not
+                # error) response. No short-lived fetch happened (picks
+                # 404s for everyone pre-season) — bootstrap is the only
+                # signal available, even though it's normally excluded as
+                # long-lived.
+                return (
+                    {
+                        "entry_id": entry_id,
+                        "bank": 0,
+                        "suggestions": [],
+                        "season_status": season_status,
+                    },
+                    [(boot_status, boot_age)],
+                    TTL_PICKS,
+                )
+            picks_data, used_gw, _, reading_status, reading_age = picks_result
+            picks_list = picks_data.get("picks", [])
+            bank = (picks_data.get("entry_history") or {}).get("bank", 0)
+
+        ttl_used = TTL_MYTEAM if token else TTL_PICKS
 
         players_dict = {p["id"]: p for p in boot["elements"]}
-        owned_ids: set = {p["element"] for p in picks_data.get("picks", [])}
+        owned_ids: set = {p["element"] for p in picks_list}
         owned_by_pos: Dict[int, List[dict]] = {}
-        for pick in picks_data.get("picks", []):
+        for pick in picks_list:
             pl = players_dict.get(pick["element"], {})
             pos = pl.get("element_type", 4)
             owned_by_pos.setdefault(pos, []).append(pl)
@@ -927,7 +959,8 @@ class FPLService:
         # including it would make the badge pessimistic without being useful.
         return (
             {"entry_id": entry_id, "bank": bank, "suggestions": suggestions},
-            [(pick_status, pick_age)],
+            [(reading_status, reading_age)],
+            ttl_used,
         )
 
     async def picks_with_fallback(

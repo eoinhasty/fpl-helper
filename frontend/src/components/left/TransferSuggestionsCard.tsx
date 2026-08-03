@@ -3,6 +3,7 @@ import { useFetch } from "../../hooks/useFetch";
 import type { TransferSuggestion, TransferSuggestionsResponse } from "../../lib/types";
 import { fmtPrice, pct } from "../../lib/format";
 import { fdrDotClass } from "../../lib/utils";
+import { isAuthenticated } from "../../lib/api";
 
 const POS_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
@@ -55,7 +56,10 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
 
 export default function TransferSuggestionsCard({ entry }: { entry: number | "" }) {
   const url = entry ? `/api/transfer-suggestions/${entry}` : null;
-  const { data, loading, error } = useFetch<TransferSuggestionsResponse>(url);
+  // Send the auth token when present so the backend can source suggestions
+  // from my_team (works pre-season and stays fresh after a Live-mode
+  // transfer) instead of picks; it falls back to picks itself otherwise.
+  const { data, loading, error } = useFetch<TransferSuggestionsResponse>(url, { auth: true });
 
   return (
     <DataCard
@@ -67,7 +71,9 @@ export default function TransferSuggestionsCard({ entry }: { entry: number | "" 
     >
       {data && data.season_status === "pre_season" && (
         <div className="text-sm text-muted-foreground">
-          Suggestions appear once you've confirmed your GW1 picks.
+          {isAuthenticated()
+            ? "Suggestions appear once you've drafted your GW1 squad."
+            : "Log in on the Live tab to see suggestions before GW1 picks lock in."}
         </div>
       )}
       {data && data.season_status !== "pre_season" && data.suggestions.length === 0 && (

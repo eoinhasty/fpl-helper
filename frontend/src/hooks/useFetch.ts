@@ -1,9 +1,10 @@
 // hooks/useFetch.ts
 import * as React from "react";
-import { apiBase, baseHeaders } from "../lib/api";
+import { apiBase, baseHeaders, tokenHeaders } from "../lib/api";
 
-export function useFetch<T>(url?: string | null) {
+export function useFetch<T>(url?: string | null, opts?: { auth?: boolean }) {
   const prefixedUrl = url ? `${apiBase}${url}` : url;
+  const auth = opts?.auth ?? false;
 
   const [data, setData] = React.useState<T | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -15,7 +16,7 @@ export function useFetch<T>(url?: string | null) {
     (async () => {
       try {
         setLoading(true); setError(null); setData(null);
-        const headers = baseHeaders();
+        const headers = auth ? tokenHeaders() : baseHeaders();
         const r = await fetch(prefixedUrl, { signal: ac.signal, headers });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         setData(await r.json());
@@ -26,7 +27,7 @@ export function useFetch<T>(url?: string | null) {
       }
     })();
     return () => ac.abort();
-  }, [prefixedUrl]);
+  }, [prefixedUrl, auth]);
 
   return { data, loading, error };
 }

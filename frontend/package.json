@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently --names web,api --prefix-colors magenta,cyan \"npm run dev:web\" \"npm run dev:api\"",
     "dev:web": "vite",
-    "dev:api": "cd ..\\backend && .venv\\Scripts\\python -m uvicorn app.main:app --reload --port 8000",
+    "dev:api": "nodemon --cwd ../backend --watch app --ext py --exec \".venv/Scripts/python.exe -m uvicorn app.main:app --port 8000\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -25,12 +25,13 @@
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.4",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "nodemon": "^3.1.14",
     "postcss": "^8.5.6",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
