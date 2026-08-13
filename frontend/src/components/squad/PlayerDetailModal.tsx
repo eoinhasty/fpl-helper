@@ -236,7 +236,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
       />
 
       <div
-        className="absolute left-1/2 top-10 -translate-x-1/2 w-[min(32rem,_92vw)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col max-h-[calc(100vh-5rem)]"
+        className="absolute left-1/2 top-4 sm:top-10 -translate-x-1/2 w-[min(32rem,_94vw)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-5rem)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="player-modal-title"
@@ -256,13 +256,13 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-3.5 right-4 z-10 text-[12px] font-medium text-foreground/70 border border-border/60 px-3 py-[5px] rounded-lg"
+            className="absolute top-3 right-3 z-10 min-h-9 text-[12px] font-medium text-foreground/70 border border-border/60 px-3 py-2 rounded-lg"
           >
             Close
           </button>
 
           {/* identity row */}
-          <div className="relative flex gap-3.5 px-6 pt-5 pb-4">
+          <div className="relative flex gap-3.5 px-4 sm:px-6 pt-5 pb-4">
             <div className="w-[60px] h-[76px] shrink-0 rounded-[10px] bg-muted/50 border border-border flex items-center justify-center overflow-hidden">
               {player.shirt_url
                 ? <img src={player.shirt_url} alt={`${player.team} shirt`} className="w-full h-full object-contain p-2" />
@@ -303,7 +303,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
           </div>
 
           {/* topline strip */}
-          <div className="grid grid-cols-4 gap-[14px] px-6 py-[14px] border-t border-border">
+          <div className="grid grid-cols-4 gap-2 sm:gap-[14px] px-4 sm:px-6 py-[14px] border-t border-border">
             <TopNum label="PRICE" value={fmtPrice(player.price)} delta={costChange ?? undefined} />
             <TopNum
               label={hasGwPoints ? "GW PTS" : "FORM"}
@@ -319,12 +319,12 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
         </div>
 
         {/* tab bar */}
-        <div className="flex gap-6 px-4 border-b border-border shrink-0">
+        <div className="flex gap-6 px-4 border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
           {(["overview", "stats", "fixtures", "history"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`py-3 text-sm font-medium capitalize relative transition-colors ${
+              className={`py-3 text-sm font-medium capitalize relative transition-colors shrink-0 ${
                 tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >

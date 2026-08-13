@@ -7,7 +7,7 @@ export default function Modal({
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]" onClick={onClose} />
       <div
-        className={`absolute left-1/2 top-10 -translate-x-1/2 rounded-2xl bg-card text-foreground shadow-card border border-border ${className}`}
+        className={`absolute left-1/2 top-4 sm:top-10 -translate-x-1/2 w-[92vw] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-card text-foreground shadow-card border border-border ${className}`}
         role="dialog" aria-modal="true"
       >
         {children}

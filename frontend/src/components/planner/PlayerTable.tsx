@@ -106,7 +106,7 @@ export default function PlayerTable({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search player…"
-          className="h-9 px-3 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground flex-1 min-w-[160px]"
+          className="h-10 px-3 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground flex-1 min-w-[160px]"
           aria-label="Search players"
         />
         <SelectMenu
@@ -119,7 +119,7 @@ export default function PlayerTable({
         <button
           type="button"
           onClick={() => setSortDesc((v) => !v)}
-          className="h-9 px-3 rounded-xl border border-border bg-card text-sm text-foreground cursor-pointer transition hover:bg-muted/60"
+          className="h-10 px-3 rounded-xl border border-border bg-card text-sm text-foreground cursor-pointer transition hover:bg-muted/60"
           title="Toggle sort direction"
         >
           {sortDesc ? "↓" : "↑"}
@@ -211,7 +211,7 @@ export default function PlayerTable({
                 onClick={() => ok && onAdd(p)}
                 disabled={!ok}
                 title={!ok ? reason : undefined}
-                className={`shrink-0 h-8 px-3 rounded-lg text-xs font-semibold transition ${
+                className={`shrink-0 h-10 px-3 rounded-lg text-xs font-semibold transition ${
                   ok
                     ? "bg-primary text-primary-foreground cursor-pointer hover:opacity-90"
                     : alreadyAdded

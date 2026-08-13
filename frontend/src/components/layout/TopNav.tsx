@@ -45,23 +45,23 @@ export default function TopNav({
           <nav className="hidden sm:flex items-center gap-1 mx-4" aria-label="Primary">
             <Link
               to="/"
-              className="px-3 py-1.5 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
-              activeProps={{ className: "px-3 py-1.5 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
+              className="px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+              activeProps={{ className: "px-3 py-2 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
               activeOptions={{ exact: true }}
             >
               Dashboard
             </Link>
             <Link
               to="/fixtures"
-              className="px-3 py-1.5 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
-              activeProps={{ className: "px-3 py-1.5 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
+              className="px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+              activeProps={{ className: "px-3 py-2 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
             >
               Fixtures
             </Link>
             <Link
               to="/planner"
-              className="px-3 py-1.5 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
-              activeProps={{ className: "px-3 py-1.5 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
+              className="px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+              activeProps={{ className: "px-3 py-2 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
             >
               Planner
             </Link>

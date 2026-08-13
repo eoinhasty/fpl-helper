@@ -102,7 +102,7 @@ export default function SquadDashboard() {
       className="sticky z-30 border-b border-border bg-background/80 backdrop-blur"
       style={{ top: 0 }}
     >
-    <div className="mx-auto px-4 py-2.5 flex items-center justify-between gap-4" style={{ maxWidth: 1400 }}>
+    <div className="mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2" style={{ maxWidth: 1400 }}>
       <SquadStatusBar
         gw={data?.used_gw}
         deadlineISO={data?.deadline}

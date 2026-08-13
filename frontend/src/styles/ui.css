@@ -20,7 +20,7 @@
   /* Button */
   .btn {
     @apply inline-flex items-center justify-center rounded-lg border border-input
-           px-3 py-1.5 text-sm font-medium
+           px-3 py-1.5 text-sm font-medium min-h-11
            bg-card text-card-foreground
            transition
            focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
@@ -28,7 +28,7 @@
   .btn:hover { @apply bg-accent text-accent-foreground; }
 
   .btn-primary {
-    @apply border-0 bg-primary text-primary-foreground
+    @apply border-0 bg-primary text-primary-foreground min-h-11
            focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
   }
   .btn-primary:hover { @apply bg-primary-700; }
@@ -42,7 +42,7 @@
 
   /* Input */
   .input {
-    @apply w-full rounded-lg border border-input px-2 py-1 text-sm
+    @apply w-full rounded-lg border border-input px-2 py-1 text-sm min-h-11
            bg-card text-foreground
            focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
   }

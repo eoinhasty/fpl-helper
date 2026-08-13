@@ -74,7 +74,7 @@ export function Segmented<T extends string>({
       {options.map((opt) => {
         const active = value === opt.value;
         const common =
-          "px-3 py-1.5 rounded-xl text-sm transition focus:outline-none " +
+          "px-3 py-2 min-h-9 rounded-xl text-sm transition focus:outline-none " +
           "focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background";
 
         return (

@@ -25,7 +25,7 @@ export default function SquadStatusBar({
   const { text, ended } = useCountdown(deadlineISO);
 
   return (
-    <div className="flex items-center gap-2.5 text-sm">
+    <div className="flex items-center gap-2.5 text-sm overflow-x-auto whitespace-nowrap max-w-full [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
       {isLive ? (
         <span className="badge flex items-center gap-1.5 bg-success/15 text-success border border-success/30 shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />

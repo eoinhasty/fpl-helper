@@ -35,9 +35,9 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
       <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]" onClick={onClose} />
 
       {/* modal */}
-      <div className="absolute left-1/2 top-10 -translate-x-1/2 w-[min(56rem,_92vw)] rounded-2xl bg-card text-foreground shadow-card border border-border overflow-hidden">
+      <div className="absolute left-1/2 top-4 sm:top-10 -translate-x-1/2 w-[min(56rem,_94vw)] max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-5rem)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col overflow-hidden">
         {/* header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border shrink-0">
           <h2 className="text-lg font-semibold">Settings</h2>
           <button
             onClick={onClose}
@@ -49,7 +49,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
         </div>
 
         {/* body */}
-        <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-4 pb-3">
+        <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-4 pb-3 overflow-y-auto flex-1 min-h-0">
           {/* Account & Token */}
           <Card className="p-4">
             <div className="text-sm font-semibold mb-3">Account</div>

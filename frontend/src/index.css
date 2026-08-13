@@ -8,5 +8,27 @@
 /* tiny base tweaks */
 :root { color-scheme: light; }
 html, body { height: 100%; }
-body { margin: 0; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; overflow-x: hidden; }
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+/* Mobile: avoid double-tap zoom / 300ms tap delay on interactive elements */
+a, button, [role="button"], [role="radio"], input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* Mobile: keep form fields at >=16px so iOS Safari doesn't auto-zoom on focus */
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

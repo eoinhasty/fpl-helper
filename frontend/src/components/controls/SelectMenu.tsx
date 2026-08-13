@@ -27,7 +27,7 @@ export function SelectMenu<T>({
         <ListboxButton
           aria-label={ariaLabel}
           className={[
-            "flex h-9 w-full items-center justify-between gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
+            "flex h-10 w-full items-center justify-between gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
             "transition focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
             disabled ? "opacity-60 cursor-not-allowed" : "hover:bg-muted/60",
           ].join(" ")}
@@ -59,7 +59,7 @@ export function SelectMenu<T>({
               value={o.value}
               className={({ focus, selected }) =>
                 [
-                  "cursor-pointer select-none rounded-lg px-3 py-1.5 text-sm",
+                  "cursor-pointer select-none rounded-lg px-3 py-2 text-sm",
                   selected
                     ? "bg-primary text-primary-foreground"
                     : focus
