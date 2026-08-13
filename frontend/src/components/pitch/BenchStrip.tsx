@@ -7,9 +7,11 @@ type BenchSlot = { label: string; player?: Player };
 export default function BenchStrip({
     bench,
     onPlayerClick,
+    scale = 1,
 }: {
     bench: BenchSlot[];
     onPlayerClick?: (p: Player) => void;
+    scale?: number;
 }) {
     return (
         <div className="w-full flex justify-center">
@@ -23,16 +25,17 @@ export default function BenchStrip({
                 <div className="grid grid-cols-4 gap-3">
                     {bench.map((slot, idx) => (
                         <div key={idx} className="flex flex-col items-center">
-                            <div className="w-full flex justify-center min-h-[128px] items-end pb-4">
+                            <div className="w-full flex justify-center items-end pb-4" style={{ minHeight: 128 * scale }}>
                                 {slot.player ? (
                                     <div className="relative">
                                         <PlayerChip
                                             p={slot.player}
                                             onClick={() => onPlayerClick?.(slot.player!)}
+                                            scale={scale}
                                         />
                                     </div>
                                 ) : (
-                                    <div className="h-[74px] w-[92px] rounded-lg bg-muted ring-1 ring-border" />
+                                    <div className="rounded-lg bg-muted ring-1 ring-border" style={{ height: 74 * scale, width: 92 * scale }} />
                                 )}
                             </div>
                         </div>

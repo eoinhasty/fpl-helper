@@ -91,6 +91,14 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
   const chipGapVB = pxToVB ? (CHIP_W_PX + 2 * CHIP_MARGIN_PX) * pxToVB : 0;
   const gutterVB = pxToVB ? 6 * pxToVB : 8;
 
+  // Shrink chips on narrow viewports so the widest row (up to 5 across, or
+  // the bench's fixed 4 slots) always has room to fit without overlapping —
+  // chip pixel size is otherwise fixed while row position spacing is
+  // proportional to container width, so small screens need smaller chips.
+  const maxRowLen = Math.max(4, ...rows.map((r) => r.list.length));
+  const neededPx = maxRowLen * (CHIP_W_PX + 2 * CHIP_MARGIN_PX);
+  const chipScale = boxW ? Math.min(1, Math.max(0.62, boxW / neededPx)) : 1;
+
   return (
     <div className={`w-full select-none relative ${className ?? ""}`}>
       {loading && (
@@ -121,7 +129,7 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
                       className="absolute -translate-x-1/2 -translate-y-1/2"
                       style={{ left: `${leftPct}%`, top: `${topPct}%` }}
                     >
-                      <PlayerChip p={p} onClick={() => onPlayerClick?.(p)} hideStartMeter={hideStartMeter} />
+                      <PlayerChip p={p} onClick={() => onPlayerClick?.(p)} hideStartMeter={hideStartMeter} scale={chipScale} />
                     </div>
                   );
                 });
@@ -140,7 +148,7 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
           {/* subtle fade from pitch -> band */}
           <div className="h-5 bg-gradient-to-b from-emerald-900/10 to-transparent" />
 
-          <BenchStrip bench={bench} onPlayerClick={onPlayerClick} />
+          <BenchStrip bench={bench} onPlayerClick={onPlayerClick} scale={chipScale} />
         </div>
       </div>
     </div>
