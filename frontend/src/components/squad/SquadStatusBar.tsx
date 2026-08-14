@@ -12,6 +12,7 @@ export default function SquadStatusBar({
   activeChip,
   isLive,
   isSwitching,
+  compact,
 }: {
   gw?: number;
   deadlineISO?: string | null;
@@ -21,6 +22,10 @@ export default function SquadStatusBar({
   cache: CacheMeta;
   isLive?: boolean;
   isSwitching?: boolean;
+  /** Drop Value/Bank/chip — just the badge, countdown, and cache indicator.
+   * Used on mobile where the full row doesn't fit without squeezing; the
+   * dropped stats move into SquadStatTiles in the scrolling content instead. */
+  compact?: boolean;
 }) {
   const { text, ended } = useCountdown(deadlineISO);
 
@@ -39,20 +44,24 @@ export default function SquadStatusBar({
       <span className={ended ? "text-destructive font-medium" : "text-muted-foreground"}>
         {text}
       </span>
-      <span className="w-px h-4 bg-border shrink-0" />
-      <span className="text-muted-foreground">
-        Value <span className="font-semibold text-foreground">{money(teamValue)}</span>
-      </span>
-      <span className="w-px h-4 bg-border shrink-0" />
-      <span className="text-muted-foreground">
-        Bank <span className="font-semibold text-foreground">{money(teamBank)}</span>
-      </span>
-      {activeChip && (
+      {!compact && (
         <>
           <span className="w-px h-4 bg-border shrink-0" />
-          <span className="badge pill-warn uppercase font-semibold shrink-0">
-            {activeChip.replace(/_/g, " ")}
+          <span className="text-muted-foreground">
+            Value <span className="font-semibold text-foreground">{money(teamValue)}</span>
           </span>
+          <span className="w-px h-4 bg-border shrink-0" />
+          <span className="text-muted-foreground">
+            Bank <span className="font-semibold text-foreground">{money(teamBank)}</span>
+          </span>
+          {activeChip && (
+            <>
+              <span className="w-px h-4 bg-border shrink-0" />
+              <span className="badge pill-warn uppercase font-semibold shrink-0">
+                {activeChip.replace(/_/g, " ")}
+              </span>
+            </>
+          )}
         </>
       )}
       {cache?.status !== null && (
