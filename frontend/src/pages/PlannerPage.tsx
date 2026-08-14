@@ -1,5 +1,5 @@
 import * as React from "react";
-import TopNav from "../components/layout/TopNav";
+import AppShell from "../components/layout/AppShell";
 import DataCard from "../components/ui/DataCard";
 import PlayerTable from "../components/planner/PlayerTable";
 import DraftPanel from "../components/planner/DraftPanel";
@@ -32,8 +32,7 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="min-h-screen page-bg flex flex-col">
-      <TopNav />
+    <AppShell>
       <div className="mx-auto w-full px-4 py-4 flex flex-col lg:flex-row gap-5" style={{ maxWidth: 1400 }}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-4 mb-3">
@@ -96,7 +95,7 @@ export default function PlannerPage() {
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="fixed bottom-6 right-6 z-30 h-11 w-11 rounded-full border border-border bg-card text-foreground shadow-card cursor-pointer transition hover:bg-muted/60 flex items-center justify-center"
+          className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] right-4 lg:bottom-6 lg:right-6 z-30 h-11 w-11 rounded-full border border-border bg-card text-foreground shadow-card cursor-pointer transition hover:bg-muted/60 flex items-center justify-center"
           aria-label="Back to top"
           title="Back to top"
         >
@@ -114,11 +113,6 @@ export default function PlannerPage() {
           season={data?.season}
         />
       )}
-
-      <footer className="mt-auto py-4 text-center text-xs text-muted-foreground/60">
-        Not affiliated with or endorsed by Fantasy Premier League or the Premier League.{" "}
-        <a href="/privacy" className="underline hover:text-muted-foreground">Privacy policy</a>
-      </footer>
-    </div>
+    </AppShell>
   );
 }

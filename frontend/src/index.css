@@ -15,6 +15,13 @@ body { margin: 0; overflow-x: hidden; }
 /* Mobile: avoid double-tap zoom / 300ms tap delay on interactive elements */
 a, button, [role="button"], [role="radio"], input, select, textarea {
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile: scrollable panels (horizontal strips, sheet bodies) shouldn't
+   rubber-band the page behind them once they hit their own scroll limit */
+.overflow-x-auto, .overflow-y-auto, .overflow-auto {
+  overscroll-behavior: contain;
 }
 
 /* Mobile: keep form fields at >=16px so iOS Safari doesn't auto-zoom on focus */

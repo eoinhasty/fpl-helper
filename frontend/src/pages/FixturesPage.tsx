@@ -1,5 +1,5 @@
 import * as React from "react";
-import TopNav from "../components/layout/TopNav";
+import AppShell from "../components/layout/AppShell";
 import DataCard from "../components/ui/DataCard";
 import FdrGrid from "../components/fixtures/FdrGrid";
 import { Segmented } from "../components/controls/Segmented";
@@ -13,8 +13,7 @@ export default function FixturesPage() {
   const { data, loading, error } = useFetch<FdrGridResponse>(`/api/fixtures/grid?horizon=${horizon}`);
 
   return (
-    <div className="min-h-screen page-bg flex flex-col">
-      <TopNav />
+    <AppShell>
       <div className="mx-auto w-full px-4 py-4 space-y-4" style={{ maxWidth: 1400 }}>
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-lg font-semibold text-foreground">Fixture ticker</h1>
@@ -33,10 +32,6 @@ export default function FixturesPage() {
           {data && <FdrGrid data={data} />}
         </DataCard>
       </div>
-      <footer className="mt-auto py-4 text-center text-xs text-muted-foreground/60">
-        Not affiliated with or endorsed by Fantasy Premier League or the Premier League.{" "}
-        <a href="/privacy" className="underline hover:text-muted-foreground">Privacy policy</a>
-      </footer>
-    </div>
+    </AppShell>
   );
 }

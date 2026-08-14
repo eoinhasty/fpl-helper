@@ -56,7 +56,7 @@ export default function SquadStatusBar({
         </>
       )}
       {cache?.status !== null && (
-        <div className="hidden xl:flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5">
           <span className="w-px h-4 bg-border shrink-0" />
           <CacheIndicators status={cache.status} ageSeconds={cache.ageSeconds} isSwitching={isSwitching} />
         </div>
