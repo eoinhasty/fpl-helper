@@ -29,9 +29,26 @@ export default function DashboardLayout({
   contentClassName = "",
   footer,
 }: Props) {
+  // Below the sidebar breakpoint the two asides stop being sticky columns and
+  // instead stack full-width in the main flow — content is never hidden on
+  // mobile, it just reads top-to-bottom instead of three-across. Main
+  // content leads (order-1), then the right/"insights" panel (order-2, most
+  // directly related to the squad above it), then the left/"leagues"
+  // panel (order-3). At the breakpoint, `*:order-none` drops back to
+  // source order (left, main, right) for the normal 3-column layout.
   const BP = {
-    lg: { leftCol: "lg:col-span-3", rightCol: "lg:col-span-3", mainCol: "col-span-12 lg:col-span-6", hide: "hidden lg:block" },
-    xl: { leftCol: "xl:col-span-3", rightCol: "xl:col-span-3", mainCol: "col-span-12 xl:col-span-6", hide: "hidden xl:block" },
+    lg: {
+      leftCol: "col-span-12 lg:col-span-3",
+      rightCol: "col-span-12 lg:col-span-3",
+      mainCol: "col-span-12 lg:col-span-6",
+      sticky: "lg:sticky",
+    },
+    xl: {
+      leftCol: "col-span-12 xl:col-span-3",
+      rightCol: "col-span-12 xl:col-span-3",
+      mainCol: "col-span-12 xl:col-span-6",
+      sticky: "xl:sticky",
+    },
   } as const;
 
   const GAP: Record<number, string> = {
@@ -39,8 +56,9 @@ export default function DashboardLayout({
     5: "gap-5", 6: "gap-6", 7: "gap-7", 8: "gap-8", 9: "gap-9", 10: "gap-10",
   };
 
-  const { leftCol, rightCol, mainCol, hide } = BP[sidebarBreakpoint];
+  const { leftCol, rightCol, mainCol, sticky } = BP[sidebarBreakpoint];
   const gapClass = GAP[gap] ?? "gap-5";
+  const orderNoneAtBp = sidebarBreakpoint === "lg" ? "lg:order-none" : "xl:order-none";
 
   return (
     <div
@@ -50,8 +68,8 @@ export default function DashboardLayout({
       {top && <div className="col-span-12">{top}</div>}
 
       <aside
-        className={`${hide} ${leftCol} space-y-4 self-start`}
-        style={{ position: "sticky", top: stickyOffsetPx }}
+        className={`${leftCol} order-3 ${orderNoneAtBp} space-y-4 self-start ${sticky}`}
+        style={{ top: stickyOffsetPx }}
         aria-label="Left sidebar"
       >
         {left}
@@ -60,20 +78,20 @@ export default function DashboardLayout({
       <main
         id="main-content"
         role="main"
-        className={`${mainCol} space-y-4 ${contentClassName}`}
+        className={`${mainCol} order-1 ${orderNoneAtBp} space-y-4 ${contentClassName}`}
       >
         {children}
       </main>
 
       <aside
-        className={`${hide} ${rightCol} space-y-4 self-start`}
-        style={{ position: "sticky", top: stickyOffsetPx }}
+        className={`${rightCol} order-2 ${orderNoneAtBp} space-y-4 self-start ${sticky}`}
+        style={{ top: stickyOffsetPx }}
         aria-label="Right sidebar"
       >
         {right}
       </aside>
 
-      {footer && <div className="col-span-12">{footer}</div>}
+      {footer && <div className="col-span-12 order-4">{footer}</div>}
     </div>
   );
 }
