@@ -1,18 +1,19 @@
 // pages/SquadDashboard.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import LeaguesCard from "../components/left/LeaguesCard";
 import TransferSuggestionsCard from "../components/left/TransferSuggestionsCard";
 import XIList from "../components/squad/XIList";
 import PitchView from "../components/pitch/PitchView";
 import SquadStatusBar from "../components/squad/SquadStatusBar";
-import SquadStatTiles from "../components/squad/SquadStatTiles";
 import RightPanel from "../components/right/RightPanel";
 import { useEntryId } from "../hooks/useEntryID";
 import { useSquad } from "../hooks/useSquad";
 import { usePreferences } from "../hooks/usePreferences";
 import { Segmented } from "../components/controls/Segmented";
 import { GwSelect } from "../components/controls/GwSelect";
+import { money } from "../lib/format";
 
 import type { Player } from "../lib/types";
 import PlayerDetailModal from "../components/squad/PlayerDetailModal";
@@ -20,6 +21,19 @@ import LiveAuthGate from "../components/squad/LiveAuthGate";
 import PreSeasonNotice from "../components/squad/PreSeasonNotice";
 
 type Mode = "live" | "squad";
+
+/** Plain label/value pair — no border, no card background. Used in the
+ * mobile stats/controls row, which is deliberately borderless (see
+ * SquadStatusBar/GwSelect's "plain" treatment below) rather than reusing
+ * LeaguesCard's boxed Tile idiom. */
+function StatText({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-sm font-semibold text-foreground">{value}</div>
+    </div>
+  );
+}
 
 export default function SquadDashboard() {
   const { entry } = useEntryId();
@@ -170,11 +184,61 @@ export default function SquadDashboard() {
         stickyOffsetPx={52}
       >
         {/* Mobile: Value/Bank/chip + the mode controls, relocated out of the
-            cramped sticky header (see contentHeader above) into normal
-            scrolling content, right above the squad itself. */}
-        <div className="lg:hidden space-y-3">
-          {modeControls}
-          <SquadStatTiles teamValue={data?.team_value} teamBank={data?.team_bank} activeChip={data?.active_chip ?? null} />
+            sticky header (see contentHeader above) into normal scrolling
+            content, right above the squad itself. Deliberately borderless —
+            plain text/inline controls, not the bordered Segmented/SelectMenu/
+            .btn chrome used in the lg+ header (that stays in modeControls
+            above, unchanged) — this row is a scoped, mobile-only exception. */}
+        <div className="lg:hidden flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
+          <div className="flex items-center gap-4">
+            <StatText label="Value" value={money(data?.team_value)} />
+            <StatText label="Bank" value={money(data?.team_bank)} />
+            {data?.active_chip && (
+              <StatText
+                label="Chip"
+                value={<span className="uppercase">{data.active_chip.replace(/_/g, " ")}</span>}
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <div role="radiogroup" aria-label="View" className="flex items-center gap-3">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={mode === "squad"}
+                onClick={() => setMode("squad")}
+                className={mode === "squad" ? "font-semibold text-primary" : "text-muted-foreground"}
+              >
+                Squad
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={mode === "live"}
+                onClick={() => setMode("live")}
+                className={mode === "live" ? "font-semibold text-primary" : "text-muted-foreground"}
+              >
+                Live
+              </button>
+            </div>
+            <GwSelect
+              value={gw ?? data?.used_gw}
+              options={gwOptions}
+              onChange={setGw}
+              disabled={mode === "live"}
+              variant="plain"
+              className="w-20"
+            />
+            <button
+              type="button"
+              onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
+              className="min-h-9 min-w-9 flex items-center justify-center text-muted-foreground hover:text-foreground"
+              title="Force fresh fetch"
+              aria-label="Refresh"
+            >
+              ↻
+            </button>
+          </div>
         </div>
 
         {mode === "live" ? (

@@ -7,12 +7,16 @@ export function GwSelect({
   onChange,
   disabled = false,
   ariaLabel = "Select gameweek",
+  className = "w-28",
+  variant = "default",
 }: {
   value: number | undefined;
   options: number[];
   onChange: (gw: number) => void;
   disabled?: boolean;
   ariaLabel?: string;
+  className?: string;
+  variant?: "default" | "plain";
 }) {
   return (
     <SelectMenu<number | null>
@@ -20,7 +24,8 @@ export function GwSelect({
       onChange={(gw) => gw != null && onChange(gw)}
       disabled={disabled}
       ariaLabel={ariaLabel}
-      className="w-28"
+      className={className}
+      variant={variant}
       anchor="bottom end"
       placeholder="GW —"
       options={options.map((g) => ({ label: `GW ${g}`, value: g }))}

@@ -10,6 +10,10 @@ export function SelectMenu<T>({
   disabled = false,
   placeholder = "",
   anchor = "bottom start",
+  /** "plain" drops the bordered/card chrome — inline text + chevron only.
+   * Used where the select sits in a borderless toolbar row (e.g. mobile
+   * SquadDashboard) instead of standing alone as a normal form control. */
+  variant = "default",
 }: {
   value: T;
   options: { label: string; value: T }[];
@@ -19,6 +23,7 @@ export function SelectMenu<T>({
   disabled?: boolean;
   placeholder?: string;
   anchor?: "bottom start" | "bottom end";
+  variant?: "default" | "plain";
 }) {
   const current = options.find((o) => o.value === value);
   return (
@@ -27,9 +32,11 @@ export function SelectMenu<T>({
         <ListboxButton
           aria-label={ariaLabel}
           className={[
-            "flex h-10 w-full items-center justify-between gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
+            variant === "plain"
+              ? "flex min-h-9 w-full items-center justify-between gap-1 py-1 text-sm text-foreground"
+              : "flex h-10 w-full items-center justify-between gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
             "transition focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
-            disabled ? "opacity-60 cursor-not-allowed" : "hover:bg-muted/60",
+            disabled ? "opacity-60 cursor-not-allowed" : variant === "plain" ? "hover:text-primary" : "hover:bg-muted/60",
           ].join(" ")}
         >
           <span className="truncate">{current?.label ?? placeholder}</span>
