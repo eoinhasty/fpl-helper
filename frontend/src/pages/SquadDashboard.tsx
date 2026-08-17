@@ -1,6 +1,6 @@
 // pages/SquadDashboard.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, KeyboardEvent } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import LeaguesCard from "../components/left/LeaguesCard";
 import TransferSuggestionsCard from "../components/left/TransferSuggestionsCard";
@@ -113,14 +113,19 @@ export default function SquadDashboard() {
   );
 
   // Squad/Live + GW picker + refresh — rendered twice (inline in the sticky
-  // header on lg+, and again in the scrolling content on mobile, see below)
-  // rather than made responsive in place, since the two contexts need very
-  // different layouts around it. Same controlled state either way.
+  // header on lg+, and again — as a plain/borderless variant — in the same
+  // sticky header on mobile, see contentHeader below) rather than made
+  // responsive in place, since the two contexts need very different
+  // layouts and visual treatments around it. Same controlled state either
+  // way; two mounted-but-hidden copies (one via `hidden lg:flex`, one via
+  // `lg:hidden`) is a deliberate, accepted tradeoff over a JS media-query
+  // hook — harmless here since neither copy fetches anything on its own.
   const modeControls = (
     <div className="flex items-center gap-2">
       <Segmented<Mode>
         value={mode}
         onChange={setMode}
+        ariaLabel="View"
         options={[
           { label: "Squad", value: "squad" },
           { label: "Live", value: "live" },
@@ -140,6 +145,79 @@ export default function SquadDashboard() {
       >
         ↻
       </button>
+    </div>
+  );
+
+  // Plain/borderless equivalent of modeControls for the mobile sticky
+  // header — hand-rolled rather than reusing <Segmented> (which is always
+  // bordered) since this row is a deliberate, scoped exception to the
+  // app's normal control styling. Kept keyboard-operable and at the same
+  // 44px touch-target floor as everywhere else in the app despite having
+  // no visible border to hint at that hit area.
+  function onModeToggleKeyDown(e: KeyboardEvent) {
+    if (["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) {
+      e.preventDefault();
+      setMode((m) => (m === "squad" ? "live" : "squad"));
+    }
+  }
+  const plainModeToggleClass = (active: boolean) =>
+    [
+      "min-h-11 min-w-11 px-2 flex items-center justify-center rounded-md text-sm transition",
+      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+      active ? "font-semibold text-primary-strong" : "text-muted-foreground",
+    ].join(" ");
+  const mobileModeControls = (
+    <div className="flex items-center gap-3 shrink-0">
+      <div role="radiogroup" aria-label="View" className="flex items-center" onKeyDown={onModeToggleKeyDown}>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={mode === "squad"}
+          onClick={() => setMode("squad")}
+          className={plainModeToggleClass(mode === "squad")}
+        >
+          Squad
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={mode === "live"}
+          onClick={() => setMode("live")}
+          className={plainModeToggleClass(mode === "live")}
+        >
+          Live
+        </button>
+      </div>
+      <GwSelect
+        value={gw ?? data?.used_gw}
+        options={gwOptions}
+        onChange={setGw}
+        disabled={mode === "live"}
+        variant="plain"
+        className="w-auto"
+      />
+      <button
+        type="button"
+        onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
+        className="min-h-11 min-w-11 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        title="Force fresh fetch"
+        aria-label="Refresh"
+      >
+        ↻
+      </button>
+    </div>
+  );
+
+  const mobileStats = (
+    <div className="flex items-end gap-4">
+      <StatText label="Value" value={money(data?.team_value)} />
+      <StatText label="Bank" value={money(data?.team_bank)} />
+      {data?.active_chip && (
+        <StatText
+          label="Chip"
+          value={<span className="uppercase">{data.active_chip.replace(/_/g, " ")}</span>}
+        />
+      )}
     </div>
   );
 
@@ -166,10 +244,22 @@ export default function SquadDashboard() {
           <div className="shrink-0">{modeControls}</div>
         </div>
 
-        {/* Mobile: just the essentials — Value/Bank/chip and the mode
-            controls move into the scrolling content instead, see below. */}
-        <div className="flex lg:hidden">
+        {/* Mobile: two stacked rows, both sticky — badge/countdown/cache on
+            top, then Value/Bank/chip + the mode controls below. Keeping the
+            controls in the sticky header (not the scrolling content) means
+            they stay reachable without scrolling back up, matching desktop;
+            an earlier version moved them into scrolling content and lost
+            that. Borderless/plain styling throughout is a deliberate,
+            scoped exception to the app's normal bordered controls (see
+            mobileModeControls above) — items-end so the two-line stat
+            blocks and the single-line controls share a bottom edge instead
+            of centering against each other. */}
+        <div className="lg:hidden space-y-2">
           <SquadStatusBar {...statusBarProps} compact />
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 text-sm">
+            {mobileStats}
+            {mobileModeControls}
+          </div>
         </div>
       </div>
     </div>
@@ -183,64 +273,6 @@ export default function SquadDashboard() {
         right={right}
         stickyOffsetPx={52}
       >
-        {/* Mobile: Value/Bank/chip + the mode controls, relocated out of the
-            sticky header (see contentHeader above) into normal scrolling
-            content, right above the squad itself. Deliberately borderless —
-            plain text/inline controls, not the bordered Segmented/SelectMenu/
-            .btn chrome used in the lg+ header (that stays in modeControls
-            above, unchanged) — this row is a scoped, mobile-only exception. */}
-        <div className="lg:hidden flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
-          <div className="flex items-center gap-4">
-            <StatText label="Value" value={money(data?.team_value)} />
-            <StatText label="Bank" value={money(data?.team_bank)} />
-            {data?.active_chip && (
-              <StatText
-                label="Chip"
-                value={<span className="uppercase">{data.active_chip.replace(/_/g, " ")}</span>}
-              />
-            )}
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <div role="radiogroup" aria-label="View" className="flex items-center gap-3">
-              <button
-                type="button"
-                role="radio"
-                aria-checked={mode === "squad"}
-                onClick={() => setMode("squad")}
-                className={mode === "squad" ? "font-semibold text-primary" : "text-muted-foreground"}
-              >
-                Squad
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={mode === "live"}
-                onClick={() => setMode("live")}
-                className={mode === "live" ? "font-semibold text-primary" : "text-muted-foreground"}
-              >
-                Live
-              </button>
-            </div>
-            <GwSelect
-              value={gw ?? data?.used_gw}
-              options={gwOptions}
-              onChange={setGw}
-              disabled={mode === "live"}
-              variant="plain"
-              className="w-20"
-            />
-            <button
-              type="button"
-              onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
-              className="min-h-9 min-w-9 flex items-center justify-center text-muted-foreground hover:text-foreground"
-              title="Force fresh fetch"
-              aria-label="Refresh"
-            >
-              ↻
-            </button>
-          </div>
-        </div>
-
         {mode === "live" ? (
           <LiveAuthGate key={error === "AUTH_EXPIRED" ? "expired" : "authed"} onAuthenticated={loadLive}>
             {isPreSeason ? (

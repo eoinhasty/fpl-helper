@@ -1,5 +1,5 @@
 // components/controls/GwSelect.tsx
-import { SelectMenu } from "./SelectMenu";
+import { SelectMenu, type SelectMenuVariant } from "./SelectMenu";
 
 export function GwSelect({
   value,
@@ -16,7 +16,7 @@ export function GwSelect({
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
-  variant?: "default" | "plain";
+  variant?: SelectMenuVariant;
 }) {
   return (
     <SelectMenu<number | null>

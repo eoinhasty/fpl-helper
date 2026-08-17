@@ -10,7 +10,6 @@ type Props = {
   maxWidthPx?: number;
   gap?: number;
   stickyOffsetPx?: number;
-  sidebarBreakpoint?: "lg" | "xl";
   containerClassName?: string;
   contentClassName?: string;
   footer?: React.ReactNode;
@@ -24,51 +23,38 @@ export default function DashboardLayout({
   maxWidthPx = 1400,
   gap = 5,
   stickyOffsetPx = 64,
-  sidebarBreakpoint = "lg",
   containerClassName = "",
   contentClassName = "",
   footer,
 }: Props) {
-  // Below the sidebar breakpoint the two asides stop being sticky columns and
-  // instead stack full-width in the main flow — content is never hidden on
-  // mobile, it just reads top-to-bottom instead of three-across. Main
-  // content leads (order-1), then the right/"insights" panel (order-2, most
-  // directly related to the squad above it), then the left/"leagues"
-  // panel (order-3). At the breakpoint, `*:order-none` drops back to
-  // source order (left, main, right) for the normal 3-column layout.
-  const BP = {
-    lg: {
-      leftCol: "col-span-12 lg:col-span-3",
-      rightCol: "col-span-12 lg:col-span-3",
-      mainCol: "col-span-12 lg:col-span-6",
-      sticky: "lg:sticky",
-    },
-    xl: {
-      leftCol: "col-span-12 xl:col-span-3",
-      rightCol: "col-span-12 xl:col-span-3",
-      mainCol: "col-span-12 xl:col-span-6",
-      sticky: "xl:sticky",
-    },
-  } as const;
+  // Below `lg` the two asides stop being sticky columns and instead stack
+  // full-width in the main flow — content is never hidden on mobile, it
+  // just reads top-to-bottom instead of three-across. Main content leads
+  // (order-1), then the right/"insights" panel (order-2, most directly
+  // related to the squad above it), then the left/"leagues" panel
+  // (order-3). At `lg`, `lg:order-none` drops back to source order (left,
+  // main, right) for the normal 3-column layout.
+  //
+  // (There used to be an `xl` variant of this breakpoint too, selectable
+  // via a `sidebarBreakpoint` prop — removed since no caller ever used
+  // anything but the `lg` default. Re-add if a future page needs it.)
 
   const GAP: Record<number, string> = {
     0: "gap-0", 1: "gap-1", 2: "gap-2", 3: "gap-3", 4: "gap-4",
     5: "gap-5", 6: "gap-6", 7: "gap-7", 8: "gap-8", 9: "gap-9", 10: "gap-10",
   };
 
-  const { leftCol, rightCol, mainCol, sticky } = BP[sidebarBreakpoint];
   const gapClass = GAP[gap] ?? "gap-5";
-  const orderNoneAtBp = sidebarBreakpoint === "lg" ? "lg:order-none" : "xl:order-none";
 
   return (
     <div
-      className={`mx-auto px-4 py-4 grid grid-cols-12 ${gapClass} ${containerClassName}`}
+      className={`w-full mx-auto px-4 py-4 grid grid-cols-12 ${gapClass} ${containerClassName}`}
       style={{ maxWidth: `${maxWidthPx}px` }}
     >
       {top && <div className="col-span-12">{top}</div>}
 
       <aside
-        className={`${leftCol} order-3 ${orderNoneAtBp} space-y-4 self-start ${sticky}`}
+        className="col-span-12 lg:col-span-3 order-3 lg:order-none space-y-4 self-start lg:sticky"
         style={{ top: stickyOffsetPx }}
         aria-label="Left sidebar"
       >
@@ -78,13 +64,13 @@ export default function DashboardLayout({
       <main
         id="main-content"
         role="main"
-        className={`${mainCol} order-1 ${orderNoneAtBp} space-y-4 ${contentClassName}`}
+        className={`col-span-12 lg:col-span-6 order-1 lg:order-none space-y-4 ${contentClassName}`}
       >
         {children}
       </main>
 
       <aside
-        className={`${rightCol} order-2 ${orderNoneAtBp} space-y-4 self-start ${sticky}`}
+        className="col-span-12 lg:col-span-3 order-2 lg:order-none space-y-4 self-start lg:sticky"
         style={{ top: stickyOffsetPx }}
         aria-label="Right sidebar"
       >

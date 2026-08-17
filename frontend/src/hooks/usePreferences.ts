@@ -25,6 +25,17 @@ function applyTheme(theme: Theme) {
   const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const isDark = theme === "dark" || (theme === "system" && systemDark);
   root.classList.toggle("dark", isDark);
+
+  // Keep the browser chrome (mobile status bar / URL bar tint) matching
+  // the app's own theme choice, not just OS preference — index.html's
+  // static <meta name="theme-color"> tags only cover the pre-hydration
+  // paint; from here on, both variants get set to the same resolved
+  // color so whichever one the media query currently matches shows it.
+  // Values match --color-bg / page-bg's gradient start in theme.css/ui.css.
+  const themeColor = isDark ? "#0b1022" : "#dbeafe";
+  document.querySelectorAll('meta[name="theme-color"]').forEach((el) => {
+    el.setAttribute("content", themeColor);
+  });
 }
 
 export function usePreferences() {

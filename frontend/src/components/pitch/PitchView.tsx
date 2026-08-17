@@ -97,7 +97,12 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
   // proportional to container width, so small screens need smaller chips.
   const maxRowLen = Math.max(4, ...rows.map((r) => r.list.length));
   const neededPx = maxRowLen * (CHIP_W_PX + 2 * CHIP_MARGIN_PX);
-  const chipScale = boxW ? Math.min(1, Math.max(0.62, boxW / neededPx)) : 1;
+  // Floor was 0.62, but a 5-across row at a real phone width (~358px
+  // content width at 390px viewport) needs ~0.46 to avoid overlap — the
+  // higher floor was silently overriding the anti-overlap math it sits
+  // next to. 0.4 covers down to ~312px content width (~320px phones)
+  // before the floor itself starts binding again.
+  const chipScale = boxW ? Math.min(1, Math.max(0.4, boxW / neededPx)) : 1;
 
   return (
     <div className={`w-full select-none relative ${className ?? ""}`}>

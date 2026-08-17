@@ -236,7 +236,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
       />
 
       <div
-        className="absolute left-1/2 top-4 sm:top-10 -translate-x-1/2 w-[min(32rem,_94vw)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-5rem)]"
+        className="absolute left-1/2 top-4 lg:top-10 -translate-x-1/2 w-[min(32rem,_94vw)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col max-h-[calc(100dvh-2rem-3.5rem-env(safe-area-inset-bottom))] lg:max-h-[calc(100vh-5rem)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="player-modal-title"
@@ -319,7 +319,11 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
         </div>
 
         {/* tab bar */}
-        <div className="flex gap-6 px-4 border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+        <div
+          className="flex gap-6 px-4 border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+          style={{ scrollbarWidth: "none" }}
+          tabIndex={0}
+        >
           {(["overview", "stats", "fixtures", "history"] as const).map((t) => (
             <button
               key={t}

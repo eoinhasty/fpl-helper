@@ -7,6 +7,10 @@
 
 /* tiny base tweaks */
 :root { color-scheme: light; }
+/* Theme is a manual .dark class toggle (usePreferences), not just OS
+   preference — native form controls/scrollbars need to follow it too, or
+   they stay light-styled even when the user has explicitly picked dark. */
+:root.dark { color-scheme: dark; }
 html, body { height: 100%; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; overflow-x: hidden; }
@@ -16,6 +20,7 @@ body { margin: 0; overflow-x: hidden; }
 a, button, [role="button"], [role="radio"], input, select, textarea {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 /* Mobile: scrollable panels (horizontal strips, sheet bodies) shouldn't
@@ -24,8 +29,11 @@ a, button, [role="button"], [role="radio"], input, select, textarea {
   overscroll-behavior: contain;
 }
 
-/* Mobile: keep form fields at >=16px so iOS Safari doesn't auto-zoom on focus */
-@media (max-width: 640px) {
+/* Keep form fields at >=16px so iOS Safari doesn't auto-zoom on focus.
+   Threshold matches the app's mobile/desktop breakpoint (lg, 1024px) —
+   a 640px cutoff missed landscape phones (e.g. 844px-wide) and iPads,
+   which still got the zoom despite genuinely being touch/mobile Safari. */
+@media (max-width: 1023px) {
   input, select, textarea {
     font-size: 16px;
   }

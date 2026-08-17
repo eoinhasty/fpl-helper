@@ -24,8 +24,6 @@ export function Segmented<T extends string>({
   /** Optional aria-label for the radiogroup */
   ariaLabel?: string;
 }) {
-  const containerRef = React.useRef<HTMLDivElement | null>(null);
-
   const idx = Math.max(
     0,
     options.findIndex((o) => o.value === value)
@@ -61,11 +59,15 @@ export function Segmented<T extends string>({
 
   return (
     <div
-      ref={containerRef}
       role="radiogroup"
       aria-label={ariaLabel}
       className={[
-        "inline-flex rounded-2xl border border-border p-1 bg-card",
+        // p-0.5 (not p-1) so the outer pill's total rendered height lands
+        // close to the app's 44px control-height standard (.btn/.input's
+        // min-h-11, SelectMenu's h-11) instead of sitting ~6px taller —
+        // three visibly different control heights side by side (46/40/44px)
+        // was flagged as inconsistent in the SquadDashboard header row.
+        "inline-flex rounded-2xl border border-border p-0.5 bg-card",
         className,
         fullWidth && "w-full",
       ].filter(Boolean).join(" ")}
@@ -74,7 +76,7 @@ export function Segmented<T extends string>({
       {options.map((opt) => {
         const active = value === opt.value;
         const common =
-          "px-3 py-2 min-h-9 rounded-xl text-sm transition active:scale-[0.98] focus:outline-none " +
+          "px-3 py-2 min-h-9 rounded-xl text-sm whitespace-nowrap transition active:scale-[0.98] focus:outline-none " +
           "focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background";
 
         return (

@@ -14,10 +14,43 @@ type Props = {
 export default function SettingsModal({ open, onClose, entry, setEntry }: Props) {
   const { prefs, set, reset } = usePreferences();
   const [confirmingReset, setConfirmingReset] = React.useState(false);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const closeBtnRef = React.useRef<HTMLButtonElement>(null);
+  const previouslyFocused = React.useRef<HTMLElement | null>(null);
+
+  // Move focus into the dialog on open, and back to whatever triggered it
+  // (the settings gear) on close — previously focus just stayed on the
+  // trigger behind the modal, which is a real keyboard/screen-reader trap.
+  React.useEffect(() => {
+    if (!open) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    closeBtnRef.current?.focus();
+    return () => previouslyFocused.current?.focus?.();
+  }, [open]);
 
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Minimal focus trap: wrap Tab/Shift+Tab at the dialog's edges so
+      // keyboard focus can't leave the modal into the page behind it.
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
     if (open) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -32,14 +65,21 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
   return (
     <div className="fixed inset-0 z-50">
       {/* backdrop */}
-      <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]" onClick={onClose} aria-hidden="true" />
 
       {/* modal */}
-      <div className="absolute left-1/2 top-4 sm:top-10 -translate-x-1/2 w-[min(56rem,_94vw)] max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-5rem)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col overflow-hidden">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-modal-title"
+        className="absolute left-1/2 top-4 lg:top-10 -translate-x-1/2 w-[min(56rem,_94vw)] max-h-[calc(100dvh-2rem-3.5rem-env(safe-area-inset-bottom))] lg:max-h-[calc(100vh-5rem)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col overflow-hidden"
+      >
         {/* header */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border shrink-0">
-          <h2 className="text-lg font-semibold">Settings</h2>
+          <h2 id="settings-modal-title" className="text-lg font-semibold">Settings</h2>
           <button
+            ref={closeBtnRef}
             onClick={onClose}
             className="btn"
             aria-label="Close settings"
@@ -99,7 +139,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
               <Segmented<DefaultView>
                 value={prefs.defaultView}
                 onChange={(v) => set("defaultView", v)}
-                options={(["squad", "live"] as DefaultView[]).map((v) => ({ value: v, label: v }))}
+                options={(["squad", "live"] as DefaultView[]).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
                 ariaLabel="Default view"
               />
             </div>
@@ -109,7 +149,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
               <Segmented<SquadLayout>
                 value={prefs.squadLayout}
                 onChange={(v) => set("squadLayout", v)}
-                options={(["list", "pitch"] as SquadLayout[]).map((v) => ({ value: v, label: v }))}
+                options={(["list", "pitch"] as SquadLayout[]).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
                 ariaLabel="Squad layout"
               />
             </div>
@@ -151,7 +191,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
             </div>
           </Card>
         </div>
-        <p className="col-span-full text-xs text-muted-foreground/60 text-center pt-1">
+        <p className="shrink-0 text-xs text-muted-foreground/60 text-center px-4 sm:px-5 py-3 border-t border-border">
           Not affiliated with Fantasy Premier League or the Premier League.{" "}
           <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">
             Privacy policy

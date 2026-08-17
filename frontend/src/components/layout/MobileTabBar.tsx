@@ -41,7 +41,7 @@ export default function MobileTabBar() {
               {({ isActive }) => (
                 <span
                   className={`relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 ${
-                    isActive ? "text-primary" : "text-muted-foreground"
+                    isActive ? "text-primary-strong" : "text-muted-foreground"
                   }`}
                 >
                   {isActive && (

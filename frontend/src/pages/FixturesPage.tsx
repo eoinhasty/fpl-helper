@@ -15,7 +15,7 @@ export default function FixturesPage() {
   return (
     <AppShell>
       <div className="mx-auto w-full px-4 py-4 space-y-4" style={{ maxWidth: 1400 }}>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <h1 className="text-lg font-semibold text-foreground">Fixture ticker</h1>
           <Segmented<Horizon>
             value={horizon}
