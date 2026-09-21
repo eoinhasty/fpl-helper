@@ -12,6 +12,7 @@ A Fantasy Premier League companion app that enriches your squad view with live d
 - **League rankings** — Your overall rank, GW rank, and position in classic/H2H leagues.
 - **Hot news** — Recent injury and transfer news for your squad players.
 - **PL standings** — Live Premier League table.
+- **International & European football** — Fixtures and standings for Champions League, Europa League, Conference League, Nations League, and international/club friendlies. No API key required.
 - **Dark / light / system theme** — Persisted per device.
 - **Cache status** — Live cache hit/miss/stale indicators and data age shown in the top nav.
 

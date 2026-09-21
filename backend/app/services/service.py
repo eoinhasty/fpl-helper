@@ -40,10 +40,46 @@ TTL_PLAYERS = 30 * 60  # 30m fresh
 SWR_PLAYERS = 6 * 60 * 60  # +6h stale
 TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
+# ESPN's public soccer endpoints are undocumented/unofficial (no key, no
+# published quota or contract — the shape could change without notice), but
+# unlike api-football's free tier they actually serve current-season data.
+# Verified live against all six competitions below on 2026-09-21.
+TTL_ESPN_FOOTBALL = 15 * 60  # 15m fresh
+SWR_ESPN_FOOTBALL = 3 * 60 * 60  # +3h stale
+
+ESPN_SOCCER_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
+ESPN_STANDINGS_BASE = "https://site.api.espn.com/apis/v2/sports/soccer"
+
+# ESPN league slugs for the competitions this app cares about beyond the
+# Premier League (which football-data.org already covers).
+ESPN_LEAGUES: Dict[str, str] = {
+    "champions-league": "uefa.champions",
+    "europa-league": "uefa.europa",
+    "conference-league": "uefa.europa.conf",
+    "nations-league": "uefa.nations",
+    "international-friendlies": "fifa.friendly",
+    "preseason-friendlies": "club.friendly",
+}
+# Friendlies aren't a league table, so ESPN has no standings for them.
+ESPN_NO_STANDINGS = {"international-friendlies", "preseason-friendlies"}
 
 
 def _ua() -> Dict[str, str]:
     return {"User-Agent": "Personal FPL Helper"}
+
+
+def _int_or_none(v: Any) -> Optional[int]:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+# ESPN's edge blocks our normal descriptive User-Agent (and browser-spoofed
+# ones) with a 403, but accepts httpx's own default signature — so ESPN
+# calls explicitly restore it instead of inheriting self.public's default.
+def _espn_ua() -> Dict[str, str]:
+    return {"User-Agent": f"python-httpx/{httpx.__version__}"}
 
 
 def _auth_headers_from(token: Optional[str]) -> Dict[str, str]:
@@ -522,6 +558,88 @@ class FPLService:
                 },
             ],
         }
+
+    # ----------------- ESPN (international / preseason / UEFA) -----------------
+    async def football_fixtures(self, competition: str) -> dict:
+        slug = ESPN_LEAGUES.get(competition)
+        if not slug:
+            raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
+
+        r = await self.public.get(
+            f"{ESPN_SOCCER_BASE}/{slug}/scoreboard", headers=_espn_ua()
+        )
+        r.raise_for_status()
+        js = r.json()
+
+        fixtures = []
+        for e in js.get("events", []):
+            comp = (e.get("competitions") or [{}])[0]
+            competitors = comp.get("competitors") or []
+            home = next((c for c in competitors if c.get("homeAway") == "home"), None)
+            away = next((c for c in competitors if c.get("homeAway") == "away"), None)
+            if not home or not away:
+                continue
+            status = comp.get("status", {}).get("type", {})
+            fixtures.append(
+                {
+                    "id": e.get("id"),
+                    "date": e.get("date"),
+                    "completed": bool(status.get("completed")),
+                    "status_detail": status.get("shortDetail"),
+                    "round": comp.get("altGameNote"),
+                    "home": {
+                        "name": (home.get("team") or {}).get("displayName"),
+                        "logo": (home.get("team") or {}).get("logo"),
+                    },
+                    "away": {
+                        "name": (away.get("team") or {}).get("displayName"),
+                        "logo": (away.get("team") or {}).get("logo"),
+                    },
+                    "home_goals": _int_or_none(home.get("score")),
+                    "away_goals": _int_or_none(away.get("score")),
+                }
+            )
+        return {"source": "espn", "competition": competition, "fixtures": fixtures}
+
+    async def football_standings(self, competition: str) -> dict:
+        if competition not in ESPN_LEAGUES or competition in ESPN_NO_STANDINGS:
+            raise HTTPException(
+                400, detail=f"No standings available for '{competition}'."
+            )
+        slug = ESPN_LEAGUES[competition]
+
+        r = await self.public.get(
+            f"{ESPN_STANDINGS_BASE}/{slug}/standings", headers=_espn_ua()
+        )
+        r.raise_for_status()
+        js = r.json()
+
+        groups = []
+        for child in js.get("children") or []:
+            entries = (child.get("standings") or {}).get("entries") or []
+            rows = []
+            for entry in entries:
+                stats = {s.get("name"): s.get("value") for s in entry.get("stats", [])}
+                team = entry.get("team") or {}
+                logos = team.get("logos") or []
+                rows.append(
+                    {
+                        "rank": int(stats.get("rank") or 0),
+                        "team": team.get("displayName"),
+                        "logo": logos[0]["href"] if logos else None,
+                        "group": child.get("name"),
+                        "played": int(stats.get("gamesPlayed") or 0),
+                        "w": int(stats.get("wins") or 0),
+                        "d": int(stats.get("ties") or 0),
+                        "l": int(stats.get("losses") or 0),
+                        "gf": int(stats.get("pointsFor") or 0),
+                        "ga": int(stats.get("pointsAgainst") or 0),
+                        "pts": int(stats.get("points") or 0),
+                    }
+                )
+            rows.sort(key=lambda row: row["rank"])
+            groups.append(rows)
+        return {"source": "espn", "competition": competition, "groups": groups}
 
     async def live_event(
         self, gw: int, ttl: float = TTL_PICKS, stale_ttl: float = SWR_PICKS
