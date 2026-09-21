@@ -4,6 +4,7 @@ import CaptaincyCard from "./CaptaincyCard";
 import FootballFixturesCard from "./FootballFixturesCard";
 import HealthCard from "./HealthCard";
 import HotNewsCard from "./HotNewsCard";
+import InternationalDutyCard from "./InternationalDutyCard";
 import NextMatchCard from "./NextMatchCard";
 import StandingsCard from "./StandingsCard";
 import type { Player } from "../../lib/types";
@@ -44,6 +45,7 @@ export default function RightPanel({
         <>
           <CaptaincyCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
           <HealthCard entry={entry} players={players} loading={loading} error={error} />
+          <InternationalDutyCard players={players} />
           <HotNewsCard />
         </>
       )}

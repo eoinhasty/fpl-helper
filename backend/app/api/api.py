@@ -618,3 +618,22 @@ async def football_lineups(
     )
     set_cache_headers(response, status, age, TTL_ESPN_LINEUPS)
     return data
+
+
+@router.get("/football/international-news")
+@limiter.limit("30/minute")
+async def football_international_news(
+    request: Request, response: Response, player_ids: str
+):
+    svc: FPLService = request.app.state.svc
+    try:
+        ids = [int(x) for x in player_ids.split(",") if x.strip()][:30]
+    except ValueError:
+        raise HTTPException(400, detail="player_ids must be a comma-separated list of ints.")
+    if not ids:
+        return {"source": "espn", "players": {}}
+    # Not wrapped in the shared cache: the per-country roster/news lookups
+    # this calls into are already cached individually (that's the actual
+    # ESPN traffic), so there's nothing expensive left to cache here, and
+    # caching by an arbitrary set of player_ids would just grow unbounded.
+    return await svc.international_squad_news(ids)

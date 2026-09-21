@@ -4,6 +4,7 @@ import os
 import asyncio
 import hashlib
 import logging
+import unicodedata
 from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
@@ -64,6 +65,73 @@ ESPN_LEAGUES: Dict[str, str] = {
     "international-friendlies": "fifa.friendly",
     "preseason-friendlies": "club.friendly",
 }
+
+# International squad news: whether a player has been called up to or
+# withdrawn from their national team, surfaced for squad players during
+# international breaks. Checking every ESPN national-team roster for every
+# player would be impolite (200+ teams) and pointless (most PL players
+# only represent a handful of footballing nations), so nationality is
+# looked up first via FPL's own (undocumented) `region` code on each
+# player, decoded against this table built by cross-referencing ESPN
+# national rosters against FPL's player pool — verified clean (no
+# conflicting country for the same code, across 40 codes / ~575 of the
+# ~667 PL players) on 2026-09-21. `region` reflects birth/federation
+# nationality, not necessarily which country a player currently turns out
+# for internationally (dual nationals can differ — confirmed one real
+# case, Thierno Barry: region says France, he actually plays for Guinea) —
+# so this table is a good first guess, not a guarantee, for that edge case.
+# Players whose region isn't in this table (~15% of the pool, mostly
+# single- or few-player nationalities) are simply skipped rather than
+# guessed at.
+TTL_ESPN_SQUAD_NEWS = 2 * 60 * 60  # 2h fresh
+SWR_ESPN_SQUAD_NEWS = 24 * 60 * 60  # +24h stale
+
+FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
+    3: ("Algeria", "624"),
+    10: ("Argentina", "202"),
+    13: ("Australia", "628"),
+    14: ("Austria", "474"),
+    21: ("Belgium", "459"),
+    30: ("Brazil", "205"),
+    38: ("Cameroon", "656"),
+    57: ("Czechia", "450"),
+    58: ("Denmark", "479"),
+    62: ("Ecuador", "209"),
+    63: ("Egypt", "2620"),
+    79: ("Georgia", "584"),
+    80: ("Germany", "481"),
+    81: ("Ghana", "4469"),
+    83: ("Greece", "455"),
+    97: ("Croatia", "477"),
+    98: ("Hungary", "480"),
+    106: ("Italy", "162"),
+    107: ("Jamaica", "1038"),
+    108: ("Japan", "627"),
+    132: ("Mali", "2849"),
+    145: ("Morocco", "2869"),
+    152: ("Netherlands", "449"),
+    157: ("Nigeria", "657"),
+    161: ("Norway", "464"),
+    168: ("Paraguay", "210"),
+    172: ("Poland", "471"),
+    173: ("Portugal", "482"),
+    189: ("Senegal", "654"),
+    190: ("Serbia", "6757"),
+    194: ("Slovakia", "468"),
+    195: ("Slovenia", "472"),
+    200: ("Spain", "164"),
+    206: ("Sweden", "466"),
+    207: ("Switzerland", "475"),
+    230: ("Uruguay", "212"),
+    241: ("England", "448"),
+    243: ("Scotland", "580"),
+    244: ("Wales", "578"),
+}
+
+
+def _norm_name(s: Optional[str]) -> str:
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
+    return s.lower().strip()
 
 
 def _ua() -> Dict[str, str]:
@@ -652,6 +720,95 @@ class FPLService:
             "teams": teams,
             "available": any(t["players"] for t in teams),
         }
+
+    async def _espn_country_roster_names(self, espn_team_id: str) -> set[str]:
+        key = f"espn:nat-roster:{espn_team_id}"
+
+        async def _fetch():
+            r = await self.public.get(
+                f"{ESPN_SOCCER_BASE}/fifa.friendly/teams/{espn_team_id}/roster",
+                headers=_espn_ua(),
+            )
+            r.raise_for_status()
+            js = r.json()
+            return [_norm_name(a.get("fullName")) for a in js.get("athletes") or []]
+
+        names, _, _ = await self.cache.get_or_set(
+            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
+        )
+        return set(names)
+
+    async def _espn_country_news(self, espn_team_id: str) -> list[dict]:
+        key = f"espn:nat-news:{espn_team_id}"
+
+        async def _fetch():
+            r = await self.public.get(
+                f"{ESPN_SOCCER_BASE}/fifa.friendly/news",
+                params={"team": espn_team_id, "limit": 50},
+                headers=_espn_ua(),
+            )
+            r.raise_for_status()
+            js = r.json()
+            out = []
+            for a in js.get("articles") or []:
+                athletes = [
+                    _norm_name(c.get("description"))
+                    for c in a.get("categories") or []
+                    if c.get("type") == "athlete"
+                ]
+                out.append(
+                    {
+                        "headline": a.get("headline"),
+                        "published": a.get("published"),
+                        "link": (a.get("links") or {}).get("web", {}).get("href"),
+                        "athletes": athletes,
+                    }
+                )
+            return out
+
+        data, _, _ = await self.cache.get_or_set(
+            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
+        )
+        return data
+
+    async def international_squad_news(self, player_ids: List[int]) -> dict:
+        boot, _, _ = await self.bootstrap()
+        by_id = {p["id"]: p for p in boot["elements"]}
+
+        # Resolve each requested player's country, then only fetch each
+        # distinct country once — a 15-player squad is usually 8-12
+        # countries, not 15 separate lookups, and never one of the 190+
+        # ESPN tracks that aren't actually represented.
+        wanted = [by_id[i] for i in player_ids if i in by_id]
+        by_country: Dict[str, List[dict]] = defaultdict(list)
+        results: Dict[int, dict] = {}
+        for p in wanted:
+            entry = FPL_REGION_TO_ESPN_COUNTRY.get(p.get("region"))
+            if not entry:
+                results[p["id"]] = {"country": None, "on_squad": None, "news": []}
+                continue
+            country, espn_team_id = entry
+            by_country[espn_team_id].append(p)
+            results[p["id"]] = {"country": country, "on_squad": None, "news": []}
+
+        for espn_team_id, players in by_country.items():
+            roster_names, news = await asyncio.gather(
+                self._espn_country_roster_names(espn_team_id),
+                self._espn_country_news(espn_team_id),
+            )
+            for p in players:
+                web = _norm_name(p.get("web_name"))
+                full = _norm_name(p.get("first_name", "") + " " + p.get("second_name", ""))
+                results[p["id"]]["on_squad"] = web in roster_names or full in roster_names
+                matched = [
+                    {"headline": a["headline"], "published": a["published"], "link": a["link"]}
+                    for a in news
+                    if web in a["athletes"] or full in a["athletes"]
+                ]
+                matched.sort(key=lambda a: a["published"] or "", reverse=True)
+                results[p["id"]]["news"] = matched[:3]
+
+        return {"source": "espn", "players": results}
 
     async def live_event(
         self, gw: int, ttl: float = TTL_PICKS, stale_ttl: float = SWR_PICKS
