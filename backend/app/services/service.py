@@ -40,6 +40,27 @@ TTL_PLAYERS = 30 * 60  # 30m fresh
 SWR_PLAYERS = 6 * 60 * 60  # +6h stale
 TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
+# api-football's free tier is capped at 100 requests/day, so lean hard on
+# caching rather than the shorter TTLs used for FPL's own (unlimited) API.
+TTL_AF_FOOTBALL = 3 * 60 * 60  # 3h fresh
+SWR_AF_FOOTBALL = 24 * 60 * 60  # +24h stale
+
+AF_BASE = "https://v3.football.api-sports.io"
+
+# api-football league IDs for the competitions this app cares about beyond
+# the Premier League (which football-data.org already covers). IDs are
+# stable on api-football but unverified against a live key in this repo —
+# double check via GET /leagues?search=... if a competition comes back empty.
+AF_LEAGUES: Dict[str, int] = {
+    "champions-league": 2,
+    "europa-league": 3,
+    "conference-league": 848,
+    "nations-league": 5,
+    "international-friendlies": 10,
+    "preseason-friendlies": 667,  # api-football's "Friendlies Clubs" league
+}
+# These two run on the calendar year rather than an Aug–May season year.
+AF_CALENDAR_SEASON_COMPETITIONS = {"international-friendlies", "preseason-friendlies"}
 
 
 def _ua() -> Dict[str, str]:
@@ -521,6 +542,111 @@ class FPLService:
                     "pts": 41,
                 },
             ],
+        }
+
+    # ----------------- api-football (international / preseason / UEFA) -----------------
+    @staticmethod
+    def _af_season_for(competition: str) -> int:
+        now = datetime.now(timezone.utc)
+        if competition in AF_CALENDAR_SEASON_COMPETITIONS:
+            return now.year
+        return now.year if now.month >= 7 else now.year - 1
+
+    async def _af_get_json(self, path: str, params: dict, api_key: str) -> Any:
+        r = await self.public.get(
+            f"{AF_BASE}{path}",
+            params=params,
+            headers={"x-apisports-key": api_key, **_ua()},
+        )
+        r.raise_for_status()
+        js = r.json()
+        if js.get("errors"):
+            raise HTTPException(
+                status_code=502, detail=f"api-football error: {js['errors']}"
+            )
+        return js
+
+    async def football_fixtures(
+        self, competition: str, api_key: Optional[str], next_n: int = 15
+    ) -> dict:
+        if competition not in AF_LEAGUES:
+            raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
+        if not api_key:
+            return {"source": "stub", "competition": competition, "fixtures": []}
+
+        season = self._af_season_for(competition)
+        js = await self._af_get_json(
+            "/fixtures",
+            {"league": AF_LEAGUES[competition], "season": season, "next": next_n},
+            api_key,
+        )
+        fixtures = [
+            {
+                "id": f["fixture"]["id"],
+                "date": f["fixture"]["date"],
+                "status": f["fixture"]["status"]["short"],
+                "round": f["league"].get("round"),
+                "home": {
+                    "name": f["teams"]["home"]["name"],
+                    "logo": f["teams"]["home"].get("logo"),
+                },
+                "away": {
+                    "name": f["teams"]["away"]["name"],
+                    "logo": f["teams"]["away"].get("logo"),
+                },
+                "home_goals": f["goals"]["home"],
+                "away_goals": f["goals"]["away"],
+            }
+            for f in js.get("response", [])
+        ]
+        return {
+            "source": "api-football",
+            "competition": competition,
+            "season": season,
+            "fixtures": fixtures,
+        }
+
+    async def football_standings(self, competition: str, api_key: Optional[str]) -> dict:
+        if (
+            competition not in AF_LEAGUES
+            or competition in AF_CALENDAR_SEASON_COMPETITIONS
+        ):
+            raise HTTPException(
+                400, detail=f"No standings available for '{competition}'."
+            )
+        if not api_key:
+            return {"source": "stub", "competition": competition, "groups": []}
+
+        season = self._af_season_for(competition)
+        js = await self._af_get_json(
+            "/standings", {"league": AF_LEAGUES[competition], "season": season}, api_key
+        )
+        resp = js.get("response") or []
+        raw_groups = (resp[0]["league"].get("standings") or []) if resp else []
+        groups = [
+            [
+                {
+                    "rank": row["rank"],
+                    "team": row["team"]["name"],
+                    "logo": row["team"].get("logo"),
+                    "group": row.get("group"),
+                    "played": row["all"]["played"],
+                    "w": row["all"]["win"],
+                    "d": row["all"]["draw"],
+                    "l": row["all"]["lose"],
+                    "gf": row["all"]["goals"]["for"],
+                    "ga": row["all"]["goals"]["against"],
+                    "pts": row["points"],
+                }
+                for row in group
+            ]
+            for group in raw_groups
+        ]
+        return {
+            "source": "api-football",
+            "competition": competition,
+            "season": season,
+            "groups": groups,
         }
 
     async def live_event(

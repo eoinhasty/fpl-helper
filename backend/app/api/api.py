@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Optional, List
 import httpx
-from fastapi import APIRouter, Response, Request, Depends, HTTPException
+from fastapi import APIRouter, Response, Request, Depends, HTTPException, Query
 from app.deps import limiter, verify_api_key, nocache_guard
 from app.services.service import (
     FPLService,
@@ -18,6 +18,8 @@ from app.services.service import (
     TTL_FDR,
     TTL_PLAYERS,
     TTL_PLAYER_SUMMARY,
+    TTL_AF_FOOTBALL,
+    SWR_AF_FOOTBALL,
     SWR_NEXTMATCH,
     SWR_NEWS,
     SWR_STANDINGS,
@@ -579,4 +581,43 @@ async def pl_standings(request: Request, response: Response):
         key, _fetch, TTL_STANDINGS, SWR_STANDINGS
     )
     set_cache_headers(response, status, age, TTL_STANDINGS)
+    return data
+
+
+@router.get("/football/fixtures")
+@limiter.limit("30/minute")
+async def football_fixtures(
+    request: Request,
+    response: Response,
+    competition: str,
+    next: int = Query(15, alias="next", ge=1, le=50),
+):
+    svc: FPLService = request.app.state.svc
+    api_key = os.getenv("API_FOOTBALL_KEY")  # optional
+    key = f"af:fixtures:{competition}:{next}"
+
+    async def _fetch():
+        return await svc.football_fixtures(competition, api_key, next)
+
+    data, status, age = await svc.cache.get_or_set(
+        key, _fetch, TTL_AF_FOOTBALL, SWR_AF_FOOTBALL
+    )
+    set_cache_headers(response, status, age, TTL_AF_FOOTBALL)
+    return data
+
+
+@router.get("/football/standings")
+@limiter.limit("30/minute")
+async def football_standings(request: Request, response: Response, competition: str):
+    svc: FPLService = request.app.state.svc
+    api_key = os.getenv("API_FOOTBALL_KEY")  # optional
+    key = f"af:standings:{competition}"
+
+    async def _fetch():
+        return await svc.football_standings(competition, api_key)
+
+    data, status, age = await svc.cache.get_or_set(
+        key, _fetch, TTL_AF_FOOTBALL, SWR_AF_FOOTBALL
+    )
+    set_cache_headers(response, status, age, TTL_AF_FOOTBALL)
     return data

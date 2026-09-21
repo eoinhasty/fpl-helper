@@ -59,6 +59,11 @@ FPL_BEARER_TOKEN=
 # Leave empty to use stub data.
 FOOTBALL_DATA_API_KEY=
 
+# Optional — enables international-break, preseason and UEFA competition
+# (Champions/Europa/Conference League) fixtures & standings widgets.
+# Free tier: 100 requests/day. Leave empty to use stub data.
+API_FOOTBALL_KEY=
+
 # Optional — comma-separated allowed CORS origins.
 # Leave empty for local development.
 ALLOWED_ORIGINS=
