@@ -2,6 +2,7 @@ import * as React from "react";
 import { Segmented } from "../controls/Segmented";
 import CaptaincyCard from "./CaptaincyCard";
 import FootballFixturesCard from "./FootballFixturesCard";
+import FootballStandingsCard from "./FootballStandingsCard";
 import HealthCard from "./HealthCard";
 import HotNewsCard from "./HotNewsCard";
 import NextMatchCard from "./NextMatchCard";
@@ -53,6 +54,7 @@ export default function RightPanel({
           <NextMatchCard />
           <StandingsCard />
           <FootballFixturesCard />
+          <FootballStandingsCard />
         </>
       )}
     </div>
