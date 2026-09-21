@@ -48,12 +48,11 @@ TTL_ESPN_FOOTBALL = 15 * 60  # 15m fresh
 SWR_ESPN_FOOTBALL = 3 * 60 * 60  # +3h stale
 # Lineups only exist once a match is close to kickoff or under way, and
 # change fast (announced XI, then subs as the game goes on) — a much
-# shorter TTL than the fixture-list/standings cache above.
+# shorter TTL than the fixture-list cache above.
 TTL_ESPN_LINEUPS = 2 * 60  # 2m fresh
 SWR_ESPN_LINEUPS = 15 * 60  # +15m stale
 
 ESPN_SOCCER_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
-ESPN_STANDINGS_BASE = "https://site.api.espn.com/apis/v2/sports/soccer"
 
 # ESPN league slugs for the competitions this app cares about beyond the
 # Premier League (which football-data.org already covers).
@@ -65,8 +64,6 @@ ESPN_LEAGUES: Dict[str, str] = {
     "international-friendlies": "fifa.friendly",
     "preseason-friendlies": "club.friendly",
 }
-# Friendlies aren't a league table, so ESPN has no standings for them.
-ESPN_NO_STANDINGS = {"international-friendlies", "preseason-friendlies"}
 
 
 def _ua() -> Dict[str, str]:
@@ -605,46 +602,6 @@ class FPLService:
                 }
             )
         return {"source": "espn", "competition": competition, "fixtures": fixtures}
-
-    async def football_standings(self, competition: str) -> dict:
-        if competition not in ESPN_LEAGUES or competition in ESPN_NO_STANDINGS:
-            raise HTTPException(
-                400, detail=f"No standings available for '{competition}'."
-            )
-        slug = ESPN_LEAGUES[competition]
-
-        r = await self.public.get(
-            f"{ESPN_STANDINGS_BASE}/{slug}/standings", headers=_espn_ua()
-        )
-        r.raise_for_status()
-        js = r.json()
-
-        groups = []
-        for child in js.get("children") or []:
-            entries = (child.get("standings") or {}).get("entries") or []
-            rows = []
-            for entry in entries:
-                stats = {s.get("name"): s.get("value") for s in entry.get("stats", [])}
-                team = entry.get("team") or {}
-                logos = team.get("logos") or []
-                rows.append(
-                    {
-                        "rank": int(stats.get("rank") or 0),
-                        "team": team.get("displayName"),
-                        "logo": logos[0]["href"] if logos else None,
-                        "group": child.get("name"),
-                        "played": int(stats.get("gamesPlayed") or 0),
-                        "w": int(stats.get("wins") or 0),
-                        "d": int(stats.get("ties") or 0),
-                        "l": int(stats.get("losses") or 0),
-                        "gf": int(stats.get("pointsFor") or 0),
-                        "ga": int(stats.get("pointsAgainst") or 0),
-                        "pts": int(stats.get("points") or 0),
-                    }
-                )
-            rows.sort(key=lambda row: row["rank"])
-            groups.append(rows)
-        return {"source": "espn", "competition": competition, "groups": groups}
 
     async def football_lineups(self, competition: str, event_id: str) -> dict:
         slug = ESPN_LEAGUES.get(competition)

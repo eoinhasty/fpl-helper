@@ -618,19 +618,3 @@ async def football_lineups(
     )
     set_cache_headers(response, status, age, TTL_ESPN_LINEUPS)
     return data
-
-
-@router.get("/football/standings")
-@limiter.limit("30/minute")
-async def football_standings(request: Request, response: Response, competition: str):
-    svc: FPLService = request.app.state.svc
-    key = f"espn:standings:{competition}"
-
-    async def _fetch():
-        return await svc.football_standings(competition)
-
-    data, status, age = await svc.cache.get_or_set(
-        key, _fetch, TTL_ESPN_FOOTBALL, SWR_ESPN_FOOTBALL
-    )
-    set_cache_headers(response, status, age, TTL_ESPN_FOOTBALL)
-    return data
