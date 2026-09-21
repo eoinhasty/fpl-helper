@@ -46,6 +46,11 @@ SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
 # Verified live against all six competitions below on 2026-09-21.
 TTL_ESPN_FOOTBALL = 15 * 60  # 15m fresh
 SWR_ESPN_FOOTBALL = 3 * 60 * 60  # +3h stale
+# Lineups only exist once a match is close to kickoff or under way, and
+# change fast (announced XI, then subs as the game goes on) — a much
+# shorter TTL than the fixture-list/standings cache above.
+TTL_ESPN_LINEUPS = 2 * 60  # 2m fresh
+SWR_ESPN_LINEUPS = 15 * 60  # +15m stale
 
 ESPN_SOCCER_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 ESPN_STANDINGS_BASE = "https://site.api.espn.com/apis/v2/sports/soccer"
@@ -640,6 +645,56 @@ class FPLService:
             rows.sort(key=lambda row: row["rank"])
             groups.append(rows)
         return {"source": "espn", "competition": competition, "groups": groups}
+
+    async def football_lineups(self, competition: str, event_id: str) -> dict:
+        slug = ESPN_LEAGUES.get(competition)
+        if not slug:
+            raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
+
+        r = await self.public.get(
+            f"{ESPN_SOCCER_BASE}/{slug}/summary",
+            params={"event": event_id},
+            headers=_espn_ua(),
+        )
+        r.raise_for_status()
+        js = r.json()
+
+        def _shape_team(roster: dict) -> dict:
+            players = []
+            for p in roster.get("roster") or []:
+                athlete = p.get("athlete") or {}
+                stats = {s.get("name"): s.get("displayValue") for s in p.get("stats", [])}
+                players.append(
+                    {
+                        "id": athlete.get("id"),
+                        "name": athlete.get("fullName"),
+                        "jersey": p.get("jersey"),
+                        "position": (p.get("position") or {}).get("abbreviation"),
+                        "starter": bool(p.get("starter")),
+                        "subbed_in": bool(p.get("subbedIn")),
+                        "subbed_out": bool(p.get("subbedOut")),
+                        "goals": stats.get("totalGoals"),
+                        "assists": stats.get("goalAssists"),
+                        "yellow_cards": stats.get("yellowCards"),
+                        "red_cards": stats.get("redCards"),
+                    }
+                )
+            team = roster.get("team") or {}
+            return {
+                "team": team.get("displayName"),
+                "home_away": roster.get("homeAway"),
+                "formation": roster.get("formation"),
+                "players": players,
+            }
+
+        teams = [_shape_team(r) for r in (js.get("rosters") or [])]
+        return {
+            "source": "espn",
+            "competition": competition,
+            "event": event_id,
+            "teams": teams,
+            "available": any(t["players"] for t in teams),
+        }
 
     async def live_event(
         self, gw: int, ttl: float = TTL_PICKS, stale_ttl: float = SWR_PICKS
