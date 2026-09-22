@@ -4,6 +4,7 @@ import os
 import asyncio
 import hashlib
 import logging
+import re
 import unicodedata
 from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
@@ -132,6 +133,18 @@ FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
 def _norm_name(s: Optional[str]) -> str:
     s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
     return s.lower().strip()
+
+
+# ESPN tags any article that so much as name-drops a player (Ballon d'Or
+# takes, "FC 100" rankings, unrelated quotes) with that athlete, which
+# drowns out the actual squad call-up/withdrawal/injury news this feature
+# is for. Narrow to headlines that are plausibly about squad status itself.
+_SQUAD_NEWS_RE = re.compile(
+    r"injur|withdraw|knock\b|doubt|fitness|\bscan\b|surgery|ruled out|"
+    r"sideline|recall|call-up|called up|call up|snub|omit|left out|\baxe|"
+    r"\breplace|\bmiss(es|ed|ing)?\b|setback|return to training|operation",
+    re.IGNORECASE,
+)
 
 
 def _ua() -> Dict[str, str]:
@@ -751,6 +764,9 @@ class FPLService:
             js = r.json()
             out = []
             for a in js.get("articles") or []:
+                headline = a.get("headline") or ""
+                if not _SQUAD_NEWS_RE.search(headline):
+                    continue
                 athletes = [
                     _norm_name(c.get("description"))
                     for c in a.get("categories") or []
@@ -758,7 +774,7 @@ class FPLService:
                 ]
                 out.append(
                     {
-                        "headline": a.get("headline"),
+                        "headline": headline,
                         "published": a.get("published"),
                         "link": (a.get("links") or {}).get("web", {}).get("href"),
                         "athletes": athletes,
