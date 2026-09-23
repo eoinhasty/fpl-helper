@@ -4,6 +4,13 @@ import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import { fmtRelTime } from "../../lib/format";
 import type { Player } from "../../lib/types";
+import {
+  CheckCircleIcon,
+  ArrowUpCircleIcon,
+  ArrowDownCircleIcon,
+  ClockIcon,
+  XCircleIcon,
+} from "@heroicons/react/16/solid";
 
 type NewsItem = { headline: string; published: string | null; link: string | null };
 type RecentMatch = {
@@ -17,12 +24,12 @@ type RecentMatch = {
 type PlayerNews = { country: string | null; on_squad: boolean | null; news: NewsItem[]; recent_match: RecentMatch | null };
 type Resp = { players: Record<string, PlayerNews> };
 
-function matchLabel(m: RecentMatch): string {
-  const vs = m.opponent ? ` vs ${m.opponent}` : "";
-  if (!m.in_squad) return "Named in squad but not in matchday XI or bench";
-  if (m.starter) return `Started${vs}${m.subbed_out ? " (subbed off)" : ""}`;
-  if (m.subbed_in) return `Came on as a substitute${vs}`;
-  return `Unused substitute${vs}`;
+function matchBadge(m: RecentMatch): { Icon: typeof CheckCircleIcon; color: string; label: string } {
+  if (!m.in_squad) return { Icon: XCircleIcon, color: "text-muted-foreground", label: "Not in squad" };
+  if (m.starter && m.subbed_out) return { Icon: ArrowDownCircleIcon, color: "text-warning", label: "Subbed off" };
+  if (m.starter) return { Icon: CheckCircleIcon, color: "text-success", label: "Started" };
+  if (m.subbed_in) return { Icon: ArrowUpCircleIcon, color: "text-success", label: "Came on" };
+  return { Icon: ClockIcon, color: "text-muted-foreground", label: "Unused sub" };
 }
 
 export default function InternationalDutyCard({ players }: { players?: Player[] | null }) {
@@ -42,10 +49,11 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
       empty={!url || rows.length === 0}
       emptyMessage="No international squad news for your players."
     >
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {rows.map(({ player, info }) => {
           const item = info!.news[0];
           const match = info!.recent_match;
+          const badge = match ? matchBadge(match) : null;
           return (
             <div key={player.element} className="flex items-start gap-2">
               <span
@@ -55,8 +63,15 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
                 title={info!.on_squad === false ? "Not on current squad list" : info!.on_squad === true ? "On current squad list" : ""}
               />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-foreground">
-                  {player.name} <span className="text-xs text-muted-foreground">({info!.country})</span>
+                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <span className="truncate">{player.name}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">({info!.country})</span>
+                  {badge && (
+                    <span className={`flex items-center gap-0.5 text-[11px] font-normal shrink-0 ${badge.color}`} title={match!.opponent ? `vs ${match!.opponent}` : undefined}>
+                      <badge.Icon className="w-3.5 h-3.5" />
+                      {badge.label}
+                    </span>
+                  )}
                 </div>
                 {item && (
                   <>
@@ -74,9 +89,6 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
                     )}
                     <div className="text-[11px] text-muted-foreground mt-0.5">{fmtRelTime(item.published)}</div>
                   </>
-                )}
-                {match && (
-                  <div className="text-xs text-foreground mt-0.5">{matchLabel(match)}</div>
                 )}
               </div>
             </div>
