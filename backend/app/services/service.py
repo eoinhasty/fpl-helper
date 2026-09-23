@@ -88,14 +88,17 @@ ESPN_LEAGUES: Dict[str, str] = {
 # only represent a handful of footballing nations), so nationality is
 # looked up first via FPL's own (undocumented) `region` code on each
 # player, decoded against this table built by cross-referencing ESPN
-# national rosters against FPL's player pool — verified clean (no
-# conflicting country for the same code, across 40 codes / ~575 of the
-# ~667 PL players) on 2026-09-21. `region` reflects birth/federation
-# nationality, not necessarily which country a player currently turns out
-# for internationally (dual nationals can differ — confirmed one real
-# case, Thierno Barry: region says France, he actually plays for Guinea) —
-# so this table is a good first guess, not a guarantee, for that edge case.
-# Players whose region isn't in this table (~15% of the pool, mostly
+# national rosters against FPL's player pool, then extended by resolving
+# individual players' ESPN `citizenship` directly (the roster-based method
+# alone undercounts — it only reflects one active call-up window, missing
+# uncapped/fringe internationals) — verified clean (no conflicting country
+# for the same code, across 51 codes / 594 of the 667 PL players, 89.1%)
+# as of 2026-09-23. `region` reflects birth/federation nationality, not
+# necessarily which country a player currently turns out for
+# internationally (dual nationals can differ — confirmed one real case,
+# Thierno Barry: region says France, he actually plays for Guinea) — so
+# this table is a good first guess, not a guarantee, for that edge case.
+# Players whose region isn't in this table (~11% of the pool, all
 # single- or few-player nationalities) are simply skipped rather than
 # guessed at.
 TTL_ESPN_SQUAD_NEWS = 2 * 60 * 60  # 2h fresh
@@ -107,8 +110,14 @@ FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
     13: ("Australia", "628"),
     14: ("Austria", "474"),
     21: ("Belgium", "459"),
+    27: ("Bosnia and Herzegovina", "452"),
     30: ("Brazil", "205"),
     38: ("Cameroon", "656"),
+    39: ("Canada", "206"),
+    44: ("Chile", "207"),
+    48: ("Colombia", "208"),
+    50: ("DR Congo", "2850"),
+    54: ("Ivory Coast", "4789"),
     57: ("Czechia", "450"),
     58: ("Denmark", "479"),
     62: ("Ecuador", "209"),
@@ -119,12 +128,14 @@ FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
     83: ("Greece", "455"),
     97: ("Croatia", "477"),
     98: ("Hungary", "480"),
+    104: ("Republic of Ireland", "476"),
     106: ("Italy", "162"),
     107: ("Jamaica", "1038"),
     108: ("Japan", "627"),
     132: ("Mali", "2849"),
     145: ("Morocco", "2869"),
     152: ("Netherlands", "449"),
+    154: ("New Zealand", "2666"),
     157: ("Nigeria", "657"),
     161: ("Norway", "464"),
     168: ("Paraguay", "210"),
@@ -137,8 +148,12 @@ FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
     200: ("Spain", "164"),
     206: ("Sweden", "466"),
     207: ("Switzerland", "475"),
+    219: ("Turkey", "465"),
+    225: ("Ukraine", "457"),
+    229: ("United States", "660"),
     230: ("Uruguay", "212"),
     241: ("England", "448"),
+    242: ("Northern Ireland", "586"),
     243: ("Scotland", "580"),
     244: ("Wales", "578"),
 }
