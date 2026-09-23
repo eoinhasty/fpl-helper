@@ -144,6 +144,14 @@ FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
 }
 
 
+class _EspnUnavailable(Exception):
+    """Raised inside a cached fetch when ESPN returned 403 (throttling or
+    UA rejection). Never let this get cached as a false-negative empty
+    result — raising here means AsyncCache.get_or_set doesn't store
+    anything, so the next request just tries again instead of being
+    stuck with "no data" for the full TTL window."""
+
+
 def _norm_name(s: Optional[str]) -> str:
     s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
     return s.lower().strip()
@@ -202,6 +210,11 @@ class FPLService:
         # redo the same sort on every load.
         self._rank_cache_boot_id: Optional[int] = None
         self._rank_cache: Optional[Tuple[dict, dict]] = None
+        # ESPN has no published rate limit or concurrency guidance for
+        # these endpoints (checked — nothing documented anywhere), so this
+        # caps how many ESPN requests this app has in flight at once
+        # rather than trusting a number nobody publishes.
+        self._espn_semaphore = asyncio.Semaphore(4)
 
     async def _get_json_auth(
         self, path: str, token: Optional[str], params: Optional[dict] = None
@@ -666,15 +679,30 @@ class FPLService:
         }
 
     # ----------------- ESPN (international / preseason / UEFA) -----------------
+    async def _espn_get(self, url: str, **kwargs) -> Optional[httpx.Response]:
+        """GET an ESPN endpoint, capped for concurrency and tolerant of a
+        403. ESPN's 403 is ambiguous — could be the UA rejection we've
+        already worked around, or could be undocumented throttling (both
+        are known to happen; there's no documented rate limit either way)
+        — so callers get None back and can skip/degrade that one piece
+        gracefully instead of the whole request 500ing."""
+        kwargs.setdefault("headers", _espn_ua())
+        async with self._espn_semaphore:
+            r = await self.public.get(url, **kwargs)
+        if r.status_code == 403:
+            logger.warning("ESPN returned 403 (throttling or UA rejection) for %s", url)
+            return None
+        r.raise_for_status()
+        return r
+
     async def football_fixtures(self, competition: str) -> dict:
         slug = ESPN_LEAGUES.get(competition)
         if not slug:
             raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
 
-        r = await self.public.get(
-            f"{ESPN_SOCCER_BASE}/{slug}/scoreboard", headers=_espn_ua()
-        )
-        r.raise_for_status()
+        r = await self._espn_get(f"{ESPN_SOCCER_BASE}/{slug}/scoreboard")
+        if r is None:
+            return {"source": "espn", "competition": competition, "fixtures": []}
         js = r.json()
 
         fixtures = []
@@ -712,12 +740,17 @@ class FPLService:
         if not slug:
             raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
 
-        r = await self.public.get(
-            f"{ESPN_SOCCER_BASE}/{slug}/summary",
-            params={"event": event_id},
-            headers=_espn_ua(),
+        r = await self._espn_get(
+            f"{ESPN_SOCCER_BASE}/{slug}/summary", params={"event": event_id}
         )
-        r.raise_for_status()
+        if r is None:
+            return {
+                "source": "espn",
+                "competition": competition,
+                "event": event_id,
+                "teams": [],
+                "available": False,
+            }
         js = r.json()
 
         def _shape_team(roster: dict) -> dict:
@@ -761,11 +794,11 @@ class FPLService:
         key = f"espn:nat-roster:{espn_team_id}"
 
         async def _fetch():
-            r = await self.public.get(
-                f"{ESPN_SOCCER_BASE}/fifa.friendly/teams/{espn_team_id}/roster",
-                headers=_espn_ua(),
+            r = await self._espn_get(
+                f"{ESPN_SOCCER_BASE}/fifa.friendly/teams/{espn_team_id}/roster"
             )
-            r.raise_for_status()
+            if r is None:
+                raise _EspnUnavailable(espn_team_id)
             js = r.json()
             return [_norm_name(a.get("fullName")) for a in js.get("athletes") or []]
 
@@ -778,12 +811,12 @@ class FPLService:
         key = f"espn:nat-news:{espn_team_id}"
 
         async def _fetch():
-            r = await self.public.get(
+            r = await self._espn_get(
                 f"{ESPN_SOCCER_BASE}/fifa.friendly/news",
                 params={"team": espn_team_id, "limit": 50},
-                headers=_espn_ua(),
             )
-            r.raise_for_status()
+            if r is None:
+                raise _EspnUnavailable(espn_team_id)
             js = r.json()
             now = datetime.now(timezone.utc)
             out = []
@@ -830,20 +863,24 @@ class FPLService:
         none has been played yet this window. Returns (competition, event_id)."""
         key = f"espn:nat-events:{espn_team_id}"
 
-        async def _resolve_ref(ref: str) -> dict:
-            er = await self.public.get(ref, headers=_espn_ua())
-            er.raise_for_status()
-            return er.json()
+        async def _resolve_ref(ref: str) -> Optional[dict]:
+            # A single event among several failing (403) isn't worth
+            # losing the whole lookup over — skip just that one.
+            er = await self._espn_get(ref)
+            return er.json() if er is not None else None
 
         async def _fetch():
             found = []
             for comp_key, slug in NATIONAL_TEAM_COMPETITIONS:
-                r = await self.public.get(
+                r = await self._espn_get(
                     f"{ESPN_CORE_BASE}/{slug}/teams/{espn_team_id}/events",
                     params={"limit": 50},
-                    headers=_espn_ua(),
                 )
-                r.raise_for_status()
+                if r is None:
+                    # Losing the whole list (as opposed to one event in
+                    # it) is a bigger deal — don't cache a competition as
+                    # "no matches" when we just couldn't ask.
+                    raise _EspnUnavailable(espn_team_id)
                 refs = [item.get("$ref") for item in r.json().get("items") or [] if item.get("$ref")]
                 # A country's event list is small (typically single digits
                 # per competition) but each entry needs its own follow-up
@@ -851,7 +888,7 @@ class FPLService:
                 # than one at a time, which is what made a cold-cache
                 # lookup across a whole squad's countries take 5+ seconds.
                 for ejs in await asyncio.gather(*[_resolve_ref(ref) for ref in refs]):
-                    if ejs.get("id") and ejs.get("date"):
+                    if ejs and ejs.get("id") and ejs.get("date"):
                         found.append((comp_key, ejs["id"], ejs["date"]))
             return found
 
@@ -931,10 +968,18 @@ class FPLService:
             results[p["id"]] = {"country": country, "on_squad": None, "news": [], "recent_match": None}
 
         async def _process_country(espn_team_id: str, players: List[dict]) -> None:
-            roster_names, news = await asyncio.gather(
-                self._espn_country_roster_names(espn_team_id),
-                self._espn_country_news(espn_team_id),
-            )
+            try:
+                roster_names, news = await asyncio.gather(
+                    self._espn_country_roster_names(espn_team_id),
+                    self._espn_country_news(espn_team_id),
+                )
+            except _EspnUnavailable:
+                # This one country is throttled/unreachable right now —
+                # its players keep the already-initialized "no data yet"
+                # defaults rather than failing every other country's
+                # results in the same batch.
+                logger.warning("ESPN unavailable for country %s, skipping", espn_team_id)
+                return
             for p in players:
                 web = _norm_name(p.get("web_name"))
                 # first_name/second_name can be present but explicitly
@@ -954,9 +999,15 @@ class FPLService:
                 # on the current squad list — if they're not called up at
                 # all, there's nothing to check whether they played in.
                 if on_squad:
-                    results[p["id"]]["recent_match"] = await self._espn_player_match_involvement(
-                        espn_team_id, {web, full}
-                    )
+                    try:
+                        results[p["id"]]["recent_match"] = await self._espn_player_match_involvement(
+                            espn_team_id, {web, full}
+                        )
+                    except _EspnUnavailable:
+                        logger.warning(
+                            "ESPN unavailable resolving match involvement for %s, skipping",
+                            espn_team_id,
+                        )
 
         # Countries are independent — resolve them all concurrently rather
         # than one at a time, same reasoning as the event-ref fix above.
