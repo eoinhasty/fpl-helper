@@ -159,6 +159,11 @@ _SQUAD_NEWS_RE = re.compile(
     r"\breplace|\bmiss(es|ed|ing)?\b|setback|return to training|operation",
     re.IGNORECASE,
 )
+# The keyword match alone isn't enough — e.g. a 2024 Euros injury story
+# about a teammate matches "injur" just as well as this week's actual
+# squad news. International squad status is only ever current for the
+# length of a break, so anything older than this is stale by definition.
+_SQUAD_NEWS_MAX_AGE_DAYS = 30
 
 
 def _ua() -> Dict[str, str]:
@@ -776,11 +781,20 @@ class FPLService:
             )
             r.raise_for_status()
             js = r.json()
+            now = datetime.now(timezone.utc)
             out = []
             for a in js.get("articles") or []:
                 headline = a.get("headline") or ""
                 if not _SQUAD_NEWS_RE.search(headline):
                     continue
+                published = a.get("published")
+                if published:
+                    try:
+                        age_days = (now - datetime.fromisoformat(published.replace("Z", "+00:00"))).days
+                        if age_days > _SQUAD_NEWS_MAX_AGE_DAYS:
+                            continue
+                    except ValueError:
+                        pass
                 athletes = [
                     _norm_name(c.get("description"))
                     for c in a.get("categories") or []
