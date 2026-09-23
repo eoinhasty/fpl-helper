@@ -532,7 +532,11 @@ class FPLService:
             if not news:
                 continue
             added = p.get("news_added")
-            recent = True
+            # No timestamp (or an unparseable one) means we can't verify
+            # this is actually recent — same failure mode as the stale
+            # ESPN squad-news article that slipped through earlier, so
+            # fail closed (hide) rather than open (show) here too.
+            recent = False
             if added:
                 try:
                     dt = datetime.fromisoformat(added.replace("Z", "+00:00"))
