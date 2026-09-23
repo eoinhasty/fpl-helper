@@ -791,14 +791,18 @@ class FPLService:
                 headline = a.get("headline") or ""
                 if not _SQUAD_NEWS_RE.search(headline):
                     continue
+                # No timestamp (or an unparseable one) means we can't
+                # verify this is recent — exclude it, same fail-closed
+                # reasoning as the news_added handling in hot_news().
                 published = a.get("published")
-                if published:
-                    try:
-                        age_days = (now - datetime.fromisoformat(published.replace("Z", "+00:00"))).days
-                        if age_days > _SQUAD_NEWS_MAX_AGE_DAYS:
-                            continue
-                    except ValueError:
-                        pass
+                if not published:
+                    continue
+                try:
+                    age_days = (now - datetime.fromisoformat(published.replace("Z", "+00:00"))).days
+                    if age_days > _SQUAD_NEWS_MAX_AGE_DAYS:
+                        continue
+                except ValueError:
+                    continue
                 athletes = [
                     _norm_name(c.get("description"))
                     for c in a.get("categories") or []
@@ -826,6 +830,11 @@ class FPLService:
         none has been played yet this window. Returns (competition, event_id)."""
         key = f"espn:nat-events:{espn_team_id}"
 
+        async def _resolve_ref(ref: str) -> dict:
+            er = await self.public.get(ref, headers=_espn_ua())
+            er.raise_for_status()
+            return er.json()
+
         async def _fetch():
             found = []
             for comp_key, slug in NATIONAL_TEAM_COMPETITIONS:
@@ -835,13 +844,13 @@ class FPLService:
                     headers=_espn_ua(),
                 )
                 r.raise_for_status()
-                for item in r.json().get("items") or []:
-                    ref = item.get("$ref")
-                    if not ref:
-                        continue
-                    er = await self.public.get(ref, headers=_espn_ua())
-                    er.raise_for_status()
-                    ejs = er.json()
+                refs = [item.get("$ref") for item in r.json().get("items") or [] if item.get("$ref")]
+                # A country's event list is small (typically single digits
+                # per competition) but each entry needs its own follow-up
+                # request to get a date — resolve those concurrently rather
+                # than one at a time, which is what made a cold-cache
+                # lookup across a whole squad's countries take 5+ seconds.
+                for ejs in await asyncio.gather(*[_resolve_ref(ref) for ref in refs]):
                     if ejs.get("id") and ejs.get("date"):
                         found.append((comp_key, ejs["id"], ejs["date"]))
             return found
@@ -921,14 +930,17 @@ class FPLService:
             by_country[espn_team_id].append(p)
             results[p["id"]] = {"country": country, "on_squad": None, "news": [], "recent_match": None}
 
-        for espn_team_id, players in by_country.items():
+        async def _process_country(espn_team_id: str, players: List[dict]) -> None:
             roster_names, news = await asyncio.gather(
                 self._espn_country_roster_names(espn_team_id),
                 self._espn_country_news(espn_team_id),
             )
             for p in players:
                 web = _norm_name(p.get("web_name"))
-                full = _norm_name(p.get("first_name", "") + " " + p.get("second_name", ""))
+                # first_name/second_name can be present but explicitly
+                # null (not just absent), which .get(key, "") doesn't
+                # guard against — `or ""` does.
+                full = _norm_name((p.get("first_name") or "") + " " + (p.get("second_name") or ""))
                 on_squad = web in roster_names or full in roster_names
                 results[p["id"]]["on_squad"] = on_squad
                 matched = [
@@ -945,6 +957,12 @@ class FPLService:
                     results[p["id"]]["recent_match"] = await self._espn_player_match_involvement(
                         espn_team_id, {web, full}
                     )
+
+        # Countries are independent — resolve them all concurrently rather
+        # than one at a time, same reasoning as the event-ref fix above.
+        await asyncio.gather(
+            *[_process_country(tid, players) for tid, players in by_country.items()]
+        )
 
         return {"source": "espn", "players": results}
 
