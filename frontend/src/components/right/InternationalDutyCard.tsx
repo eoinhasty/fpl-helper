@@ -6,8 +6,24 @@ import { fmtRelTime } from "../../lib/format";
 import type { Player } from "../../lib/types";
 
 type NewsItem = { headline: string; published: string | null; link: string | null };
-type PlayerNews = { country: string | null; on_squad: boolean | null; news: NewsItem[] };
+type RecentMatch = {
+  competition: string;
+  opponent: string | null;
+  in_squad: boolean;
+  starter?: boolean | null;
+  subbed_in?: boolean | null;
+  subbed_out?: boolean | null;
+};
+type PlayerNews = { country: string | null; on_squad: boolean | null; news: NewsItem[]; recent_match: RecentMatch | null };
 type Resp = { players: Record<string, PlayerNews> };
+
+function matchLabel(m: RecentMatch): string {
+  const vs = m.opponent ? ` vs ${m.opponent}` : "";
+  if (!m.in_squad) return "Named in squad but not in matchday XI or bench";
+  if (m.starter) return `Started${vs}${m.subbed_out ? " (subbed off)" : ""}`;
+  if (m.subbed_in) return `Came on as a substitute${vs}`;
+  return `Unused substitute${vs}`;
+}
 
 export default function InternationalDutyCard({ players }: { players?: Player[] | null }) {
   const ids = (players ?? []).map((p) => p.element);
@@ -16,7 +32,7 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
 
   const rows = ids
     .map((id) => ({ player: players!.find((p) => p.element === id)!, info: data?.players[id] }))
-    .filter((r) => r.info && r.info.news.length > 0);
+    .filter((r) => r.info && (r.info.news.length > 0 || r.info.recent_match));
 
   return (
     <DataCard
@@ -29,6 +45,7 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
       <div className="space-y-3">
         {rows.map(({ player, info }) => {
           const item = info!.news[0];
+          const match = info!.recent_match;
           return (
             <div key={player.element} className="flex items-start gap-2">
               <span
@@ -41,19 +58,26 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
                 <div className="text-sm font-medium text-foreground">
                   {player.name} <span className="text-xs text-muted-foreground">({info!.country})</span>
                 </div>
-                {item.link ? (
-                  <a
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground mt-0.5 line-clamp-2 hover:text-foreground hover:underline block"
-                  >
-                    {item.headline}
-                  </a>
-                ) : (
-                  <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.headline}</div>
+                {item && (
+                  <>
+                    {item.link ? (
+                      <a
+                        href={item.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground mt-0.5 line-clamp-2 hover:text-foreground hover:underline block"
+                      >
+                        {item.headline}
+                      </a>
+                    ) : (
+                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.headline}</div>
+                    )}
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{fmtRelTime(item.published)}</div>
+                  </>
                 )}
-                <div className="text-[11px] text-muted-foreground mt-0.5">{fmtRelTime(item.published)}</div>
+                {match && (
+                  <div className="text-xs text-foreground mt-0.5">{matchLabel(match)}</div>
+                )}
               </div>
             </div>
           );

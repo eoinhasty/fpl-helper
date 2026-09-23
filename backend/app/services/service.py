@@ -55,6 +55,20 @@ TTL_ESPN_LINEUPS = 2 * 60  # 2m fresh
 SWR_ESPN_LINEUPS = 15 * 60  # +15m stale
 
 ESPN_SOCCER_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
+# ESPN's "core" API tier — used only to find a national team's most recent
+# or next fixture. The site API's own teams/{id}/schedule looked like the
+# obvious tool for that, but it's bugged: it silently caps at the first
+# half of the calendar year (verified against both Brazil and England —
+# both stopped dead at June, missing real September fixtures) and ignores
+# every season/half param tried. This core-API events list doesn't have
+# that bug, but a team's matches are scoped per-competition here (a
+# country's Nations League and friendly fixtures are genuinely separate
+# lists, not merged), so both get checked.
+ESPN_CORE_BASE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues"
+NATIONAL_TEAM_COMPETITIONS = [
+    ("nations-league", "uefa.nations"),
+    ("international-friendlies", "fifa.friendly"),
+]
 
 # ESPN league slugs for the competitions this app cares about beyond the
 # Premier League (which football-data.org already covers).
@@ -787,6 +801,88 @@ class FPLService:
         )
         return data
 
+    async def _espn_country_recent_or_next_match(
+        self, espn_team_id: str
+    ) -> Optional[Tuple[str, str]]:
+        """A country's most recently completed match, or its next one if
+        none has been played yet this window. Returns (competition, event_id)."""
+        key = f"espn:nat-events:{espn_team_id}"
+
+        async def _fetch():
+            found = []
+            for comp_key, slug in NATIONAL_TEAM_COMPETITIONS:
+                r = await self.public.get(
+                    f"{ESPN_CORE_BASE}/{slug}/teams/{espn_team_id}/events",
+                    params={"limit": 50},
+                    headers=_espn_ua(),
+                )
+                r.raise_for_status()
+                for item in r.json().get("items") or []:
+                    ref = item.get("$ref")
+                    if not ref:
+                        continue
+                    er = await self.public.get(ref, headers=_espn_ua())
+                    er.raise_for_status()
+                    ejs = er.json()
+                    if ejs.get("id") and ejs.get("date"):
+                        found.append((comp_key, ejs["id"], ejs["date"]))
+            return found
+
+        events, _, _ = await self.cache.get_or_set(
+            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
+        )
+        if not events:
+            return None
+
+        def _parse(d: str) -> datetime:
+            return datetime.fromisoformat(d.replace("Z", "+00:00"))
+
+        now = datetime.now(timezone.utc)
+        played = [e for e in events if _parse(e[2]) <= now]
+        comp_key, event_id, _ = (
+            max(played, key=lambda e: _parse(e[2]))
+            if played
+            else min(events, key=lambda e: _parse(e[2]))
+        )
+        return comp_key, event_id
+
+    async def _espn_player_match_involvement(
+        self, espn_team_id: str, candidate_names: set[str]
+    ) -> Optional[dict]:
+        match = await self._espn_country_recent_or_next_match(espn_team_id)
+        if not match:
+            return None
+        competition, event_id = match
+        key = f"espn:lineups:{competition}:{event_id}"
+
+        async def _fetch():
+            return await self.football_lineups(competition, event_id)
+
+        lineup, _, _ = await self.cache.get_or_set(
+            key, _fetch, TTL_ESPN_LINEUPS, SWR_ESPN_LINEUPS
+        )
+        if not lineup.get("available"):
+            return None  # lineup not announced yet — nothing to report either way
+
+        for team in lineup.get("teams", []):
+            for p in team["players"]:
+                if _norm_name(p.get("name")) in candidate_names:
+                    opponent = next(
+                        (t.get("team") for t in lineup.get("teams", []) if t is not team),
+                        None,
+                    )
+                    return {
+                        "competition": competition,
+                        "opponent": opponent,
+                        "in_squad": True,
+                        "starter": p["starter"],
+                        "subbed_in": p["subbed_in"],
+                        "subbed_out": p["subbed_out"],
+                    }
+        # Lineup is out but this player isn't in it at all — an unused
+        # squad member (or not selected), a stronger signal than "unknown".
+        return {"competition": competition, "opponent": None, "in_squad": False}
+
     async def international_squad_news(self, player_ids: List[int]) -> dict:
         boot, _, _ = await self.bootstrap()
         by_id = {p["id"]: p for p in boot["elements"]}
@@ -801,11 +897,11 @@ class FPLService:
         for p in wanted:
             entry = FPL_REGION_TO_ESPN_COUNTRY.get(p.get("region"))
             if not entry:
-                results[p["id"]] = {"country": None, "on_squad": None, "news": []}
+                results[p["id"]] = {"country": None, "on_squad": None, "news": [], "recent_match": None}
                 continue
             country, espn_team_id = entry
             by_country[espn_team_id].append(p)
-            results[p["id"]] = {"country": country, "on_squad": None, "news": []}
+            results[p["id"]] = {"country": country, "on_squad": None, "news": [], "recent_match": None}
 
         for espn_team_id, players in by_country.items():
             roster_names, news = await asyncio.gather(
@@ -815,7 +911,8 @@ class FPLService:
             for p in players:
                 web = _norm_name(p.get("web_name"))
                 full = _norm_name(p.get("first_name", "") + " " + p.get("second_name", ""))
-                results[p["id"]]["on_squad"] = web in roster_names or full in roster_names
+                on_squad = web in roster_names or full in roster_names
+                results[p["id"]]["on_squad"] = on_squad
                 matched = [
                     {"headline": a["headline"], "published": a["published"], "link": a["link"]}
                     for a in news
@@ -823,6 +920,13 @@ class FPLService:
                 ]
                 matched.sort(key=lambda a: a["published"] or "", reverse=True)
                 results[p["id"]]["news"] = matched[:3]
+                # Only worth checking match involvement for players actually
+                # on the current squad list — if they're not called up at
+                # all, there's nothing to check whether they played in.
+                if on_squad:
+                    results[p["id"]]["recent_match"] = await self._espn_player_match_involvement(
+                        espn_team_id, {web, full}
+                    )
 
         return {"source": "espn", "players": results}
 
