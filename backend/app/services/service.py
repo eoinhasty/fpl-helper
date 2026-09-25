@@ -122,6 +122,7 @@ FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
     58: ("Denmark", "479"),
     62: ("Ecuador", "209"),
     63: ("Egypt", "2620"),
+    73: ("France", "478"),
     79: ("Georgia", "584"),
     80: ("Germany", "481"),
     81: ("Ghana", "4469"),
