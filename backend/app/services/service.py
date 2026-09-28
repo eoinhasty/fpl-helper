@@ -159,6 +159,33 @@ FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
     244: ("Wales", "578"),
 }
 
+# FPL team id -> (name, ESPN eng.1 club id). Stable for the season (only
+# changes on promotion/relegation), built once by cross-referencing FPL's
+# own team list against ESPN's — same durability assumption as the
+# nationality table above.
+FPL_TEAM_TO_ESPN_CLUB: Dict[int, Tuple[str, str]] = {
+    1: ("Arsenal", "359"),
+    2: ("Aston Villa", "362"),
+    3: ("Bournemouth", "349"),
+    4: ("Brentford", "337"),
+    5: ("Brighton", "331"),
+    6: ("Chelsea", "363"),
+    7: ("Coventry City", "388"),
+    8: ("Crystal Palace", "384"),
+    9: ("Everton", "368"),
+    10: ("Fulham", "370"),
+    11: ("Hull City", "306"),
+    12: ("Ipswich Town", "373"),
+    13: ("Leeds", "357"),
+    14: ("Liverpool", "364"),
+    15: ("Man City", "382"),
+    16: ("Man Utd", "360"),
+    17: ("Newcastle", "361"),
+    18: ("Nott'm Forest", "393"),
+    19: ("Spurs", "367"),
+    20: ("Sunderland", "366"),
+}
+
 
 class _EspnUnavailable(Exception):
     """Raised inside a cached fetch when ESPN returned 403 (throttling or
@@ -823,12 +850,19 @@ class FPLService:
         )
         return set(names)
 
-    async def _espn_country_news(self, espn_team_id: str) -> list[dict]:
-        key = f"espn:nat-news:{espn_team_id}"
+    async def _espn_team_news(self, league_slug: str, espn_team_id: str, cache_ns: str) -> list[dict]:
+        """Squad-relevant news for an ESPN team, whether that's a country
+        (fifa.friendly) or a PL club (eng.1). A story about a player's
+        international withdrawal/injury can get filed under either feed
+        depending on how the outlet framed it (e.g. "leaves Sweden camp"
+        vs. "returns to Liverpool") — confirmed live: Alexander Isak's
+        September 2026 injury only showed up under Liverpool's feed, not
+        Sweden's, so both need checking, not just the country."""
+        key = f"espn:{cache_ns}-news:{espn_team_id}"
 
         async def _fetch():
             r = await self._espn_get(
-                f"{ESPN_SOCCER_BASE}/fifa.friendly/news",
+                f"{ESPN_SOCCER_BASE}/{league_slug}/news",
                 params={"team": espn_team_id, "limit": 50},
             )
             if r is None:
@@ -871,6 +905,12 @@ class FPLService:
             key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
         )
         return data
+
+    async def _espn_country_news(self, espn_team_id: str) -> list[dict]:
+        return await self._espn_team_news("fifa.friendly", espn_team_id, "nat")
+
+    async def _espn_club_news(self, espn_club_id: str) -> list[dict]:
+        return await self._espn_team_news("eng.1", espn_club_id, "club")
 
     async def _espn_country_recent_or_next_match(
         self, espn_team_id: str
@@ -967,21 +1007,34 @@ class FPLService:
         boot, _, _ = await self.bootstrap()
         by_id = {p["id"]: p for p in boot["elements"]}
 
-        # Resolve each requested player's country, then only fetch each
-        # distinct country once — a 15-player squad is usually 8-12
-        # countries, not 15 separate lookups, and never one of the 190+
-        # ESPN tracks that aren't actually represented.
+        # Resolve each requested player's country and PL club, then only
+        # fetch each distinct one once — a 15-player squad is usually
+        # 8-12 countries but at most 20 clubs (often far fewer), not 15
+        # separate lookups either way.
         wanted = [by_id[i] for i in player_ids if i in by_id]
         by_country: Dict[str, List[dict]] = defaultdict(list)
+        by_club: Dict[str, List[dict]] = defaultdict(list)
         results: Dict[int, dict] = {}
+        news_by_player: Dict[int, List[dict]] = defaultdict(list)
         for p in wanted:
+            results[p["id"]] = {"country": None, "on_squad": None, "news": [], "recent_match": None}
             entry = FPL_REGION_TO_ESPN_COUNTRY.get(p.get("region"))
-            if not entry:
-                results[p["id"]] = {"country": None, "on_squad": None, "news": [], "recent_match": None}
-                continue
-            country, espn_team_id = entry
-            by_country[espn_team_id].append(p)
-            results[p["id"]] = {"country": country, "on_squad": None, "news": [], "recent_match": None}
+            if entry:
+                country, espn_team_id = entry
+                by_country[espn_team_id].append(p)
+                results[p["id"]]["country"] = country
+            club_entry = FPL_TEAM_TO_ESPN_CLUB.get(p.get("team"))
+            if club_entry:
+                _, espn_club_id = club_entry
+                by_club[espn_club_id].append(p)
+
+        def _player_names(p: dict) -> tuple[str, str]:
+            web = _norm_name(p.get("web_name"))
+            # first_name/second_name can be present but explicitly null
+            # (not just absent), which .get(key, "") doesn't guard
+            # against — `or ""` does.
+            full = _norm_name((p.get("first_name") or "") + " " + (p.get("second_name") or ""))
+            return web, full
 
         async def _process_country(espn_team_id: str, players: List[dict]) -> None:
             try:
@@ -997,20 +1050,12 @@ class FPLService:
                 logger.warning("ESPN unavailable for country %s, skipping", espn_team_id)
                 return
             for p in players:
-                web = _norm_name(p.get("web_name"))
-                # first_name/second_name can be present but explicitly
-                # null (not just absent), which .get(key, "") doesn't
-                # guard against — `or ""` does.
-                full = _norm_name((p.get("first_name") or "") + " " + (p.get("second_name") or ""))
+                web, full = _player_names(p)
                 on_squad = web in roster_names or full in roster_names
                 results[p["id"]]["on_squad"] = on_squad
-                matched = [
-                    {"headline": a["headline"], "published": a["published"], "link": a["link"]}
-                    for a in news
-                    if web in a["athletes"] or full in a["athletes"]
-                ]
-                matched.sort(key=lambda a: a["published"] or "", reverse=True)
-                results[p["id"]]["news"] = matched[:3]
+                news_by_player[p["id"]].extend(
+                    a for a in news if web in a["athletes"] or full in a["athletes"]
+                )
                 # Only worth checking match involvement for players actually
                 # on the current squad list — if they're not called up at
                 # all, there's nothing to check whether they played in.
@@ -1025,11 +1070,39 @@ class FPLService:
                             espn_team_id,
                         )
 
-        # Countries are independent — resolve them all concurrently rather
-        # than one at a time, same reasoning as the event-ref fix above.
+        async def _process_club(espn_club_id: str, players: List[dict]) -> None:
+            # A story about international-duty withdrawal/injury can be
+            # filed under either the player's country feed or their club's
+            # ("leaves Sweden camp" vs. "returns to Liverpool") — confirmed
+            # live (Alexander Isak, Sep 2026: only under Liverpool's feed).
+            # Check both rather than assume which one an outlet chose.
+            try:
+                news = await self._espn_club_news(espn_club_id)
+            except _EspnUnavailable:
+                logger.warning("ESPN unavailable for club %s, skipping", espn_club_id)
+                return
+            for p in players:
+                web, full = _player_names(p)
+                news_by_player[p["id"]].extend(
+                    a for a in news if web in a["athletes"] or full in a["athletes"]
+                )
+
+        # Countries and clubs are all independent — resolve everything
+        # concurrently rather than one at a time.
         await asyncio.gather(
-            *[_process_country(tid, players) for tid, players in by_country.items()]
+            *[_process_country(tid, players) for tid, players in by_country.items()],
+            *[_process_club(cid, players) for cid, players in by_club.items()],
         )
+
+        for pid, articles in news_by_player.items():
+            seen_links = set()
+            deduped = []
+            for a in sorted(articles, key=lambda a: a["published"] or "", reverse=True):
+                if a["link"] in seen_links:
+                    continue
+                seen_links.add(a["link"])
+                deduped.append({"headline": a["headline"], "published": a["published"], "link": a["link"]})
+            results[pid]["news"] = deduped[:3]
 
         return {"source": "espn", "players": results}
 
