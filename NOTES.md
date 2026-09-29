@@ -21,6 +21,11 @@ the ideas (and what's already built vs. not) aren't lost between sessions.
 - **Bench auto-sub order** — `BenchStrip.tsx` labels the bench "Auto-sub
   priority" and displays it in that order.
 
+- **Projection model + transfer/wildcard solver (offline)** — `tools/analysis/`
+  (see its README). xG-based team model, per-player expected points with
+  last-season priors, backtest/calibration, and a multi-GW MILP planner. Not
+  wired into the app; ideas 1-3 and 5 below could reuse its projections.
+
 ## Partially built — real scaffolding to extend, not build from scratch
 
 1. **Auto-sub simulation.** Bench priority order is shown, but nothing
