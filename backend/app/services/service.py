@@ -1405,7 +1405,6 @@ class FPLService:
         bank = 0
         reading_status: Optional[str] = None
         reading_age: Optional[float] = None
-        used_gw = next_gw
 
         if token:
             try:
@@ -1442,7 +1441,7 @@ class FPLService:
                     [(boot_status, boot_age)],
                     TTL_PICKS,
                 )
-            picks_data, used_gw, _, reading_status, reading_age = picks_result
+            picks_data, _, _, reading_status, reading_age = picks_result
             picks_list = picks_data.get("picks", [])
             bank = (picks_data.get("entry_history") or {}).get("bank", 0)
 
@@ -1456,7 +1455,9 @@ class FPLService:
             pos = pl.get("element_type", 4)
             owned_by_pos.setdefault(pos, []).append(pl)
 
-        fixtures_data, _, _ = await self.fixtures(used_gw)
+        # Suggestions are for the next transfer, so score against the upcoming
+        # GW's fixtures even when the squad itself came from current-GW picks.
+        fixtures_data, _, _ = await self.fixtures(next_gw)
         teams = {t["id"]: t for t in boot["teams"]}
         fdr_by_team: Dict[int, list] = {}
         for fx in fixtures_data:

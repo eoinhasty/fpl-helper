@@ -226,8 +226,20 @@ async def squad(
         live_data = {"elements": []}
         live_status, live_age = "miss", 0.0
 
+    # FPL only exposes next-GW picks once its deadline passes, so between
+    # gameweeks the squad comes from the current GW's picks. Once that GW has
+    # finished, though, the fixtures and deadline that matter are the next GW's.
+    fixture_gw = used_gw
+    if (
+        used_label == "current"
+        and current_event
+        and current_event.get("finished")
+        and next_event
+    ):
+        fixture_gw = next_event["id"]
+
     # fixtures (cached)
-    fixtures_data, _, _ = await svc.fixtures(used_gw)
+    fixtures_data, _, _ = await svc.fixtures(fixture_gw)
 
     summary = await _entry_summary(svc, entry_id, boot, entry_data=entry_data)
     overall_rank = summary["overall_rank"]
@@ -240,6 +252,7 @@ async def squad(
     used_event = next((e for e in events if e["id"] == used_gw), None)
     if used_event is None:
         raise HTTPException(404, detail=f"Gameweek {used_gw} not found.")
+    fixture_event = next((e for e in events if e["id"] == fixture_gw), used_event)
 
     # Report the older/worse of picks vs. live scoring — picks alone would
     # understate staleness if live_event hasn't revalidated as recently.
@@ -258,7 +271,8 @@ async def squad(
         "used_gw": used_gw,
         "current_gw": current_gw_id,
         "used_label": used_label,
-        "deadline": used_event["deadline_time"],
+        "fixture_gw": fixture_gw,
+        "deadline": fixture_event["deadline_time"],
         "active_chip": picks_data.get("active_chip"),
         "team_value": team_value,
         "team_bank": team_bank,

@@ -104,7 +104,7 @@ export default function SquadDashboard() {
     >
     <div className="mx-auto px-4 py-2.5 flex items-center justify-between gap-4" style={{ maxWidth: 1400 }}>
       <SquadStatusBar
-        gw={data?.used_gw}
+        gw={data?.fixture_gw ?? data?.used_gw}
         deadlineISO={data?.deadline}
         teamValue={data?.team_value}
         teamBank={data?.team_bank}
