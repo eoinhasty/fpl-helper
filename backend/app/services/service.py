@@ -10,7 +10,7 @@ from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from app.simple_cache import AsyncCache
 
 logger = logging.getLogger("uvicorn.error")
@@ -215,6 +215,7 @@ _SQUAD_NEWS_RE = re.compile(
 # squad news. International squad status is only ever current for the
 # length of a break, so anything older than this is stale by definition.
 _SQUAD_NEWS_MAX_AGE_DAYS = 30
+_RECENT_MATCH_MAX_AGE_DAYS = 14
 
 
 def _ua() -> Dict[str, str]:
@@ -926,27 +927,33 @@ class FPLService:
             return er.json() if er is not None else None
 
         async def _fetch():
-            found = []
+            found: Dict[str, Tuple[str, str, str]] = {}
             for comp_key, slug in NATIONAL_TEAM_COMPETITIONS:
-                r = await self._espn_get(
-                    f"{ESPN_CORE_BASE}/{slug}/teams/{espn_team_id}/events",
-                    params={"limit": 50},
+                # The core events list only carries upcoming matches, and the
+                # site schedule only carries played ones — need both to know
+                # the most recent match mid-window as well as the next one.
+                upcoming, played = await asyncio.gather(
+                    self._espn_get(
+                        f"{ESPN_CORE_BASE}/{slug}/teams/{espn_team_id}/events",
+                        params={"limit": 50},
+                    ),
+                    self._espn_get(f"{ESPN_SOCCER_BASE}/{slug}/teams/{espn_team_id}/schedule"),
                 )
-                if r is None:
-                    # Losing the whole list (as opposed to one event in
-                    # it) is a bigger deal — don't cache a competition as
-                    # "no matches" when we just couldn't ask.
+                if upcoming is None or played is None:
+                    # Losing a whole list (as opposed to one event in it) is a
+                    # bigger deal — don't cache a competition as "no matches"
+                    # when we just couldn't ask.
                     raise _EspnUnavailable(espn_team_id)
-                refs = [item.get("$ref") for item in r.json().get("items") or [] if item.get("$ref")]
-                # A country's event list is small (typically single digits
-                # per competition) but each entry needs its own follow-up
-                # request to get a date — resolve those concurrently rather
-                # than one at a time, which is what made a cold-cache
-                # lookup across a whole squad's countries take 5+ seconds.
+                for ev in played.json().get("events") or []:
+                    if ev.get("id") and ev.get("date"):
+                        found[ev["id"]] = (comp_key, ev["id"], ev["date"])
+                refs = [item.get("$ref") for item in upcoming.json().get("items") or [] if item.get("$ref")]
+                # Each upcoming entry needs its own follow-up request to get a
+                # date — resolve those concurrently rather than one at a time.
                 for ejs in await asyncio.gather(*[_resolve_ref(ref) for ref in refs]):
                     if ejs and ejs.get("id") and ejs.get("date"):
-                        found.append((comp_key, ejs["id"], ejs["date"]))
-            return found
+                        found.setdefault(ejs["id"], (comp_key, ejs["id"], ejs["date"]))
+            return list(found.values())
 
         events, _, _ = await self.cache.get_or_set(
             key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
@@ -958,12 +965,17 @@ class FPLService:
             return datetime.fromisoformat(d.replace("Z", "+00:00"))
 
         now = datetime.now(timezone.utc)
-        played = [e for e in events if _parse(e[2]) <= now]
-        comp_key, event_id, _ = (
-            max(played, key=lambda e: _parse(e[2]))
-            if played
-            else min(events, key=lambda e: _parse(e[2]))
-        )
+        cutoff = now - timedelta(days=_RECENT_MATCH_MAX_AGE_DAYS)
+        # A match from a previous window (e.g. June's friendlies) says nothing
+        # about this one, so only count recent results.
+        recent = [e for e in events if cutoff <= _parse(e[2]) <= now]
+        upcoming = [e for e in events if _parse(e[2]) > now]
+        if recent:
+            comp_key, event_id, _ = max(recent, key=lambda e: _parse(e[2]))
+        elif upcoming:
+            comp_key, event_id, _ = min(upcoming, key=lambda e: _parse(e[2]))
+        else:
+            return None
         return comp_key, event_id
 
     async def _espn_player_match_involvement(
