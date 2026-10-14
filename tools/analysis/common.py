@@ -82,14 +82,15 @@ class Data:
             paid = bought.get(pid, now - e["cost_change_start"])
             return now if now <= paid else paid + (now - paid) // 2
 
-        # One FT per GW from GW2, max 5 banked; wildcard/free hit weeks keep them.
+        # One FT per GW from GW2, max 5 banked. A wildcard/free hit week keeps the
+        # count as it was (no FT is used, but none is gained either).
         chips = {c["event"]: c["name"] for c in self.entry["history"]["chips"]}
         ft = 1
         for h in self.entry["history"]["current"]:
             if h["event"] < 2:
                 continue
             if chips.get(h["event"]) in ("wildcard", "freehit"):
-                ft = min(MAX_FT, ft + 1)
+                continue
             else:
                 ft = min(MAX_FT, max(ft - h["event_transfers"], 0) + 1)
 
