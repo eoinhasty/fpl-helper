@@ -17,8 +17,9 @@ import numpy as np
 from scipy.optimize import Bounds, LinearConstraint, milp
 from scipy.sparse import coo_matrix
 
+import points_model
+import projections
 from common import MAX_FT, POS, Data
-from projections import Projector, load_calibration
 
 SQUAD_QUOTA = {1: 2, 2: 5, 3: 5, 4: 3}
 XI_RANGE = {1: (1, 1), 2: (3, 5), 3: (2, 5), 4: (1, 3)}
@@ -163,7 +164,8 @@ def solve(d, proj, state, gws, *, scenario=None, wildcard=None, max_now=None, no
         hits = 0 if g == wg else round(x[H(g)])
         plan.append(dict(
             gw=gw, squad=sq, xi=xi, captain=cap, hits=hits,
-            out=[p for p in prev if p not in sq], into=[p for p in sq if p not in prev],
+            out=sorted((p for p in prev if p not in sq), key=lambda p: d.els[p]["element_type"]),
+            into=sorted((p for p in sq if p not in prev), key=lambda p: d.els[p]["element_type"]),
             points=sum(pts[(p, gw)] for p in xi) + pts[(cap, gw)],
         ))
         prev = sq
@@ -206,12 +208,16 @@ def main():
     ap.add_argument("--force-out", nargs="*", default=[], help="sell these in the first GW")
     ap.add_argument("--keep", nargs="*", default=[], help="keep these for the whole horizon")
     ap.add_argument("--scenario", help='JSON availability overrides: {"Isak": {"6": 0.75}}')
+    ap.add_argument("--legacy", action="store_true", help="use the old hand-built projections (projections.py)")
     args = ap.parse_args()
 
     d = Data()
     state = d.squad_state()
-    proj = Projector(d, calib=load_calibration())
     gws = list(range(d.next_gw, d.next_gw + args.horizon))
+    if args.legacy:
+        proj = projections.Projector(d, calib=projections.load_calibration())
+    else:
+        proj = points_model.Projector(d, horizon=args.horizon)
     scenario = json.loads(open(args.scenario).read()) if args.scenario else {}
     print(f"Entry {d.entry['id']}: bank £{state.bank / 10:.1f}m, {state.free_transfers} free transfer(s), "
           f"chips used {state.chips_used or 'none'}")

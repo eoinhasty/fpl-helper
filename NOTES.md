@@ -22,9 +22,9 @@ the ideas (and what's already built vs. not) aren't lost between sessions.
   priority" and displays it in that order.
 
 - **Projection model + transfer/wildcard solver (offline)** — `tools/analysis/`
-  (see its README). xG-based team model, per-player expected points with
-  last-season priors, backtest/calibration, and a multi-GW MILP planner. Not
-  wired into the app; ideas 1-3 and 5 below could reuse its projections.
+  (see its README). Expected-points model trained on four past seasons'
+  per-GW data (walk-forward tested against form), and a multi-GW MILP planner.
+  Not wired into the app; ideas 1-3 and 5 below could reuse its projections.
 
 ## Partially built — real scaffolding to extend, not build from scratch
 
