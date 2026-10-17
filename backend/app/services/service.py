@@ -812,10 +812,12 @@ class FPLService:
                     "round": comp.get("altGameNote"),
                     "home": {
                         "name": (home.get("team") or {}).get("displayName"),
+                        "short_name": (home.get("team") or {}).get("shortDisplayName"),
                         "logo": (home.get("team") or {}).get("logo"),
                     },
                     "away": {
                         "name": (away.get("team") or {}).get("displayName"),
+                        "short_name": (away.get("team") or {}).get("shortDisplayName"),
                         "logo": (away.get("team") or {}).get("logo"),
                     },
                     "home_goals": _int_or_none(home.get("score")),
