@@ -18,6 +18,10 @@ from app.services.service import (
     TTL_FDR,
     TTL_PLAYERS,
     TTL_PLAYER_SUMMARY,
+    TTL_ESPN_FOOTBALL,
+    SWR_ESPN_FOOTBALL,
+    TTL_ESPN_LINEUPS,
+    SWR_ESPN_LINEUPS,
     SWR_NEXTMATCH,
     SWR_NEWS,
     SWR_STANDINGS,
@@ -593,4 +597,38 @@ async def pl_standings(request: Request, response: Response):
         key, _fetch, TTL_STANDINGS, SWR_STANDINGS
     )
     set_cache_headers(response, status, age, TTL_STANDINGS)
+    return data
+
+
+@router.get("/football/fixtures")
+@limiter.limit("30/minute")
+async def football_fixtures(request: Request, response: Response, competition: str):
+    svc: FPLService = request.app.state.svc
+    key = f"espn:fixtures:{competition}"
+
+    async def _fetch():
+        return await svc.football_fixtures(competition)
+
+    data, status, age = await svc.cache.get_or_set(
+        key, _fetch, TTL_ESPN_FOOTBALL, SWR_ESPN_FOOTBALL
+    )
+    set_cache_headers(response, status, age, TTL_ESPN_FOOTBALL)
+    return data
+
+
+@router.get("/football/lineups")
+@limiter.limit("30/minute")
+async def football_lineups(
+    request: Request, response: Response, competition: str, event: str
+):
+    svc: FPLService = request.app.state.svc
+    key = f"espn:lineups:{competition}:{event}"
+
+    async def _fetch():
+        return await svc.football_lineups(competition, event)
+
+    data, status, age = await svc.cache.get_or_set(
+        key, _fetch, TTL_ESPN_LINEUPS, SWR_ESPN_LINEUPS
+    )
+    set_cache_headers(response, status, age, TTL_ESPN_LINEUPS)
     return data

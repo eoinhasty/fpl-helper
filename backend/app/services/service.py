@@ -8,7 +8,7 @@ from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from app.simple_cache import AsyncCache
 
 logger = logging.getLogger("uvicorn.error")
@@ -40,10 +40,59 @@ TTL_PLAYERS = 30 * 60  # 30m fresh
 SWR_PLAYERS = 6 * 60 * 60  # +6h stale
 TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
+# ESPN's public soccer endpoints are undocumented/unofficial (no key, no
+# published quota or contract — the shape could change without notice), but
+# unlike api-football's free tier they actually serve current-season data.
+# Verified live against all six competitions below on 2026-09-21.
+TTL_ESPN_FOOTBALL = 15 * 60  # 15m fresh
+SWR_ESPN_FOOTBALL = 3 * 60 * 60  # +3h stale
+# Lineups only exist once a match is close to kickoff or under way, and
+# change fast (announced XI, then subs as the game goes on) — a much
+# shorter TTL than the fixture-list cache above.
+TTL_ESPN_LINEUPS = 2 * 60  # 2m fresh
+SWR_ESPN_LINEUPS = 15 * 60  # +15m stale
+
+ESPN_SOCCER_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
+
+# ESPN league slugs for the competitions this app cares about beyond the
+# Premier League (which football-data.org already covers).
+ESPN_LEAGUES: Dict[str, str] = {
+    "champions-league": "uefa.champions",
+    "europa-league": "uefa.europa",
+    "conference-league": "uefa.europa.conf",
+    "nations-league": "uefa.nations",
+    "international-friendlies": "fifa.friendly",
+    "preseason-friendlies": "club.friendly",
+}
+# Days either side of the scoreboard's anchor day to also fetch. The day
+# before catches ESPN anchoring on a matchday's second day; two days after
+# covers a matchday's remaining days when it anchors on the first.
+MATCHDAY_NEIGHBOUR_DAYS = (-1, 1, 2)
 
 
 def _ua() -> Dict[str, str]:
     return {"User-Agent": "Personal FPL Helper"}
+
+
+def _int_or_none(v: Any) -> Optional[int]:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_date(v: Optional[str]) -> Optional[date]:
+    try:
+        return date.fromisoformat((v or "")[:10])
+    except ValueError:
+        return None
+
+
+# ESPN's edge blocks our normal descriptive User-Agent (and browser-spoofed
+# ones) with a 403, but accepts httpx's own default signature — so ESPN
+# calls explicitly restore it instead of inheriting self.public's default.
+def _espn_ua() -> Dict[str, str]:
+    return {"User-Agent": f"python-httpx/{httpx.__version__}"}
 
 
 def _auth_headers_from(token: Optional[str]) -> Dict[str, str]:
@@ -64,6 +113,11 @@ class FPLService:
         # redo the same sort on every load.
         self._rank_cache_boot_id: Optional[int] = None
         self._rank_cache: Optional[Tuple[dict, dict]] = None
+        # ESPN has no published rate limit or concurrency guidance for
+        # these endpoints (checked — nothing documented anywhere), so this
+        # caps how many ESPN requests this app has in flight at once
+        # rather than trusting a number nobody publishes.
+        self._espn_semaphore = asyncio.Semaphore(4)
 
     async def _get_json_auth(
         self, path: str, token: Optional[str], params: Optional[dict] = None
@@ -524,6 +578,154 @@ class FPLService:
                     "pts": 41,
                 },
             ],
+        }
+
+    # ----------------- ESPN (international / preseason / UEFA) -----------------
+    async def _espn_get(self, url: str, **kwargs) -> Optional[httpx.Response]:
+        """GET an ESPN endpoint, capped for concurrency and tolerant of a
+        403. ESPN's 403 is ambiguous — could be the UA rejection we've
+        already worked around, or could be undocumented throttling (both
+        are known to happen; there's no documented rate limit either way)
+        — so callers get None back and can skip/degrade that one piece
+        gracefully instead of the whole request 500ing."""
+        kwargs.setdefault("headers", _espn_ua())
+        async with self._espn_semaphore:
+            r = await self.public.get(url, **kwargs)
+        if r.status_code == 403:
+            logger.warning("ESPN returned 403 (throttling or UA rejection) for %s", url)
+            return None
+        r.raise_for_status()
+        return r
+
+    async def football_fixtures(self, competition: str) -> dict:
+        slug = ESPN_LEAGUES.get(competition)
+        if not slug:
+            raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
+
+        url = f"{ESPN_SOCCER_BASE}/{slug}/scoreboard"
+        r = await self._espn_get(url)
+        if r is None:
+            return {"source": "espn", "competition": competition, "fixtures": []}
+        js = r.json()
+        events = {e["id"]: e for e in js.get("events", []) if e.get("id")}
+
+        # The undated scoreboard only covers the single day ESPN considers
+        # current (the next match day, or the last one between rounds), but
+        # a UEFA matchday spans several — e.g. 20–21 Oct 2026 was 9 Champions
+        # League games each day, and the undated call returned only the
+        # first. ESPN rejects a `dates=` range (400), so fetch the days
+        # around that anchor individually and merge them in.
+        anchor = _parse_date((js.get("day") or {}).get("date"))
+        if anchor:
+            extra = await asyncio.gather(
+                *[
+                    self._espn_get(
+                        url,
+                        params={
+                            "dates": (anchor + timedelta(days=d)).strftime("%Y%m%d")
+                        },
+                    )
+                    for d in MATCHDAY_NEIGHBOUR_DAYS
+                ],
+                return_exceptions=True,
+            )
+            for er in extra:
+                # A neighbouring day failing isn't worth losing the anchor
+                # day's fixtures over — just show what did come back.
+                if isinstance(er, Exception):
+                    logger.warning(
+                        "ESPN neighbouring-day fetch failed for %s: %s", slug, er
+                    )
+                elif er is not None:
+                    for e in er.json().get("events", []):
+                        if e.get("id"):
+                            events.setdefault(e["id"], e)
+
+        fixtures = []
+        for e in sorted(events.values(), key=lambda e: e.get("date") or ""):
+            comp = (e.get("competitions") or [{}])[0]
+            competitors = comp.get("competitors") or []
+            home = next((c for c in competitors if c.get("homeAway") == "home"), None)
+            away = next((c for c in competitors if c.get("homeAway") == "away"), None)
+            if not home or not away:
+                continue
+            status = comp.get("status", {}).get("type", {})
+            fixtures.append(
+                {
+                    "id": e.get("id"),
+                    "date": e.get("date"),
+                    "completed": bool(status.get("completed")),
+                    "status_detail": status.get("shortDetail"),
+                    "round": comp.get("altGameNote"),
+                    "home": {
+                        "name": (home.get("team") or {}).get("displayName"),
+                        "logo": (home.get("team") or {}).get("logo"),
+                    },
+                    "away": {
+                        "name": (away.get("team") or {}).get("displayName"),
+                        "logo": (away.get("team") or {}).get("logo"),
+                    },
+                    "home_goals": _int_or_none(home.get("score")),
+                    "away_goals": _int_or_none(away.get("score")),
+                }
+            )
+        return {"source": "espn", "competition": competition, "fixtures": fixtures}
+
+    async def football_lineups(self, competition: str, event_id: str) -> dict:
+        slug = ESPN_LEAGUES.get(competition)
+        if not slug:
+            raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
+
+        r = await self._espn_get(
+            f"{ESPN_SOCCER_BASE}/{slug}/summary", params={"event": event_id}
+        )
+        if r is None:
+            return {
+                "source": "espn",
+                "competition": competition,
+                "event": event_id,
+                "teams": [],
+                "available": False,
+            }
+        js = r.json()
+
+        def _shape_team(roster: dict) -> dict:
+            players = []
+            for p in roster.get("roster") or []:
+                athlete = p.get("athlete") or {}
+                stats = {
+                    s.get("name"): s.get("displayValue") for s in p.get("stats", [])
+                }
+                players.append(
+                    {
+                        "id": athlete.get("id"),
+                        "name": athlete.get("fullName"),
+                        "jersey": p.get("jersey"),
+                        "position": (p.get("position") or {}).get("abbreviation"),
+                        "starter": bool(p.get("starter")),
+                        "subbed_in": bool(p.get("subbedIn")),
+                        "subbed_out": bool(p.get("subbedOut")),
+                        "goals": stats.get("totalGoals"),
+                        "assists": stats.get("goalAssists"),
+                        "yellow_cards": stats.get("yellowCards"),
+                        "red_cards": stats.get("redCards"),
+                    }
+                )
+            team = roster.get("team") or {}
+            return {
+                "team": team.get("displayName"),
+                "home_away": roster.get("homeAway"),
+                "formation": roster.get("formation"),
+                "players": players,
+            }
+
+        teams = [_shape_team(r) for r in (js.get("rosters") or [])]
+        return {
+            "source": "espn",
+            "competition": competition,
+            "event": event_id,
+            "teams": teams,
+            "available": any(t["players"] for t in teams),
         }
 
     async def live_event(
