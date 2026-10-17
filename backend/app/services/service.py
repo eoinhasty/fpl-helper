@@ -1087,13 +1087,23 @@ class FPLService:
                 _, espn_club_id = club_entry
                 by_club[espn_club_id].append(p)
 
-        def _player_names(p: dict) -> tuple[str, str]:
+        def _player_names(p: dict) -> set[str]:
             web = _norm_name(p.get("web_name"))
             # first_name/second_name can be present but explicitly null
             # (not just absent), which .get(key, "") doesn't guard
             # against — `or ""` does.
-            full = _norm_name((p.get("first_name") or "") + " " + (p.get("second_name") or ""))
-            return web, full
+            first = _norm_name(p.get("first_name")).split()
+            second = _norm_name(p.get("second_name")).split()
+            names = {web, " ".join(first + second)}
+            # FPL carries full legal names, ESPN the playing name — for
+            # compound Portuguese/Brazilian names those never match exactly
+            # ("Bruno Borges Fernandes" vs "Bruno Fernandes", "Gabriel dos
+            # Santos Magalhães" vs "Gabriel Magalhães"), which wrongly showed
+            # called-up players as dropped. First + last name bridges that.
+            if first and second:
+                names.add(f"{first[0]} {second[-1]}")
+            names.discard("")
+            return names
 
         async def _process_country(espn_team_id: str, players: List[dict]) -> None:
             try:
@@ -1109,11 +1119,11 @@ class FPLService:
                 logger.warning("ESPN unavailable for country %s, skipping", espn_team_id)
                 return
             for p in players:
-                web, full = _player_names(p)
-                on_squad = web in roster_names or full in roster_names
+                names = _player_names(p)
+                on_squad = not names.isdisjoint(roster_names)
                 results[p["id"]]["on_squad"] = on_squad
                 news_by_player[p["id"]].extend(
-                    a for a in news if web in a["athletes"] or full in a["athletes"]
+                    a for a in news if not names.isdisjoint(a["athletes"])
                 )
                 # Only worth checking match involvement for players actually
                 # on the current squad list — if they're not called up at
@@ -1121,7 +1131,7 @@ class FPLService:
                 if on_squad:
                     try:
                         results[p["id"]]["recent_match"] = await self._espn_player_match_involvement(
-                            espn_team_id, {web, full}
+                            espn_team_id, names
                         )
                     except _EspnUnavailable:
                         logger.warning(
@@ -1141,9 +1151,9 @@ class FPLService:
                 logger.warning("ESPN unavailable for club %s, skipping", espn_club_id)
                 return
             for p in players:
-                web, full = _player_names(p)
+                names = _player_names(p)
                 news_by_player[p["id"]].extend(
-                    a for a in news if web in a["athletes"] or full in a["athletes"]
+                    a for a in news if not names.isdisjoint(a["athletes"])
                 )
 
         # Countries and clubs are all independent — resolve everything
