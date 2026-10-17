@@ -13,6 +13,7 @@ A Fantasy Premier League companion app that enriches your squad view with live d
 - **Hot news** — Recent injury and transfer news for your squad players.
 - **PL standings** — Live Premier League table.
 - **International & European football** — Fixtures and lineups for Champions League, Europa League, Conference League, Nations League, and international/club friendlies. No API key required.
+- **International duty** — Call-ups, withdrawals and recent country/club news for your squad players, plus whether each one featured in their country's most recent or next match.
 - **Dark / light / system theme** — Persisted per device.
 - **Cache status** — Live cache hit/miss/stale indicators and data age shown in the top nav.
 
