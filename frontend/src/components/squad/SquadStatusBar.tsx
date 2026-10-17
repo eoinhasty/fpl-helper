@@ -12,6 +12,7 @@ export default function SquadStatusBar({
   activeChip,
   isLive,
   isSwitching,
+  compact,
 }: {
   gw?: number;
   deadlineISO?: string | null;
@@ -21,11 +22,24 @@ export default function SquadStatusBar({
   cache: CacheMeta;
   isLive?: boolean;
   isSwitching?: boolean;
+  /** Drop Value/Bank/chip — just the badge, countdown, and cache indicator.
+   * Used on mobile where the full row doesn't fit without squeezing; the
+   * dropped stats render via StatText in SquadDashboard's mobile header
+   * row instead (see contentHeader in pages/SquadDashboard.tsx). */
+  compact?: boolean;
 }) {
   const { text, ended } = useCountdown(deadlineISO);
 
   return (
-    <div className="flex items-center gap-2.5 text-sm">
+    <div
+      className="flex items-center gap-2.5 text-sm overflow-x-auto whitespace-nowrap max-w-full [&::-webkit-scrollbar]:hidden"
+      style={{ scrollbarWidth: "none" }}
+      // Scrollbar is hidden for visual cleanliness, so tabIndex is the only
+      // remaining affordance that a keyboard user can reach and scroll this
+      // strip when it overflows (native browser behavior on a focused
+      // scrollable element responds to arrow keys).
+      tabIndex={0}
+    >
       {isLive ? (
         <span className="badge flex items-center gap-1.5 bg-success/15 text-success border border-success/30 shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
@@ -39,24 +53,28 @@ export default function SquadStatusBar({
       <span className={ended ? "text-destructive font-medium" : "text-muted-foreground"}>
         {text}
       </span>
-      <span className="w-px h-4 bg-border shrink-0" />
-      <span className="text-muted-foreground">
-        Value <span className="font-semibold text-foreground">{money(teamValue)}</span>
-      </span>
-      <span className="w-px h-4 bg-border shrink-0" />
-      <span className="text-muted-foreground">
-        Bank <span className="font-semibold text-foreground">{money(teamBank)}</span>
-      </span>
-      {activeChip && (
+      {!compact && (
         <>
           <span className="w-px h-4 bg-border shrink-0" />
-          <span className="badge pill-warn uppercase font-semibold shrink-0">
-            {activeChip.replace(/_/g, " ")}
+          <span className="text-muted-foreground">
+            Value <span className="font-semibold text-foreground">{money(teamValue)}</span>
           </span>
+          <span className="w-px h-4 bg-border shrink-0" />
+          <span className="text-muted-foreground">
+            Bank <span className="font-semibold text-foreground">{money(teamBank)}</span>
+          </span>
+          {activeChip && (
+            <>
+              <span className="w-px h-4 bg-border shrink-0" />
+              <span className="badge pill-warn uppercase font-semibold shrink-0">
+                {activeChip.replace(/_/g, " ")}
+              </span>
+            </>
+          )}
         </>
       )}
       {cache?.status !== null && (
-        <div className="hidden xl:flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5">
           <span className="w-px h-4 bg-border shrink-0" />
           <CacheIndicators status={cache.status} ageSeconds={cache.ageSeconds} isSwitching={isSwitching} />
         </div>

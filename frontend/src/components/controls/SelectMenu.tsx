@@ -1,6 +1,8 @@
 // components/controls/SelectMenu.tsx
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
 
+export type SelectMenuVariant = "default" | "plain";
+
 export function SelectMenu<T>({
   value,
   options,
@@ -10,6 +12,10 @@ export function SelectMenu<T>({
   disabled = false,
   placeholder = "",
   anchor = "bottom start",
+  /** "plain" drops the bordered/card chrome — inline text + chevron only.
+   * Used where the select sits in a borderless toolbar row (e.g. mobile
+   * SquadDashboard) instead of standing alone as a normal form control. */
+  variant = "default",
 }: {
   value: T;
   options: { label: string; value: T }[];
@@ -19,6 +25,7 @@ export function SelectMenu<T>({
   disabled?: boolean;
   placeholder?: string;
   anchor?: "bottom start" | "bottom end";
+  variant?: SelectMenuVariant;
 }) {
   const current = options.find((o) => o.value === value);
   return (
@@ -27,9 +34,15 @@ export function SelectMenu<T>({
         <ListboxButton
           aria-label={ariaLabel}
           className={[
-            "flex h-9 w-full items-center justify-between gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
+            variant === "plain"
+              // Content-width, chevron hugs the label — a fixed w-full +
+              // justify-between (like the default variant) left a visible
+              // gap between short labels ("GW 1") and the chevron once the
+              // bordered box that used to fill that space was removed.
+              ? "inline-flex min-h-11 items-center gap-1 px-1 text-sm text-foreground"
+              : "flex h-11 w-full items-center justify-between gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
             "transition focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
-            disabled ? "opacity-60 cursor-not-allowed" : "hover:bg-muted/60",
+            disabled ? "opacity-60 cursor-not-allowed" : variant === "plain" ? "hover:text-primary" : "hover:bg-muted/60",
           ].join(" ")}
         >
           <span className="truncate">{current?.label ?? placeholder}</span>
@@ -48,7 +61,12 @@ export function SelectMenu<T>({
           anchor={anchor}
           transition
           className={[
-            "z-40 mt-1 max-h-64 w-[var(--button-width)] overflow-auto rounded-xl border border-border bg-card p-1 shadow-lg",
+            "z-40 mt-1 max-h-64 overflow-auto rounded-xl border border-border bg-card p-1 shadow-lg",
+            // Default variant ties the panel width to the (full-width)
+            // button; plain's button is content-width and often narrow
+            // ("GW 1"), so give the panel its own floor instead of
+            // inheriting that narrowness and wrapping option labels.
+            variant === "plain" ? "min-w-[8rem]" : "w-[var(--button-width)]",
             "focus:outline-none",
             "transition duration-100 ease-out data-[closed]:opacity-0 data-[closed]:scale-95",
           ].join(" ")}
@@ -59,7 +77,7 @@ export function SelectMenu<T>({
               value={o.value}
               className={({ focus, selected }) =>
                 [
-                  "cursor-pointer select-none rounded-lg px-3 py-1.5 text-sm",
+                  "cursor-pointer select-none rounded-lg px-3 py-2 text-sm",
                   selected
                     ? "bg-primary text-primary-foreground"
                     : focus
