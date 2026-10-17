@@ -4,6 +4,12 @@
   --color-primary:       #0284c7; /* sky-600 */
   --color-primary-600:   #0284c7;
   --color-primary-700:   #0369a1; /* sky-700 */
+  /* Text-on-page use of "primary" (e.g. an active tab/toggle label) needs
+   * higher contrast than the brand color itself provides in light mode —
+   * --color-primary on white is ~4.0:1, just under AA. --color-primary-700
+   * clears it. In dark mode --color-primary (sky-400) is already high
+   * contrast against the dark background, so this just mirrors it there. */
+  --color-primary-strong: var(--color-primary-700);
 
   /* base surfaces (LIGHT) */
   --color-bg:            #f8fafc;    /* slate-50 */
@@ -57,6 +63,7 @@
   --color-primary:       #38bdf8; /* sky-400 */
   --color-primary-600:   #0ea5e9; /* sky-500 */
   --color-primary-700:   #0284c7; /* sky-600 */
+  --color-primary-strong: var(--color-primary);
 
   --color-bg:            #0b1022;               /* deep navy */
   --color-surface:       rgba(2,6,23,0.9);
