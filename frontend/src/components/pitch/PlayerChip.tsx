@@ -105,7 +105,7 @@ function BenchOrderBadge({ label }: { label: string }) {
 }
 
 
-export default function PlayerChip({ p, onClick, hideStartMeter }: { p: Player; onClick?: () => void; hideStartMeter?: boolean }) {
+export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { p: Player; onClick?: () => void; hideStartMeter?: boolean; scale?: number }) {
   const isBench = (p.slot ?? 99) >= 12 || (p.multiplier ?? 1) === 0;
 
   const benchLabel = BENCH_LABEL[p.slot ?? 0];
@@ -129,6 +129,7 @@ export default function PlayerChip({ p, onClick, hideStartMeter }: { p: Player; 
   return (
     <div
       className="cursor-pointer"
+      style={scale !== 1 ? { transform: `scale(${scale})` } : undefined}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
