@@ -13,7 +13,11 @@
 :root.dark { color-scheme: dark; }
 html, body { height: 100%; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-body { margin: 0; overflow-x: hidden; }
+/* clip, not hidden: overflow-x: hidden makes body its own scroll container
+   whenever <html> gets overflow: hidden — which Headless UI's menus do while
+   open — so the page jumped back toward the top and the options opened
+   off-screen. clip trims horizontal overflow without ever scrolling. */
+body { margin: 0; overflow-x: clip; }
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 /* Mobile: avoid double-tap zoom / 300ms tap delay on interactive elements */
