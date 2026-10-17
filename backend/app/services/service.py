@@ -394,7 +394,10 @@ class FPLService:
             if not news:
                 continue
             added = p.get("news_added")
-            recent = True
+            # No timestamp (or an unparseable one) means we can't verify
+            # this is actually recent — fail closed (hide) rather than open
+            # (show), so months-old news can't pass itself off as current.
+            recent = False
             if added:
                 try:
                     dt = datetime.fromisoformat(added.replace("Z", "+00:00"))
