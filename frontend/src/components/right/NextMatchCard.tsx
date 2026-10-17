@@ -9,17 +9,17 @@ type Payload = { gw: number; first: Fx | null; fixtures: Fx[] };
 
 function Row({ f }: { f: Fx }) {
   return (
-    <div className="flex items-center justify-between py-1">
-      <div className="flex items-center gap-1.5 font-medium text-foreground">
-        {f.home_badge && <img src={f.home_badge} alt="" className="w-5 h-5 object-contain" loading="lazy" />}
-        {f.home}
+    <div className="flex items-center justify-between gap-2 py-1">
+      <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
+        {f.home_badge && <img src={f.home_badge} alt="" className="w-5 h-5 object-contain shrink-0" loading="lazy" />}
+        <span className="truncate">{f.home}</span>
       </div>
-      <span className="text-muted-foreground">vs</span>
-      <div className="flex items-center gap-1.5 font-medium text-foreground">
-        {f.away_badge && <img src={f.away_badge} alt="" className="w-5 h-5 object-contain" loading="lazy" />}
-        {f.away}
+      <span className="text-muted-foreground shrink-0">vs</span>
+      <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
+        {f.away_badge && <img src={f.away_badge} alt="" className="w-5 h-5 object-contain shrink-0" loading="lazy" />}
+        <span className="truncate">{f.away}</span>
       </div>
-      <div className="text-xs text-muted-foreground">
+      <div className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
         {f.kickoff
           ? new Date(f.kickoff).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
           : "TBD"}
