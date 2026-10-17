@@ -28,6 +28,23 @@ async def verify_api_key(api_key: str = Security(_API_KEY_HEADER)):
 _nocache_log: dict[str, list[float]] = collections.defaultdict(list)
 _NOCACHE_WINDOW = 60.0
 _NOCACHE_MAX = 5
+_nocache_last_sweep = 0.0
+
+
+def _sweep_nocache_log(now: float) -> None:
+    """Drop IPs with no force-refresh inside the window. Each IP's own list
+    is pruned on its next request, but the outer dict never was, so it grew
+    by one key per unique client IP for the life of the process."""
+    global _nocache_last_sweep
+    if now - _nocache_last_sweep < _NOCACHE_WINDOW:
+        return
+    _nocache_last_sweep = now
+    for ip in [
+        ip
+        for ip, log in _nocache_log.items()
+        if not log or now - log[-1] >= _NOCACHE_WINDOW
+    ]:
+        del _nocache_log[ip]
 
 
 async def nocache_guard(request: Request, noCache: int = 0) -> None:
@@ -35,6 +52,7 @@ async def nocache_guard(request: Request, noCache: int = 0) -> None:
         return
     ip = get_real_ip(request)
     now = time.time()
+    _sweep_nocache_log(now)
     log = _nocache_log[ip]
     log[:] = [t for t in log if now - t < _NOCACHE_WINDOW]
     if len(log) >= _NOCACHE_MAX:
