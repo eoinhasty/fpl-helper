@@ -88,6 +88,8 @@ export type SquadResponse = {
     used_gw: number;
     current_gw: number;
     used_label: "next" | "current" | "explicit" | "live" | "pre_season";
+    /** GW the fixtures and deadline refer to — the next GW once used_gw has finished. */
+    fixture_gw?: number;
     deadline: string;
     team_value: number | null;
     team_bank?: number | null;
