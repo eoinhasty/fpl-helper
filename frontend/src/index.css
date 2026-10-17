@@ -7,6 +7,10 @@
 
 /* tiny base tweaks */
 :root { color-scheme: light; }
+/* Theme is a manual .dark class toggle (usePreferences), not just OS
+   preference — native form controls/scrollbars need to follow it too, or
+   they stay light-styled even when the user has explicitly picked dark. */
+:root.dark { color-scheme: dark; }
 html, body { height: 100%; }
 body { margin: 0; }
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
