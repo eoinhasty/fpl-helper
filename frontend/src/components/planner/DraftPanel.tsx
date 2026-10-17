@@ -62,7 +62,7 @@ export default function DraftPanel({
             onClick={() => {
               if (window.confirm("Clear your entire draft? This can't be undone.")) onClear();
             }}
-            className="text-xs text-muted-foreground hover:text-destructive cursor-pointer transition"
+            className="text-xs text-muted-foreground hover:text-destructive cursor-pointer transition px-2 py-1.5 -mx-2 -my-1.5 rounded-md hover:bg-destructive/5"
           >
             Clear draft
           </button>
@@ -104,7 +104,7 @@ export default function DraftPanel({
                       <button
                         type="button"
                         onClick={() => onRemove(p.code)}
-                        className="shrink-0 text-xs text-muted-foreground hover:text-destructive px-1.5 cursor-pointer transition"
+                        className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition"
                         aria-label={`Remove ${p.web_name}`}
                         title="Remove"
                       >
