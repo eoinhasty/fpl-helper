@@ -594,6 +594,7 @@ class FPLService:
     async def hot_news(self, days: int, limit: int) -> list[dict]:
         boot, _, _ = await self.bootstrap()
         teams = {t["id"]: t for t in boot["teams"]}
+        played_gws = self.finished_gw_count(boot)
         out = []
         now = datetime.now(timezone.utc)
         for p in boot["elements"]:
@@ -627,7 +628,7 @@ class FPLService:
                     "news": news,
                     "news_added": added,
                     "status": p["status"],
-                    "start_probability": self.start_prob_from(p),
+                    "start_probability": self.start_prob_from(p, played_gws),
                 }
             )
         # simple relevance: newest first, then “injury/transfer” hints first
@@ -1253,7 +1254,17 @@ class FPLService:
         return f"{year}/{(year + 1) % 100:02d}"
 
     @staticmethod
-    def start_prob_from(player: dict, played_gws: int = 1) -> float:
+    def finished_gw_count(boot: dict) -> int:
+        """Finished GWs this season (min 1) — the denominator start_prob_from
+        needs to turn cumulative minutes into a per-GW play-time ratio."""
+        return max(1, sum(1 for e in boot.get("events", []) if e.get("finished")))
+
+    @staticmethod
+    def start_prob_from(player: dict, played_gws: int) -> float:
+        # played_gws is deliberately required: it used to default to 1, and
+        # three callers relied on that, so from GW2 on any player past ~90
+        # season minutes pinned time_ratio at its cap and a ~40-min/game
+        # rotation risk read as ~93% to start instead of ~60%.
         status = player.get("status", "a")
         news = (player.get("news") or "").lower()
 
@@ -1358,7 +1369,7 @@ class FPLService:
             for e in (live.get("elements") or [])
         }
 
-        played_gws = max(1, sum(1 for e in boot.get("events", []) if e.get("finished")))
+        played_gws = FPLService.finished_gw_count(boot)
 
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
@@ -1446,7 +1457,9 @@ class FPLService:
         return enriched, eh.get("value"), eh.get("bank")
 
     @staticmethod
-    def _score_player(player: dict, fdr_by_team: dict, candidates: List[dict]) -> float:
+    def _score_player(
+        player: dict, fdr_by_team: dict, candidates: List[dict], played_gws: int
+    ) -> float:
         """Score a player for transfer suggestions using the captaincy blend formula."""
 
         def _norm(vals: List[float], v: float) -> float:
@@ -1478,7 +1491,7 @@ class FPLService:
         home_boost = 1 + home_ratio * 0.08
         dgw_boost = 1.8 if len(team_fixtures) > 1 else 1.0
         pos_mult = {1: 0.65, 2: 0.72, 3: 0.92, 4: 1.0}.get(pos, 1.0)
-        start_prob = FPLService.start_prob_from(player)
+        start_prob = FPLService.start_prob_from(player, played_gws)
 
         return base * fdr_factor * home_boost * dgw_boost * start_prob * pos_mult
 
@@ -1486,6 +1499,7 @@ class FPLService:
         self, entry_id: int, top_n: int = 3, *, token: Optional[str] = None
     ) -> Tuple[dict, List[Tuple[str, float]], int]:
         boot, boot_status, boot_age = await self.bootstrap()
+        played_gws = self.finished_gw_count(boot)
         events = boot["events"]
         current_event = next((e for e in events if e["is_current"]), None)
         next_event = next((e for e in events if e["is_next"]), None)
@@ -1601,7 +1615,7 @@ class FPLService:
 
             scored = sorted(
                 (
-                    (p, self._score_player(p, fdr_by_team, candidates))
+                    (p, self._score_player(p, fdr_by_team, candidates, played_gws))
                     for p in candidates
                 ),
                 key=lambda x: x[1],
@@ -1628,7 +1642,7 @@ class FPLService:
                         "ep_next": p.get("ep_next"),
                         "form": p.get("form"),
                         "score": round(score, 4),
-                        "start_probability": self.start_prob_from(p),
+                        "start_probability": self.start_prob_from(p, played_gws),
                         "selected_by_percent": p.get("selected_by_percent"),
                         "fixture": team_fixtures[0] if team_fixtures else None,
                         "has_dgw": len(team_fixtures) > 1,
