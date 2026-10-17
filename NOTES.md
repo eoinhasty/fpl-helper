@@ -62,6 +62,17 @@ the ideas (and what's already built vs. not) aren't lost between sessions.
    from transfer momentum (`transfers_in_event`/`transfers_out_event`),
    useful for timing a transfer before the price actually moves.
 
+## Known issues to fix
+
+- **European fixtures card shows only half a matchday.** `football_fixtures()`
+  in `service.py` calls ESPN's `/scoreboard` with no date, which returns only
+  the next match *date*. Champions League/Europa matchdays span two days
+  (e.g. 20 and 21 Oct 2026: 9 games each), so the second day is missing,
+  which on that matchday was Arsenal, Man Utd and Villa. ESPN rejects a `dates=` range
+  (400 "Failed to get events endpoint"), so fetch each day of the matchday
+  separately (`?dates=YYYYMMDD`, e.g. the next ~7 days), merge and dedupe by
+  event id. Found 2026-10-17.
+
 ## Status
 
 Not started. Paused here to go check the user's real squad/news instead of
