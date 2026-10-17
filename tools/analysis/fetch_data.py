@@ -43,19 +43,21 @@ async def main(entry_id: int) -> None:
         picks = await get(client, sem, f"entry/{entry_id}/event/{current}/picks/")
 
         squad = {p["element"] for p in picks["picks"]}
+        everyone = [e["id"] for e in boot["elements"]]
+        summaries = dict(zip(everyone, await asyncio.gather(*[get(client, sem, f"element-summary/{pid}/") for pid in everyone])))
         pool = [e["id"] for e in boot["elements"] if e["minutes"] >= POOL_MIN_MINUTES or e["id"] in squad]
-        summaries = await asyncio.gather(*[get(client, sem, f"element-summary/{pid}/") for pid in pool])
 
     files = {
         "bootstrap.json": boot,
         "fixtures.json": fixtures,
         "live.json": dict(zip(map(str, finished), live_list)),
-        "history_past.json": {str(pid): s["history_past"] for pid, s in zip(pool, summaries)},
+        "history_past.json": {str(pid): summaries[pid]["history_past"] for pid in pool},
+        "season_gws.json": [row for pid in everyone for row in summaries[pid]["history"]],  # per-fixture rows, this season
         "entry.json": {"id": entry_id, "history": history, "transfers": transfers, "picks": picks, "picks_gw": current},
     }
     for name, payload in files.items():
         (DATA_DIR / name).write_text(json.dumps(payload))
-    print(f"Saved GW1-{finished[-1]} data, {len(pool)} player histories and entry {entry_id} to {DATA_DIR}")
+    print(f"Saved GW1-{finished[-1]} data, {len(everyone)} players' match logs, {len(pool)} player histories and entry {entry_id} to {DATA_DIR}")
 
 
 if __name__ == "__main__":
