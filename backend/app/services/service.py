@@ -4,6 +4,8 @@ import os
 import asyncio
 import hashlib
 import logging
+import re
+import unicodedata
 from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
@@ -68,6 +70,141 @@ ESPN_LEAGUES: Dict[str, str] = {
 # before catches ESPN anchoring on a matchday's second day; two days after
 # covers a matchday's remaining days when it anchors on the first.
 MATCHDAY_NEIGHBOUR_DAYS = (-1, 1, 2)
+
+# International squad news: whether a player has been called up to or
+# withdrawn from their national team, surfaced for squad players during
+# international breaks. Checking every ESPN national-team roster for every
+# player would be impolite (200+ teams) and pointless (most PL players
+# only represent a handful of footballing nations), so nationality is
+# looked up first via FPL's own (undocumented) `region` code on each
+# player, decoded against this table built by cross-referencing ESPN
+# national rosters against FPL's player pool, then extended by resolving
+# individual players' ESPN `citizenship` directly (the roster-based method
+# alone undercounts — it only reflects one active call-up window, missing
+# uncapped/fringe internationals) — verified clean (no conflicting country
+# for the same code, across 51 codes / 594 of the 667 PL players, 89.1%)
+# as of 2026-09-23. `region` reflects birth/federation nationality, not
+# necessarily which country a player currently turns out for
+# internationally (dual nationals can differ — confirmed one real case,
+# Thierno Barry: region says France, he actually plays for Guinea) — so
+# this table is a good first guess, not a guarantee, for that edge case.
+# Players whose region isn't in this table (~11% of the pool, all
+# single- or few-player nationalities) are simply skipped rather than
+# guessed at.
+TTL_ESPN_SQUAD_NEWS = 2 * 60 * 60  # 2h fresh
+SWR_ESPN_SQUAD_NEWS = 24 * 60 * 60  # +24h stale
+
+FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
+    3: ("Algeria", "624"),
+    10: ("Argentina", "202"),
+    13: ("Australia", "628"),
+    14: ("Austria", "474"),
+    21: ("Belgium", "459"),
+    27: ("Bosnia and Herzegovina", "452"),
+    30: ("Brazil", "205"),
+    38: ("Cameroon", "656"),
+    39: ("Canada", "206"),
+    44: ("Chile", "207"),
+    48: ("Colombia", "208"),
+    50: ("DR Congo", "2850"),
+    54: ("Ivory Coast", "4789"),
+    57: ("Czechia", "450"),
+    58: ("Denmark", "479"),
+    62: ("Ecuador", "209"),
+    63: ("Egypt", "2620"),
+    73: ("France", "478"),
+    79: ("Georgia", "584"),
+    80: ("Germany", "481"),
+    81: ("Ghana", "4469"),
+    83: ("Greece", "455"),
+    97: ("Croatia", "477"),
+    98: ("Hungary", "480"),
+    104: ("Republic of Ireland", "476"),
+    106: ("Italy", "162"),
+    107: ("Jamaica", "1038"),
+    108: ("Japan", "627"),
+    132: ("Mali", "2849"),
+    145: ("Morocco", "2869"),
+    152: ("Netherlands", "449"),
+    154: ("New Zealand", "2666"),
+    157: ("Nigeria", "657"),
+    161: ("Norway", "464"),
+    168: ("Paraguay", "210"),
+    172: ("Poland", "471"),
+    173: ("Portugal", "482"),
+    189: ("Senegal", "654"),
+    190: ("Serbia", "6757"),
+    194: ("Slovakia", "468"),
+    195: ("Slovenia", "472"),
+    200: ("Spain", "164"),
+    206: ("Sweden", "466"),
+    207: ("Switzerland", "475"),
+    219: ("Turkey", "465"),
+    225: ("Ukraine", "457"),
+    229: ("United States", "660"),
+    230: ("Uruguay", "212"),
+    241: ("England", "448"),
+    242: ("Northern Ireland", "586"),
+    243: ("Scotland", "580"),
+    244: ("Wales", "578"),
+}
+
+# FPL team id -> (name, ESPN eng.1 club id). Stable for the season (only
+# changes on promotion/relegation), built once by cross-referencing FPL's
+# own team list against ESPN's — same durability assumption as the
+# nationality table above.
+FPL_TEAM_TO_ESPN_CLUB: Dict[int, Tuple[str, str]] = {
+    1: ("Arsenal", "359"),
+    2: ("Aston Villa", "362"),
+    3: ("Bournemouth", "349"),
+    4: ("Brentford", "337"),
+    5: ("Brighton", "331"),
+    6: ("Chelsea", "363"),
+    7: ("Coventry City", "388"),
+    8: ("Crystal Palace", "384"),
+    9: ("Everton", "368"),
+    10: ("Fulham", "370"),
+    11: ("Hull City", "306"),
+    12: ("Ipswich Town", "373"),
+    13: ("Leeds", "357"),
+    14: ("Liverpool", "364"),
+    15: ("Man City", "382"),
+    16: ("Man Utd", "360"),
+    17: ("Newcastle", "361"),
+    18: ("Nott'm Forest", "393"),
+    19: ("Spurs", "367"),
+    20: ("Sunderland", "366"),
+}
+
+
+class _EspnUnavailable(Exception):
+    """Raised inside a cached fetch when ESPN returned 403 (throttling or
+    UA rejection). Never let this get cached as a false-negative empty
+    result — raising here means AsyncCache.get_or_set doesn't store
+    anything, so the next request just tries again instead of being
+    stuck with "no data" for the full TTL window."""
+
+
+def _norm_name(s: Optional[str]) -> str:
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
+    return s.lower().strip()
+
+
+# ESPN tags any article that so much as name-drops a player (Ballon d'Or
+# takes, "FC 100" rankings, unrelated quotes) with that athlete, which
+# drowns out the actual squad call-up/withdrawal/injury news this feature
+# is for. Narrow to headlines that are plausibly about squad status itself.
+_SQUAD_NEWS_RE = re.compile(
+    r"injur|withdraw|knock\b|doubt|fitness|\bscan\b|surgery|ruled out|"
+    r"sideline|recall|call-up|called up|call up|snub|omit|left out|\baxe|"
+    r"\breplace|\bmiss(es|ed|ing)?\b|setback|return to training|operation",
+    re.IGNORECASE,
+)
+# The keyword match alone isn't enough — e.g. a 2024 Euros injury story
+# about a teammate matches "injur" just as well as this week's actual
+# squad news. International squad status is only ever current for the
+# length of a break, so anything older than this is stale by definition.
+_SQUAD_NEWS_MAX_AGE_DAYS = 30
 
 
 def _ua() -> Dict[str, str]:
@@ -727,6 +864,175 @@ class FPLService:
             "teams": teams,
             "available": any(t["players"] for t in teams),
         }
+
+    async def _espn_country_roster_names(self, espn_team_id: str) -> set[str]:
+        key = f"espn:nat-roster:{espn_team_id}"
+
+        async def _fetch():
+            r = await self._espn_get(
+                f"{ESPN_SOCCER_BASE}/fifa.friendly/teams/{espn_team_id}/roster"
+            )
+            if r is None:
+                raise _EspnUnavailable(espn_team_id)
+            js = r.json()
+            return [_norm_name(a.get("fullName")) for a in js.get("athletes") or []]
+
+        names, _, _ = await self.cache.get_or_set(
+            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
+        )
+        return set(names)
+
+    async def _espn_team_news(self, league_slug: str, espn_team_id: str, cache_ns: str) -> list[dict]:
+        """Squad-relevant news for an ESPN team, whether that's a country
+        (fifa.friendly) or a PL club (eng.1). A story about a player's
+        international withdrawal/injury can get filed under either feed
+        depending on how the outlet framed it (e.g. "leaves Sweden camp"
+        vs. "returns to Liverpool") — confirmed live: Alexander Isak's
+        September 2026 injury only showed up under Liverpool's feed, not
+        Sweden's, so both need checking, not just the country."""
+        key = f"espn:{cache_ns}-news:{espn_team_id}"
+
+        async def _fetch():
+            r = await self._espn_get(
+                f"{ESPN_SOCCER_BASE}/{league_slug}/news",
+                params={"team": espn_team_id, "limit": 50},
+            )
+            if r is None:
+                raise _EspnUnavailable(espn_team_id)
+            js = r.json()
+            now = datetime.now(timezone.utc)
+            out = []
+            for a in js.get("articles") or []:
+                headline = a.get("headline") or ""
+                if not _SQUAD_NEWS_RE.search(headline):
+                    continue
+                # No timestamp (or an unparseable one) means we can't
+                # verify this is recent — exclude it, same fail-closed
+                # reasoning as the news_added handling in hot_news().
+                published = a.get("published")
+                if not published:
+                    continue
+                try:
+                    age_days = (now - datetime.fromisoformat(published.replace("Z", "+00:00"))).days
+                    if age_days > _SQUAD_NEWS_MAX_AGE_DAYS:
+                        continue
+                except ValueError:
+                    continue
+                athletes = [
+                    _norm_name(c.get("description"))
+                    for c in a.get("categories") or []
+                    if c.get("type") == "athlete"
+                ]
+                out.append(
+                    {
+                        "headline": headline,
+                        "published": a.get("published"),
+                        "link": (a.get("links") or {}).get("web", {}).get("href"),
+                        "athletes": athletes,
+                    }
+                )
+            return out
+
+        data, _, _ = await self.cache.get_or_set(
+            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
+        )
+        return data
+
+    async def _espn_country_news(self, espn_team_id: str) -> list[dict]:
+        return await self._espn_team_news("fifa.friendly", espn_team_id, "nat")
+
+    async def _espn_club_news(self, espn_club_id: str) -> list[dict]:
+        return await self._espn_team_news("eng.1", espn_club_id, "club")
+
+    async def international_squad_news(self, player_ids: List[int]) -> dict:
+        boot, _, _ = await self.bootstrap()
+        by_id = {p["id"]: p for p in boot["elements"]}
+
+        # Resolve each requested player's country and PL club, then only
+        # fetch each distinct one once — a 15-player squad is usually
+        # 8-12 countries but at most 20 clubs (often far fewer), not 15
+        # separate lookups either way.
+        wanted = [by_id[i] for i in player_ids if i in by_id]
+        by_country: Dict[str, List[dict]] = defaultdict(list)
+        by_club: Dict[str, List[dict]] = defaultdict(list)
+        results: Dict[int, dict] = {}
+        news_by_player: Dict[int, List[dict]] = defaultdict(list)
+        for p in wanted:
+            results[p["id"]] = {"country": None, "on_squad": None, "news": []}
+            entry = FPL_REGION_TO_ESPN_COUNTRY.get(p.get("region"))
+            if entry:
+                country, espn_team_id = entry
+                by_country[espn_team_id].append(p)
+                results[p["id"]]["country"] = country
+            club_entry = FPL_TEAM_TO_ESPN_CLUB.get(p.get("team"))
+            if club_entry:
+                _, espn_club_id = club_entry
+                by_club[espn_club_id].append(p)
+
+        def _player_names(p: dict) -> tuple[str, str]:
+            web = _norm_name(p.get("web_name"))
+            # first_name/second_name can be present but explicitly null
+            # (not just absent), which .get(key, "") doesn't guard
+            # against — `or ""` does.
+            full = _norm_name((p.get("first_name") or "") + " " + (p.get("second_name") or ""))
+            return web, full
+
+        async def _process_country(espn_team_id: str, players: List[dict]) -> None:
+            try:
+                roster_names, news = await asyncio.gather(
+                    self._espn_country_roster_names(espn_team_id),
+                    self._espn_country_news(espn_team_id),
+                )
+            except _EspnUnavailable:
+                # This one country is throttled/unreachable right now —
+                # its players keep the already-initialized "no data yet"
+                # defaults rather than failing every other country's
+                # results in the same batch.
+                logger.warning("ESPN unavailable for country %s, skipping", espn_team_id)
+                return
+            for p in players:
+                web, full = _player_names(p)
+                on_squad = web in roster_names or full in roster_names
+                results[p["id"]]["on_squad"] = on_squad
+                news_by_player[p["id"]].extend(
+                    a for a in news if web in a["athletes"] or full in a["athletes"]
+                )
+
+        async def _process_club(espn_club_id: str, players: List[dict]) -> None:
+            # A story about international-duty withdrawal/injury can be
+            # filed under either the player's country feed or their club's
+            # ("leaves Sweden camp" vs. "returns to Liverpool") — confirmed
+            # live (Alexander Isak, Sep 2026: only under Liverpool's feed).
+            # Check both rather than assume which one an outlet chose.
+            try:
+                news = await self._espn_club_news(espn_club_id)
+            except _EspnUnavailable:
+                logger.warning("ESPN unavailable for club %s, skipping", espn_club_id)
+                return
+            for p in players:
+                web, full = _player_names(p)
+                news_by_player[p["id"]].extend(
+                    a for a in news if web in a["athletes"] or full in a["athletes"]
+                )
+
+        # Countries and clubs are all independent — resolve everything
+        # concurrently rather than one at a time.
+        await asyncio.gather(
+            *[_process_country(tid, players) for tid, players in by_country.items()],
+            *[_process_club(cid, players) for cid, players in by_club.items()],
+        )
+
+        for pid, articles in news_by_player.items():
+            seen_links = set()
+            deduped = []
+            for a in sorted(articles, key=lambda a: a["published"] or "", reverse=True):
+                if a["link"] in seen_links:
+                    continue
+                seen_links.add(a["link"])
+                deduped.append({"headline": a["headline"], "published": a["published"], "link": a["link"]})
+            results[pid]["news"] = deduped[:3]
+
+        return {"source": "espn", "players": results}
 
     async def live_event(
         self, gw: int, ttl: float = TTL_PICKS, stale_ttl: float = SWR_PICKS
