@@ -2,10 +2,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
 logger = logging.getLogger("uvicorn.error")
+
+# Entries past stale_until are never served (get_or_set treats them as a
+# miss), so they're dropped by a sweep that runs at most this often. The cap
+# backstops the sweep: keys are per entry/gw/token/player/match, so a
+# long-running server would otherwise grow one entry per combination
+# forever. Least-recently-used entries go first, so hot keys like
+# bootstrap-static (read on nearly every request) are never the ones evicted.
+SWEEP_INTERVAL = 60.0
+MAX_ENTRIES = 2000
 
 
 @dataclass
@@ -22,19 +32,47 @@ class AsyncCache:
       - TTL (fresh) + stale-while-revalidate
       - Request coalescing (one in-flight per key)
       - Optional forced refresh (for 'Refresh' button)
+      - Bounded size: expired-entry sweep + LRU cap
     Keep it simple and readable.
     """
 
-    def __init__(self):
-        self._store: Dict[str, CacheEntry] = {}
+    def __init__(self, max_entries: int = MAX_ENTRIES):
+        self._store: "OrderedDict[str, CacheEntry]" = OrderedDict()
         self._locks: Dict[str, asyncio.Lock] = {}
         self._bg: Dict[str, asyncio.Task] = {}
+        self._max_entries = max_entries
+        self._last_sweep = 0.0
 
     def _lock(self, key: str) -> asyncio.Lock:
         return self._locks.setdefault(key, asyncio.Lock())
 
     def _now(self) -> float:
         return time.time()
+
+    def _drop(self, key: str) -> None:
+        self._store.pop(key, None)
+        # Safe to discard an unheld lock: callers take it with no await
+        # between _lock() and acquiring it, so nobody can be holding a
+        # reference to an unlocked one across a yield.
+        lock = self._locks.get(key)
+        if lock is not None and not lock.locked():
+            del self._locks[key]
+
+    def _evict(self, now: float) -> None:
+        if now - self._last_sweep >= SWEEP_INTERVAL:
+            self._last_sweep = now
+            for key in [k for k, e in self._store.items() if now >= e.stale_until]:
+                self._drop(key)
+            # Locks for keys whose fetch failed (nothing ever stored).
+            for key in [
+                k
+                for k, lk in self._locks.items()
+                if k not in self._store and not lk.locked()
+            ]:
+                del self._locks[key]
+        while len(self._store) > self._max_entries:
+            oldest = next(iter(self._store))
+            self._drop(oldest)
 
     def set(
         self, key: str, data: Any, ttl: float, stale_ttl: Optional[float] = None
@@ -48,9 +86,13 @@ class AsyncCache:
             fresh_until=now + ttl,
             stale_until=now + stale_ttl,
         )
+        self._store.move_to_end(key)
+        self._evict(now)
 
     def get_meta(self, key: str) -> Tuple[Optional[CacheEntry], float]:
         entry = self._store.get(key)
+        if entry is not None:
+            self._store.move_to_end(key)
         return entry, (self._now() - entry.created_at if entry else 0.0)
 
     async def get_or_set(
@@ -99,7 +141,7 @@ class AsyncCache:
                 self._bg[key] = asyncio.create_task(_bg())
             return entry.data, "stale-serve", age
 
-        # Miss â†’ fetch (coalesced)
+        # Miss → fetch (coalesced)
         lock = self._lock(key)
         async with lock:
             # Another waiter may have filled it:
