@@ -22,3 +22,6 @@ __pycache__/
 # Developer tools
 .vscode/
 *.tsbuildinfo*
+
+# Analysis tools: downloaded FPL data cache
+tools/analysis/data/
