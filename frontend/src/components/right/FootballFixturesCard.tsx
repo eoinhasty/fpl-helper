@@ -5,7 +5,7 @@ import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import { SelectMenu } from "../controls/SelectMenu";
 
-type Team = { name: string; logo: string | null };
+type Team = { name: string; short_name: string | null; logo: string | null };
 type Fixture = {
   id: string;
   date: string;
@@ -85,6 +85,17 @@ function LineupPanel({ competition, eventId }: { competition: string; eventId: s
   );
 }
 
+function TeamSide({ team, align }: { team: Team; align: "home" | "away" }) {
+  const logo = team.logo && <img src={team.logo} alt="" className="w-4 h-4 object-contain shrink-0" loading="lazy" />;
+  return (
+    <div className={`flex flex-1 basis-0 items-center gap-1.5 font-medium text-foreground min-w-0 ${align === "away" ? "justify-end" : ""}`}>
+      {align === "home" && logo}
+      <span className="truncate" title={team.name}>{team.short_name ?? team.name}</span>
+      {align === "away" && logo}
+    </div>
+  );
+}
+
 function FixtureRow({ f, competition, expanded, onToggle }: { f: Fixture; competition: string; expanded: boolean; onToggle: () => void }) {
   return (
     <div className="border-b border-border last:border-0">
@@ -92,27 +103,34 @@ function FixtureRow({ f, competition, expanded, onToggle }: { f: Fixture; compet
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="w-full cursor-pointer flex items-center justify-between py-1.5 text-left hover:bg-muted/50 rounded-sm -mx-1 px-1"
+        className="w-full cursor-pointer flex items-center gap-2 py-1.5 text-left hover:bg-muted/50 rounded-sm -mx-1 px-1"
       >
-        <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
-          {f.home.logo && <img src={f.home.logo} alt="" className="w-4 h-4 object-contain shrink-0" loading="lazy" />}
-          <span className="truncate">{f.home.name}</span>
-        </div>
-        <div className="px-2 text-xs text-muted-foreground shrink-0 text-center">
+        <TeamSide team={f.home} align="home" />
+        <div className="w-12 text-xs text-muted-foreground shrink-0 text-center tabular-nums">
           {f.completed ? (
             <span className="font-semibold text-foreground">{f.home_goals} – {f.away_goals}</span>
           ) : (
-            new Date(f.date).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+            new Date(f.date).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
           )}
         </div>
-        <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0 justify-end">
-          <span className="truncate">{f.away.name}</span>
-          {f.away.logo && <img src={f.away.logo} alt="" className="w-4 h-4 object-contain shrink-0" loading="lazy" />}
-        </div>
+        <TeamSide team={f.away} align="away" />
       </button>
       {expanded && <LineupPanel competition={competition} eventId={f.id} />}
     </div>
   );
+}
+
+/** Group fixtures under a header per local calendar day, so each row only
+ * needs the kick-off time and the team names get the rest of the width. */
+function groupByDay(fixtures: Fixture[]): { label: string; fixtures: Fixture[] }[] {
+  const groups = new Map<string, Fixture[]>();
+  for (const f of fixtures) {
+    const label = new Date(f.date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    const day = groups.get(label);
+    if (day) day.push(f);
+    else groups.set(label, [f]);
+  }
+  return [...groups].map(([label, fixtures]) => ({ label, fixtures }));
 }
 
 export default function FootballFixturesCard() {
@@ -134,20 +152,27 @@ export default function FootballFixturesCard() {
           onChange={(v) => { setCompetition(v); setExpandedId(null); }}
           ariaLabel="Competition"
           anchor="bottom end"
-          className="w-44"
+          className="w-44 shrink-0"
         />
       }
     >
       {data && data.fixtures.length > 0 && (
         <div className="mt-1 max-h-64 overflow-auto">
-          {data.fixtures.map((f) => (
-            <FixtureRow
-              key={f.id}
-              f={f}
-              competition={competition}
-              expanded={expandedId === f.id}
-              onToggle={() => setExpandedId(expandedId === f.id ? null : f.id)}
-            />
+          {groupByDay(data.fixtures).map((g) => (
+            <div key={g.label}>
+              <div className="sticky top-0 z-10 bg-card pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {g.label}
+              </div>
+              {g.fixtures.map((f) => (
+                <FixtureRow
+                  key={f.id}
+                  f={f}
+                  competition={competition}
+                  expanded={expandedId === f.id}
+                  onToggle={() => setExpandedId(expandedId === f.id ? null : f.id)}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}
