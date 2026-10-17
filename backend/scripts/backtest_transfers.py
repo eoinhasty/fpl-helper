@@ -81,12 +81,12 @@ FORMATIONS = [
     (d, 10 - d - f, f) for d in range(3, 6) for f in range(1, 4) if 2 <= 10 - d - f <= 5
 ]
 
-# (candidate, fdr_by_team, scoring_pool) -> score; same shape as
+# (candidate, fdr_by_team, scoring_pool, played_gws) -> score; same shape as
 # FPLService._score_player so the arms only differ in this one function.
-Scorer = Callable[[dict, dict, List[dict]], float]
+Scorer = Callable[[dict, dict, List[dict], int], float]
 
 
-def form_scorer(cand: dict, fdr: dict, pool: List[dict]) -> float:
+def form_scorer(cand: dict, fdr: dict, pool: List[dict], played_gws: int) -> float:
     return cand["form"]
 
 
@@ -310,7 +310,7 @@ def run_transfer_policy(
                     )
                     if owned_dict is None:
                         continue
-                    owned_score = scorer(owned_dict, fdr, scoring_pool)
+                    owned_score = scorer(owned_dict, fdr, scoring_pool, gw - 1)
 
                     club_counts = defaultdict(int)
                     for e, i in owned.items():
@@ -330,7 +330,7 @@ def run_transfer_policy(
                             and projected_club > MAX_PER_CLUB
                         ):
                             continue
-                        cand_score = scorer(cand, fdr, scoring_pool)
+                        cand_score = scorer(cand, fdr, scoring_pool, gw - 1)
                         if cand_score <= owned_score:
                             continue
                         score_gain = cand_score - owned_score

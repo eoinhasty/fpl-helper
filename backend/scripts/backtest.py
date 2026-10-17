@@ -133,7 +133,7 @@ def main() -> None:
                 if len(cands) < 3:
                     continue
                 for c in cands:
-                    score = FPLService._score_player(c, fdr, cands)
+                    score = FPLService._score_player(c, fdr, cands, max(1, gw - 1))
                     all_scored.append((c["id"], score))
 
             # ---- Start-probability check for every player active this season ----
@@ -328,11 +328,10 @@ def main() -> None:
     print("  those inputs can be stale for individual gameweeks.")
     print("- 'form' is approximated as the mean of the last 4 GWs' points,")
     print("  not FPL's actual 30-day-window calculation.")
-    print("- start_prob_from is called with the CORRECT played_gws here, i.e.")
-    print("  this tests the heuristic as designed — not the played_gws=1 bug")
-    print("  that 3 of 4 production callers actually ship (backlog Tier 1).")
-    print("  Shipped behavior would score worse than the numbers above once")
-    print("  the season is a few GWs deep.")
+    print("- start_prob_from gets played_gws = GWs played so far, matching")
+    print("  production since every caller passes the finished-GW count (it")
+    print("  used to default to 1 in 3 of 4 callers, inflating start% once a")
+    print("  player passed ~90 season minutes).")
     print("- Candidate pool per GW = outfield players (DEF/MID/FWD) with any")
     print("  minutes so far this season and a fixture that GW — not real XIs")
     print("  from real squads, since no historical squad data is used here.")
