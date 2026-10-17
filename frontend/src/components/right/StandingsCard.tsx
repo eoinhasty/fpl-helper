@@ -28,24 +28,24 @@ export default function StandingsCard() {
               <thead className="bg-muted text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">#</th><th className="px-2 text-left">Team</th>
-                  <th className="px-2 text-center">P</th><th className="px-2 text-center">W</th><th className="px-2 text-center">D</th>
-                  <th className="px-2 text-center">L</th><th className="px-2 text-center">Pts</th>
+                  <th className="px-2 text-center">P</th><th className="px-2 text-center lg:hidden xl:table-cell">W</th><th className="px-2 text-center lg:hidden xl:table-cell">D</th>
+                  <th className="px-2 text-center lg:hidden xl:table-cell">L</th><th className="px-2 text-center">Pts</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.pos} className="odd:bg-card even:bg-muted/60">
                     <td className="px-3 py-2">{r.pos}</td>
-                    <td className="px-2 max-w-[7rem] sm:max-w-none">
+                    <td className="px-2 max-w-[7rem] sm:max-w-none lg:max-w-[5.5rem] xl:max-w-[6.5rem]">
                       <div className="flex items-center gap-1.5 min-w-0">
                         {r.crest && <img src={r.crest} alt="" className="w-4 h-4 object-contain shrink-0" loading="lazy" />}
                         <span className="truncate">{r.team}</span>
                       </div>
                     </td>
                     <td className="text-center">{r.played}</td>
-                    <td className="text-center">{r.w}</td>
-                    <td className="text-center">{r.d}</td>
-                    <td className="text-center">{r.l}</td>
+                    <td className="text-center lg:hidden xl:table-cell">{r.w}</td>
+                    <td className="text-center lg:hidden xl:table-cell">{r.d}</td>
+                    <td className="text-center lg:hidden xl:table-cell">{r.l}</td>
                     <td className="text-center font-semibold">{r.pts}</td>
                   </tr>
                 ))}
