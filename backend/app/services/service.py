@@ -8,7 +8,7 @@ from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from app.simple_cache import AsyncCache
 
 logger = logging.getLogger("uvicorn.error")
@@ -64,6 +64,10 @@ ESPN_LEAGUES: Dict[str, str] = {
     "international-friendlies": "fifa.friendly",
     "preseason-friendlies": "club.friendly",
 }
+# Days either side of the scoreboard's anchor day to also fetch. The day
+# before catches ESPN anchoring on a matchday's second day; two days after
+# covers a matchday's remaining days when it anchors on the first.
+MATCHDAY_NEIGHBOUR_DAYS = (-1, 1, 2)
 
 
 def _ua() -> Dict[str, str]:
@@ -74,6 +78,13 @@ def _int_or_none(v: Any) -> Optional[int]:
     try:
         return int(v)
     except (TypeError, ValueError):
+        return None
+
+
+def _parse_date(v: Optional[str]) -> Optional[date]:
+    try:
+        return date.fromisoformat((v or "")[:10])
+    except ValueError:
         return None
 
 
@@ -591,13 +602,47 @@ class FPLService:
         if not slug:
             raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
 
-        r = await self._espn_get(f"{ESPN_SOCCER_BASE}/{slug}/scoreboard")
+        url = f"{ESPN_SOCCER_BASE}/{slug}/scoreboard"
+        r = await self._espn_get(url)
         if r is None:
             return {"source": "espn", "competition": competition, "fixtures": []}
         js = r.json()
+        events = {e["id"]: e for e in js.get("events", []) if e.get("id")}
+
+        # The undated scoreboard only covers the single day ESPN considers
+        # current (the next match day, or the last one between rounds), but
+        # a UEFA matchday spans several — e.g. 20–21 Oct 2026 was 9 Champions
+        # League games each day, and the undated call returned only the
+        # first. ESPN rejects a `dates=` range (400), so fetch the days
+        # around that anchor individually and merge them in.
+        anchor = _parse_date((js.get("day") or {}).get("date"))
+        if anchor:
+            extra = await asyncio.gather(
+                *[
+                    self._espn_get(
+                        url,
+                        params={
+                            "dates": (anchor + timedelta(days=d)).strftime("%Y%m%d")
+                        },
+                    )
+                    for d in MATCHDAY_NEIGHBOUR_DAYS
+                ],
+                return_exceptions=True,
+            )
+            for er in extra:
+                # A neighbouring day failing isn't worth losing the anchor
+                # day's fixtures over — just show what did come back.
+                if isinstance(er, Exception):
+                    logger.warning(
+                        "ESPN neighbouring-day fetch failed for %s: %s", slug, er
+                    )
+                elif er is not None:
+                    for e in er.json().get("events", []):
+                        if e.get("id"):
+                            events.setdefault(e["id"], e)
 
         fixtures = []
-        for e in js.get("events", []):
+        for e in sorted(events.values(), key=lambda e: e.get("date") or ""):
             comp = (e.get("competitions") or [{}])[0]
             competitors = comp.get("competitors") or []
             home = next((c for c in competitors if c.get("homeAway") == "home"), None)
