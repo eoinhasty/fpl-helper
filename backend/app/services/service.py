@@ -900,7 +900,9 @@ class FPLService:
         )
         return set(names)
 
-    async def _espn_team_news(self, league_slug: str, espn_team_id: str, cache_ns: str) -> list[dict]:
+    async def _espn_team_news(
+        self, league_slug: str, espn_team_id: str, cache_ns: str
+    ) -> list[dict]:
         """Squad-relevant news for an ESPN team, whether that's a country
         (fifa.friendly) or a PL club (eng.1). A story about a player's
         international withdrawal/injury can get filed under either feed
@@ -931,7 +933,9 @@ class FPLService:
                 if not published:
                     continue
                 try:
-                    age_days = (now - datetime.fromisoformat(published.replace("Z", "+00:00"))).days
+                    age_days = (
+                        now - datetime.fromisoformat(published.replace("Z", "+00:00"))
+                    ).days
                     if age_days > _SQUAD_NEWS_MAX_AGE_DAYS:
                         continue
                 except ValueError:
@@ -986,7 +990,9 @@ class FPLService:
                         f"{ESPN_CORE_BASE}/{slug}/teams/{espn_team_id}/events",
                         params={"limit": 50},
                     ),
-                    self._espn_get(f"{ESPN_SOCCER_BASE}/{slug}/teams/{espn_team_id}/schedule"),
+                    self._espn_get(
+                        f"{ESPN_SOCCER_BASE}/{slug}/teams/{espn_team_id}/schedule"
+                    ),
                 )
                 if upcoming is None or played is None:
                     # Losing a whole list (as opposed to one event in it) is a
@@ -996,7 +1002,11 @@ class FPLService:
                 for ev in played.json().get("events") or []:
                     if ev.get("id") and ev.get("date"):
                         found[ev["id"]] = (comp_key, ev["id"], ev["date"])
-                refs = [item.get("$ref") for item in upcoming.json().get("items") or [] if item.get("$ref")]
+                refs = [
+                    item.get("$ref")
+                    for item in upcoming.json().get("items") or []
+                    if item.get("$ref")
+                ]
                 # Each upcoming entry needs its own follow-up request to get a
                 # date — resolve those concurrently rather than one at a time.
                 for ejs in await asyncio.gather(*[_resolve_ref(ref) for ref in refs]):
@@ -1049,7 +1059,11 @@ class FPLService:
             for p in team["players"]:
                 if _norm_name(p.get("name")) in candidate_names:
                     opponent = next(
-                        (t.get("team") for t in lineup.get("teams", []) if t is not team),
+                        (
+                            t.get("team")
+                            for t in lineup.get("teams", [])
+                            if t is not team
+                        ),
                         None,
                     )
                     return {
@@ -1078,7 +1092,12 @@ class FPLService:
         results: Dict[int, dict] = {}
         news_by_player: Dict[int, List[dict]] = defaultdict(list)
         for p in wanted:
-            results[p["id"]] = {"country": None, "on_squad": None, "news": [], "recent_match": None}
+            results[p["id"]] = {
+                "country": None,
+                "on_squad": None,
+                "news": [],
+                "recent_match": None,
+            }
             entry = FPL_REGION_TO_ESPN_COUNTRY.get(p.get("region"))
             if entry:
                 country, espn_team_id = entry
@@ -1118,7 +1137,9 @@ class FPLService:
                 # its players keep the already-initialized "no data yet"
                 # defaults rather than failing every other country's
                 # results in the same batch.
-                logger.warning("ESPN unavailable for country %s, skipping", espn_team_id)
+                logger.warning(
+                    "ESPN unavailable for country %s, skipping", espn_team_id
+                )
                 return
             for p in players:
                 names = _player_names(p)
@@ -1132,7 +1153,9 @@ class FPLService:
                 # all, there's nothing to check whether they played in.
                 if on_squad:
                     try:
-                        results[p["id"]]["recent_match"] = await self._espn_player_match_involvement(
+                        results[p["id"]][
+                            "recent_match"
+                        ] = await self._espn_player_match_involvement(
                             espn_team_id, names
                         )
                     except _EspnUnavailable:
@@ -1172,7 +1195,13 @@ class FPLService:
                 if a["link"] in seen_links:
                     continue
                 seen_links.add(a["link"])
-                deduped.append({"headline": a["headline"], "published": a["published"], "link": a["link"]})
+                deduped.append(
+                    {
+                        "headline": a["headline"],
+                        "published": a["published"],
+                        "link": a["link"],
+                    }
+                )
             results[pid]["news"] = deduped[:3]
 
         return {"source": "espn", "players": results}
