@@ -56,6 +56,21 @@ SWR_ESPN_LINEUPS = 15 * 60  # +15m stale
 
 ESPN_SOCCER_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 
+# ESPN's "core" API tier — used only to find a national team's most recent
+# or next fixture. The site API's own teams/{id}/schedule looked like the
+# obvious tool for that, but it's bugged: it silently caps at the first
+# half of the calendar year (verified against both Brazil and England —
+# both stopped dead at June, missing real September fixtures) and ignores
+# every season/half param tried. This core-API events list doesn't have
+# that bug, but a team's matches are scoped per-competition here (a
+# country's Nations League and friendly fixtures are genuinely separate
+# lists, not merged), so both get checked.
+ESPN_CORE_BASE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues"
+NATIONAL_TEAM_COMPETITIONS = [
+    ("nations-league", "uefa.nations"),
+    ("international-friendlies", "fifa.friendly"),
+]
+
 # ESPN league slugs for the competitions this app cares about beyond the
 # Premier League (which football-data.org already covers).
 ESPN_LEAGUES: Dict[str, str] = {
@@ -205,6 +220,7 @@ _SQUAD_NEWS_RE = re.compile(
 # squad news. International squad status is only ever current for the
 # length of a break, so anything older than this is stale by definition.
 _SQUAD_NEWS_MAX_AGE_DAYS = 30
+_RECENT_MATCH_MAX_AGE_DAYS = 14
 
 
 def _ua() -> Dict[str, str]:
@@ -944,6 +960,108 @@ class FPLService:
     async def _espn_club_news(self, espn_club_id: str) -> list[dict]:
         return await self._espn_team_news("eng.1", espn_club_id, "club")
 
+    async def _espn_country_recent_or_next_match(
+        self, espn_team_id: str
+    ) -> Optional[Tuple[str, str]]:
+        """A country's most recently completed match, or its next one if
+        none has been played yet this window. Returns (competition, event_id)."""
+        key = f"espn:nat-events:{espn_team_id}"
+
+        async def _resolve_ref(ref: str) -> Optional[dict]:
+            # A single event among several failing (403) isn't worth
+            # losing the whole lookup over — skip just that one.
+            er = await self._espn_get(ref)
+            return er.json() if er is not None else None
+
+        async def _fetch():
+            found: Dict[str, Tuple[str, str, str]] = {}
+            for comp_key, slug in NATIONAL_TEAM_COMPETITIONS:
+                # The core events list only carries upcoming matches, and the
+                # site schedule only carries played ones — need both to know
+                # the most recent match mid-window as well as the next one.
+                upcoming, played = await asyncio.gather(
+                    self._espn_get(
+                        f"{ESPN_CORE_BASE}/{slug}/teams/{espn_team_id}/events",
+                        params={"limit": 50},
+                    ),
+                    self._espn_get(f"{ESPN_SOCCER_BASE}/{slug}/teams/{espn_team_id}/schedule"),
+                )
+                if upcoming is None or played is None:
+                    # Losing a whole list (as opposed to one event in it) is a
+                    # bigger deal — don't cache a competition as "no matches"
+                    # when we just couldn't ask.
+                    raise _EspnUnavailable(espn_team_id)
+                for ev in played.json().get("events") or []:
+                    if ev.get("id") and ev.get("date"):
+                        found[ev["id"]] = (comp_key, ev["id"], ev["date"])
+                refs = [item.get("$ref") for item in upcoming.json().get("items") or [] if item.get("$ref")]
+                # Each upcoming entry needs its own follow-up request to get a
+                # date — resolve those concurrently rather than one at a time.
+                for ejs in await asyncio.gather(*[_resolve_ref(ref) for ref in refs]):
+                    if ejs and ejs.get("id") and ejs.get("date"):
+                        found.setdefault(ejs["id"], (comp_key, ejs["id"], ejs["date"]))
+            return list(found.values())
+
+        events, _, _ = await self.cache.get_or_set(
+            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
+        )
+        if not events:
+            return None
+
+        def _parse(d: str) -> datetime:
+            return datetime.fromisoformat(d.replace("Z", "+00:00"))
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=_RECENT_MATCH_MAX_AGE_DAYS)
+        # A match from a previous window (e.g. June's friendlies) says nothing
+        # about this one, so only count recent results.
+        recent = [e for e in events if cutoff <= _parse(e[2]) <= now]
+        upcoming = [e for e in events if _parse(e[2]) > now]
+        if recent:
+            comp_key, event_id, _ = max(recent, key=lambda e: _parse(e[2]))
+        elif upcoming:
+            comp_key, event_id, _ = min(upcoming, key=lambda e: _parse(e[2]))
+        else:
+            return None
+        return comp_key, event_id
+
+    async def _espn_player_match_involvement(
+        self, espn_team_id: str, candidate_names: set[str]
+    ) -> Optional[dict]:
+        match = await self._espn_country_recent_or_next_match(espn_team_id)
+        if not match:
+            return None
+        competition, event_id = match
+        key = f"espn:lineups:{competition}:{event_id}"
+
+        async def _fetch():
+            return await self.football_lineups(competition, event_id)
+
+        lineup, _, _ = await self.cache.get_or_set(
+            key, _fetch, TTL_ESPN_LINEUPS, SWR_ESPN_LINEUPS
+        )
+        if not lineup.get("available"):
+            return None  # lineup not announced yet — nothing to report either way
+
+        for team in lineup.get("teams", []):
+            for p in team["players"]:
+                if _norm_name(p.get("name")) in candidate_names:
+                    opponent = next(
+                        (t.get("team") for t in lineup.get("teams", []) if t is not team),
+                        None,
+                    )
+                    return {
+                        "competition": competition,
+                        "opponent": opponent,
+                        "in_squad": True,
+                        "starter": p["starter"],
+                        "subbed_in": p["subbed_in"],
+                        "subbed_out": p["subbed_out"],
+                    }
+        # Lineup is out but this player isn't in it at all — an unused
+        # squad member (or not selected), a stronger signal than "unknown".
+        return {"competition": competition, "opponent": None, "in_squad": False}
+
     async def international_squad_news(self, player_ids: List[int]) -> dict:
         boot, _, _ = await self.bootstrap()
         by_id = {p["id"]: p for p in boot["elements"]}
@@ -958,7 +1076,7 @@ class FPLService:
         results: Dict[int, dict] = {}
         news_by_player: Dict[int, List[dict]] = defaultdict(list)
         for p in wanted:
-            results[p["id"]] = {"country": None, "on_squad": None, "news": []}
+            results[p["id"]] = {"country": None, "on_squad": None, "news": [], "recent_match": None}
             entry = FPL_REGION_TO_ESPN_COUNTRY.get(p.get("region"))
             if entry:
                 country, espn_team_id = entry
@@ -997,6 +1115,19 @@ class FPLService:
                 news_by_player[p["id"]].extend(
                     a for a in news if web in a["athletes"] or full in a["athletes"]
                 )
+                # Only worth checking match involvement for players actually
+                # on the current squad list — if they're not called up at
+                # all, there's nothing to check whether they played in.
+                if on_squad:
+                    try:
+                        results[p["id"]]["recent_match"] = await self._espn_player_match_involvement(
+                            espn_team_id, {web, full}
+                        )
+                    except _EspnUnavailable:
+                        logger.warning(
+                            "ESPN unavailable resolving match involvement for %s, skipping",
+                            espn_team_id,
+                        )
 
         async def _process_club(espn_club_id: str, players: List[dict]) -> None:
             # A story about international-duty withdrawal/injury can be
