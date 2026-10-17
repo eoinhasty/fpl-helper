@@ -1,8 +1,11 @@
 from __future__ import annotations
 import asyncio
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @dataclass
@@ -79,13 +82,24 @@ class AsyncCache:
                     try:
                         data = await fetcher()
                         self.set(key, data, ttl, stale_ttl)
+                    except Exception:
+                        # Nobody awaits this task, so without this the error
+                        # only reaches asyncio's "exception never retrieved"
+                        # handler — the entry would keep being served stale
+                        # with no sign revalidation is failing, until
+                        # stale_until passes and requests start erroring.
+                        logger.warning(
+                            "Background refresh failed for cache key %s; serving stale",
+                            key,
+                            exc_info=True,
+                        )
                     finally:
                         self._bg.pop(key, None)
 
                 self._bg[key] = asyncio.create_task(_bg())
             return entry.data, "stale-serve", age
 
-        # Miss → fetch (coalesced)
+        # Miss â†’ fetch (coalesced)
         lock = self._lock(key)
         async with lock:
             # Another waiter may have filled it:
