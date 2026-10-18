@@ -42,7 +42,13 @@ class Data:
             if f["event"]:
                 self.fixtures_by_gw[f["event"]].append(f)
         self.last_finished = max(self.live)
+        # First GW without results — what projections are anchored to.
         self.next_gw = self.last_finished + 1
+        # First GW whose deadline hasn't passed — where plans start. Same as
+        # next_gw between gameweeks, but once a deadline passes that GW is
+        # locked while it's played, so a plan starting at next_gw would
+        # suggest transfers that can no longer be made.
+        self.plan_gw = next((e["id"] for e in self.boot["events"] if e["is_next"]), self.next_gw)
 
         # (player, gw) -> that GW's stats plus the fixture id they came from
         self.games = {}
