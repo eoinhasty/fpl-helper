@@ -213,11 +213,13 @@ def main():
 
     d = Data()
     state = d.squad_state()
-    gws = list(range(d.next_gw, d.next_gw + args.horizon))
+    gws = list(range(d.plan_gw, d.plan_gw + args.horizon))
     if args.legacy:
         proj = projections.Projector(d, calib=projections.load_calibration())
     else:
-        proj = points_model.Projector(d, horizon=args.horizon)
+        # Projections start at the first GW without results, which can be a
+        # locked one being played now — project far enough to cover the plan.
+        proj = points_model.Projector(d, horizon=args.horizon + d.plan_gw - d.next_gw)
     scenario = json.loads(open(args.scenario).read()) if args.scenario else {}
     print(f"Entry {d.entry['id']}: bank £{state.bank / 10:.1f}m, {state.free_transfers} free transfer(s), "
           f"chips used {state.chips_used or 'none'}")

@@ -100,9 +100,9 @@ if __name__ == "__main__":
     args = ap.parse_args()
 
     d = Data()
-    proj = Projector(d, horizon=args.gws)
+    proj = Projector(d, horizon=args.gws + d.plan_gw - d.next_gw)
     ids = [d.find(n) for n in args.players] or d.squad_state().squad
-    gws = range(d.next_gw, d.next_gw + args.gws)
+    gws = range(d.plan_gw, d.plan_gw + args.gws)
     code_name = {t["code"]: t["short_name"] for t in d.boot["teams"]}
     print(f"{'player':<22}" + "".join(f"{'GW' + str(g):>13}" for g in gws) + "   total")
     for pid in sorted(ids, key=lambda p: -sum(proj.expected(p, g) for g in gws)):
