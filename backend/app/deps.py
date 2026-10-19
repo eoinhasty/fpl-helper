@@ -9,8 +9,16 @@ from slowapi import Limiter
 
 
 def get_real_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
-    return fwd.split(",")[0].strip() if fwd else (request.client.host or "unknown")
+    """Rate-limit key. Production sits behind Cloudflare, which sets
+    CF-Connecting-IP to the address it saw and overwrites any client-sent
+    value. X-Forwarded-For can't be used: Render appends to whatever the client
+    sent, so its first entry is client-controlled — verified 2026-10-19, six
+    requests with different fake values all passed a 5/min limit. Without
+    Cloudflare (local dev) the direct peer address is the client."""
+    cf = request.headers.get("cf-connecting-ip")
+    if cf:
+        return cf.strip()
+    return request.client.host if request.client else "unknown"
 
 
 limiter = Limiter(key_func=get_real_ip)
