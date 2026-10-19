@@ -1477,7 +1477,8 @@ class FPLService:
         ict_vals = [float(c.get("ict_index") or 0) for c in candidates]
 
         ep = float(player.get("ep_next") or 0)
-        if any(v > 0 for v in ep_vals):
+        uses_ep = any(v > 0 for v in ep_vals)
+        if uses_ep:
             base = _norm(ep_vals, ep)
         else:
             base = (
@@ -1493,7 +1494,10 @@ class FPLService:
         fdr_factor = 1 - (avg_fdr - 1) / 4
         home_ratio = sum(1 for f in team_fixtures if f["home"]) / len(team_fixtures)
         home_boost = 1 + home_ratio * 0.08
-        dgw_boost = 1.8 if len(team_fixtures) > 1 else 1.0
+        # ep_next is already a whole-GW total (a DGW player's covers both fixtures
+        # — in the 2024-25 archive it's ~2x a single GW), so only the per-match
+        # form/ICT fallback needs the DGW boost.
+        dgw_boost = 1.8 if len(team_fixtures) > 1 and not uses_ep else 1.0
         pos_mult = {1: 0.65, 2: 0.72, 3: 0.92, 4: 1.0}.get(pos, 1.0)
         start_prob = FPLService.start_prob_from(player, played_gws)
 

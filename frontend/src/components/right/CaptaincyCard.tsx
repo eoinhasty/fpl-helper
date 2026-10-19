@@ -25,8 +25,8 @@ function score(players: Player[]) {
       p,
       form: parseFloat(p.form ?? "0"),
       ict: parseFloat(p.ict_index ?? "0"),
+      // ep_next is already a whole-GW total — a DGW player's covers both fixtures
       ep,
-      epDisplay: fxs.length > 1 && ep > 0 ? ep * fxs.length : ep,
       fdr: avgFdr,
       home: homeRatio,
       sp: p.start_probability ?? 0,
@@ -37,18 +37,19 @@ function score(players: Player[]) {
 
   const formRange = range(raw.map((r) => r.form));
   const ictRange = range(raw.map((r) => r.ict));
-  const epRange = range(raw.map((r) => r.epDisplay));
-  const hasEp = raw.some((r) => r.epDisplay > 0);
+  const epRange = range(raw.map((r) => r.ep));
+  const hasEp = raw.some((r) => r.ep > 0);
 
   return raw
     .map((r) => {
-      const base = hasEp ? norm(r.epDisplay, epRange) : norm(r.form, formRange) * 0.5 + norm(r.ict, ictRange) * 0.5;
+      const base = hasEp ? norm(r.ep, epRange) : norm(r.form, formRange) * 0.5 + norm(r.ict, ictRange) * 0.5;
       const fdrFactor = 1 - (r.fdr - 1) / 4;
       const homeBoost = 1 + r.home * 0.08;
-      const dgwBoost = r.dgw ? 1.8 : 1.0;
+      // Only the per-match form/ICT fallback needs boosting; ep_next already counts both fixtures
+      const dgwBoost = r.dgw && !hasEp ? 1.8 : 1.0;
       const bgwPenalty = r.bgw ? 0.1 : 1.0;
       const s = base * fdrFactor * homeBoost * dgwBoost * bgwPenalty * r.sp * posMult(r.p.position);
-      return { p: r.p, score: s, epDisplay: r.epDisplay };
+      return { p: r.p, score: s, epDisplay: r.ep };
     })
     .sort((a, b) => b.score - a.score);
 }
