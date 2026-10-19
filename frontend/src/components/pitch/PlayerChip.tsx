@@ -2,10 +2,9 @@
 import type { Player } from "../../lib/types";
 import { BENCH_LABEL, CHIP } from "../../lib/constants";
 import StartMeter from "../squad/StartMeter";
+import { TONE_CLASS, statusTone } from "../../lib/utils";
 
 const PURPLE = "#38003C";
-const AMBER = "#F59E0B";
-const RED = "#E11D48";
 
 const ROLE_TEXT = "#fcfcfc";  // light text for contrast on PURPLE
 
@@ -29,11 +28,10 @@ function CaptainBadge({ c, v }: { c?: boolean; v?: boolean }) {
 function StatusTriangle({ status }: { status?: string }) {
   if (!status || status === "a") return null;
 
-  const fill = status === "d" ? AMBER : RED; // d=knock-ish, i/s/n = red
   return (
     <div className="absolute -bottom-1 -right-1">
       <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-        <path d="M0 20 L20 20 L20 0 Z" fill={fill} />
+        <path d="M0 20 L20 20 L20 0 Z" className={TONE_CLASS[statusTone(status)].fill} />
       </svg>
     </div>
   );

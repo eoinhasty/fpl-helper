@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { Player, PlayerRank, PlayerSummaryResponse } from "../../lib/types";
-import { statusToText, fdrClass } from "../../lib/utils";
+import { statusToText, fdrClass, TONE_CLASS, statusTone } from "../../lib/utils";
 import { fmtKickoff, fmtPrice, pct, fmtCompact, fmtPriceDelta } from "../../lib/format";
 import { useFetch } from "../../hooks/useFetch";
 import { POSITION_LABEL } from "../../lib/constants";
@@ -49,27 +49,16 @@ function SectionHeader({ label, right }: { label: string; right?: React.ReactNod
   );
 }
 
-type StatusCfg = { dot: string; border: string; bg: string; label: string };
-
-const STATUS_CFG: Record<string, StatusCfg> = {
-  d: { dot: "bg-warning", border: "border-warning/30", bg: "bg-warning/8", label: "text-warning" },
-  i: { dot: "bg-destructive", border: "border-destructive/30", bg: "bg-destructive/8", label: "text-destructive" },
-  s: { dot: "bg-destructive", border: "border-destructive/30", bg: "bg-destructive/8", label: "text-destructive" },
-  n: { dot: "bg-muted-foreground", border: "border-border", bg: "bg-muted/40", label: "text-muted-foreground" },
-};
-
-const STATUS_CFG_DEFAULT: StatusCfg = { dot: "bg-success", border: "border-success/25", bg: "bg-success/5", label: "text-success" };
-
 function StatusBanner({ player, hideStartProbability }: { player: Player; hideStartProbability?: boolean }) {
   const s = player.status;
-  const cfg = (s ? STATUS_CFG[s] : undefined) ?? STATUS_CFG_DEFAULT;
+  const cfg = TONE_CLASS[statusTone(s)];
 
   return (
-    <div className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${cfg.border} ${cfg.bg}`}>
-      <div className={`mt-[3px] w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+    <div className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${cfg.soft}`}>
+      <div className={`mt-[3px] w-2 h-2 rounded-full shrink-0 ${cfg.bg}`} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-medium ${cfg.label}`}>{statusToText(s)}</span>
+          <span className={`text-sm font-medium ${cfg.text}`}>{statusToText(s)}</span>
           {!hideStartProbability && (
             <span className="text-xs text-muted-foreground">
               {pct(player.start_probability)} start prob

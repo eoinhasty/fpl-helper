@@ -3,8 +3,24 @@ import type { Player } from "./types";
 
 export const isStarting = (p: Player): boolean => (p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11;
 
-export const pctColor = (p: number) =>
-  p >= 0.75 ? "bg-accent" : p >= 0.60 ? "bg-warn" : "bg-danger";
+export type Tone = "success" | "warning" | "destructive";
+
+/** Class strings per tone — written out in full so Tailwind can see them. */
+export const TONE_CLASS: Record<Tone, { text: string; bg: string; fill: string; soft: string }> = {
+  success:     { text: "text-success",     bg: "bg-success",     fill: "fill-success",     soft: "bg-success/8 border-success/30" },
+  warning:     { text: "text-warning",     bg: "bg-warning",     fill: "fill-warning",     soft: "bg-warning/8 border-warning/30" },
+  destructive: { text: "text-destructive", bg: "bg-destructive", fill: "fill-destructive", soft: "bg-destructive/8 border-destructive/30" },
+};
+
+/** Start probability (0–1) → tone. Single source for every start-% colour. */
+export const startProbTone = (p: number): Tone =>
+  p >= 0.7 ? "success" : p >= 0.4 ? "warning" : "destructive";
+
+/** FPL status → tone, matching FPL's own flags: doubtful amber; injured,
+ * suspended, not available and left-the-club red. Single source for every
+ * status colour. */
+export const statusTone = (s: string | undefined): Tone =>
+  !s || s === "a" ? "success" : s === "d" ? "warning" : "destructive";
 
 export const fdrClass = (d?: number) =>
   d===1 ? "bg-fdr-good/20 text-fdr-good font-semibold" :
@@ -22,14 +38,6 @@ export const fdrDotClass = (d?: number) =>
   d===4 ? "bg-destructive/60" :
   d===5 ? "bg-destructive" : "bg-muted-foreground/20";
 
-export const statusClass = (s: string | undefined) =>
-    s === "a" ? "bg-[#e6ffed] text-[#0f5132] border border-[#b8e7c9]" :
-    s === "d" ? "bg-[#fff4e5] text-[#7c3e00] border border-[#ffe1a9]" :
-    s === "i" ? "bg-[#fff1f1] text-[#7f1d1d] border border-[#ffc4c4]" :
-    s === "s" ? "bg-[#f3f4f6] text-[#374151] border border-[#d1d5db]" :
-    s === "n" ? "bg-[#f3f4f6] text-[#374151] border border-[#d1d5db]" :
-    "bg-gray-200 text-gray-600 border border-gray-300";
-
 export function statusToText(s: string | undefined) {
   switch ((s || "").toLowerCase()) {
     case "a": return "Available";
@@ -37,6 +45,7 @@ export function statusToText(s: string | undefined) {
     case "i": return "Injured";
     case "s": return "Suspended";
     case "n": return "Not in squad";
+    case "u": return "Left club";
     default:  return "Unknown";
   }
 }

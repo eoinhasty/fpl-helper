@@ -2,18 +2,15 @@
 import * as React from "react";
 import type { PoolPlayer, PoolPosition, PoolTeam } from "../../lib/types";
 import { fmtPrice } from "../../lib/format";
-import { fdrClass, statusToText } from "../../lib/utils";
+import { fdrClass, statusToText, TONE_CLASS, statusTone } from "../../lib/utils";
 import { Segmented } from "../controls/Segmented";
 import { SelectMenu } from "../controls/SelectMenu";
 
-/** Semantic-token badge styling for a player's status — mirrors the cfg object
- * in PlayerDetailModal's StatusBanner (dark-mode safe), not the unused/dead
- * `statusClass` helper in lib/utils.ts (hardcoded hex, doesn't adapt to dark mode). */
+/** Badge styling for a non-available status; null when available. */
 function statusBadgeClass(s: string | undefined): string | null {
   if (!s || s === "a") return null;
-  if (s === "d") return "bg-warning/10 text-warning border-warning/30";
-  if (s === "i" || s === "s") return "bg-destructive/10 text-destructive border-destructive/30";
-  return "bg-muted/60 text-muted-foreground border-border";
+  const t = TONE_CLASS[statusTone(s)];
+  return `${t.soft} ${t.text}`;
 }
 
 type SortKey = "now_cost" | "selected_by_percent" | "ep_next" | "form";

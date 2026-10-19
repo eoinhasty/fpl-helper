@@ -5,6 +5,12 @@
 @import "./styles/theme.css";
 @import "./styles/ui.css";
 
+/* Make `dark:` follow the .dark class usePreferences toggles. Theme colours
+   still belong in theme.css tokens; this just stops `dark:` silently doing
+   nothing (Tailwind v4's default is the OS media query, not the class).
+   Must stay below the @imports — anything before an @import voids it. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* tiny base tweaks */
 :root { color-scheme: light; }
 /* Theme is a manual .dark class toggle (usePreferences), not just OS
@@ -18,6 +24,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
    open — so the page jumped back toward the top and the options opened
    off-screen. clip trims horizontal overflow without ever scrolling. */
 body { margin: 0; overflow-x: clip; }
+/* Safety net: text with no explicit text-* class follows the theme instead of
+   falling back to the browser's black (invisible on the dark background). */
+body { color: var(--color-foreground); }
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 /* Mobile: avoid double-tap zoom / 300ms tap delay on interactive elements */

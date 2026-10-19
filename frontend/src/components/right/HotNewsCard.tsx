@@ -4,21 +4,13 @@ import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import { fmtRelTime } from "../../lib/format";
 import { POSITION_LABEL } from "../../lib/constants";
+import { TONE_CLASS, startProbTone, statusTone } from "../../lib/utils";
 
 type Item = { id: number; name: string; team: string | null; badge_url: string | null; position: number; news: string; news_added: string | null; status: string; start_probability: number; };
 type Resp = { items: Item[] };
 
-function statusDotClass(status: string): string {
-  if (status === "a") return "bg-success";
-  if (status === "d") return "bg-warning";
-  return "bg-destructive";
-}
-
-function startProbClass(prob: number): string {
-  if (prob >= 0.7) return "text-success";
-  if (prob >= 0.4) return "text-warning";
-  return "text-destructive";
-}
+const statusDotClass = (status: string) => TONE_CLASS[statusTone(status)].bg;
+const startProbClass = (prob: number) => TONE_CLASS[startProbTone(prob)].text;
 
 export default function HotNewsCard() {
   const { data, loading, error } = useFetch<Resp>("/api/news/hot?days=7&limit=5");
