@@ -32,7 +32,7 @@ A Fantasy Premier League companion app that enriches your squad view with live d
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.14 (pinned in `backend/.python-version`)
 - Node.js 22.12+
 
 ### Install
