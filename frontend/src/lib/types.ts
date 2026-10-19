@@ -61,10 +61,21 @@ export type TransferSuggestion = {
     fixture: FixtureLite | null;
     has_dgw: boolean;
     shirt_url: string | null;
+    /** Score improvement over the owned player it replaces (always > 0) */
+    gain: number;
+    /** The owned player this buy is paired with — the sale that funds it */
+    replaces: {
+        element: number;
+        name: string;
+        sell_price: number;
+        ep_next: string | null;
+        start_probability: number;
+    };
 };
 
 export type TransferSuggestionGroup = {
     position: 1 | 2 | 3 | 4;
+    /** Bank + the highest sale price in this position */
     budget: number;
     players: TransferSuggestion[];
 };
