@@ -1268,9 +1268,14 @@ class FPLService:
         news = (player.get("news") or "").lower()
 
         # Heuristic: status base blended with actual play-time ratio to catch rotation risk
-        status_base = {"a": 0.88, "d": 0.55, "i": 0.0, "s": 0.0, "n": 0.0}.get(
-            status, 0.5
-        )
+        status_base = {
+            "a": 0.88,
+            "d": 0.55,
+            "i": 0.0,
+            "s": 0.0,
+            "n": 0.0,
+            "u": 0.0,  # left the club (transferred, loaned out, released)
+        }.get(status, 0.5)
         minutes = player.get("minutes", 0)
         if status == "a" and played_gws > 0 and minutes > 0:
             time_ratio = min(minutes / (played_gws * 90), 0.99)
@@ -1607,6 +1612,8 @@ class FPLService:
                 and p.get("element_type") == pos
                 and p.get("now_cost", 0) <= budget
                 and (p.get("minutes") or 0) > 0
+                # "u" = left the club; can't be bought (player_pool drops them too)
+                and p.get("status") != "u"
                 and fdr_by_team.get(p.get("team", 0))
             ]
             if not candidates:
