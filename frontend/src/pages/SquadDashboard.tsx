@@ -55,6 +55,21 @@ export default function SquadDashboard() {
   const openPlayer = (p: Player) => setSelectedPlayer(p);
   const closePlayer = () => setSelectedPlayer(null);
 
+  // The sidebars stick just below the sticky content header, so their offset
+  // is that header's measured height — it changes with wrapping, the chip
+  // badge and the mobile/desktop layouts, so a hardcoded number drifts.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerH, setHeaderH] = useState(52);
+  useEffect(() => {
+    if (!headerRef.current) return;
+    const ro = new ResizeObserver((es) => {
+      const h = es[0]?.borderBoxSize?.[0]?.blockSize;
+      if (h) setHeaderH(Math.round(h));
+    });
+    ro.observe(headerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
   // Keep Segmented in sync if Default View is changed in Settings.
   // mode is intentionally excluded — including it would reset the toggle on every click.
   useEffect(() => {
@@ -234,6 +249,7 @@ export default function SquadDashboard() {
 
   const contentHeader = (
     <div
+      ref={headerRef}
       className="sticky z-30 border-b border-border bg-background/80 backdrop-blur"
       style={{ top: 0 }}
     >
@@ -271,7 +287,7 @@ export default function SquadDashboard() {
       <DashboardLayout
         left={left}
         right={right}
-        stickyOffsetPx={52}
+        stickyOffsetPx={headerH}
       >
         {mode === "live" ? (
           <LiveAuthGate key={error === "AUTH_EXPIRED" ? "expired" : "authed"} onAuthenticated={loadLive}>
