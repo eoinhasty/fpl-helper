@@ -101,18 +101,28 @@ export async function getLive(entry: number, opts?: { forceRefresh?: boolean }):
   const u = new URL(`/api/live/${entry}`, ORIGIN);
   if (opts?.forceRefresh) u.searchParams.set("noCache", "1");
 
-  try {
+  // tokenHeaders() is read per attempt so the retry picks up the refreshed token
+  const attempt = async (): Promise<ApiResult<SquadResponse>> => {
     const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
     return { data: json, cache: cacheFrom(resp) };
+  };
+  const is401 = (e: unknown) => (e as Error)?.message?.startsWith("401");
+
+  try {
+    return await attempt();
   } catch (e: unknown) {
-    if ((e as Error)?.message?.startsWith("401") && await tryRefresh()) {
-      const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
-      return { data: json, cache: cacheFrom(resp) };
+    if (!is401(e)) throw e;
+    if (await tryRefresh()) {
+      try {
+        return await attempt();
+      } catch (retryErr: unknown) {
+        // Refresh succeeded but FPL still rejects the new token — same outcome
+        // as an expired session, so route it to the re-login flow too.
+        if (is401(retryErr)) throw new Error("AUTH_EXPIRED", { cause: retryErr });
+        throw retryErr;
+      }
     }
-    if ((e as Error)?.message?.startsWith("401")) {
-      throw new Error("AUTH_EXPIRED", { cause: e });
-    }
-    throw e;
+    throw new Error("AUTH_EXPIRED", { cause: e });
   }
 }
 
