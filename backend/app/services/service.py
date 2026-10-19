@@ -765,9 +765,9 @@ class FPLService:
 
         # The undated scoreboard only covers the single day ESPN considers
         # current (the next match day, or the last one between rounds), but
-        # a UEFA matchday spans several — e.g. 20–21 Oct 2026 was 9 Champions
-        # League games each day, and the undated call returned only the
-        # first. ESPN rejects a `dates=` range (400), so fetch the days
+        # a UEFA matchday spans several — e.g. the 20–21 Oct 2026 Champions
+        # League matchday has 9 games each day, and the undated call
+        # returned only the first. ESPN rejects a `dates=` range (400), so fetch the days
         # around that anchor individually and merge them in.
         anchor = _parse_date((js.get("day") or {}).get("date"))
         if anchor:
