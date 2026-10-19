@@ -24,6 +24,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
    open — so the page jumped back toward the top and the options opened
    off-screen. clip trims horizontal overflow without ever scrolling. */
 body { margin: 0; overflow-x: clip; }
+/* Safety net: text with no explicit text-* class follows the theme instead of
+   falling back to the browser's black (invisible on the dark background). */
+body { color: var(--color-foreground); }
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 /* Mobile: avoid double-tap zoom / 300ms tap delay on interactive elements */
