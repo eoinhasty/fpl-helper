@@ -1,0 +1,10 @@
+# Runtime is 3.14 (.python-version); py313 keeps the formatter from rewriting
+# `except (A, B):` into 3.14-only unparenthesized syntax
+target-version = "py313"
+line-length = 88
+
+[lint.per-file-ignores]
+# load_dotenv() has to run before app modules read env vars at import time
+"app/main.py" = ["E402"]
+# `fetch = lambda: ...` is the cache-fetcher idiom throughout the service
+"app/services/service.py" = ["E731"]

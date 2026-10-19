@@ -1,0 +1,14 @@
+# Runtime is 3.14 (.python-version); py313 keeps the formatter from rewriting
+# `except (A, B):` into 3.14-only unparenthesized syntax
+target-version = "py313"
+line-length = 120
+# Apply the excludes below even when a file is passed explicitly (editor/format-on-save)
+force-exclude = true
+
+[format]
+# These scripts are hand-wrapped at ~120 columns; the formatter would rewrap them
+exclude = ["*.py"]
+
+[lint]
+# One-line lambda helpers, and l/h for MILP lower/upper bounds, are deliberate
+ignore = ["E731", "E741"]
