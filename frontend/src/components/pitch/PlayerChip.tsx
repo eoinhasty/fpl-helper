@@ -126,11 +126,21 @@ export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { 
 
   return (
     <div
-      className="cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-label={`${p.name} — details`}
+      // Solid white outline: the theme's translucent ring colour vanishes on the green pitch
+      className="cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       style={scale !== 1 ? { transform: `scale(${scale})` } : undefined}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
       }}
     >
       <div className="relative select-none" title={`${p.name} (${p.team})`} style={{ pointerEvents: "auto", width: CHIP.WIDTH }}>
