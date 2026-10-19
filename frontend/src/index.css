@@ -5,6 +5,12 @@
 @import "./styles/theme.css";
 @import "./styles/ui.css";
 
+/* Make `dark:` follow the .dark class usePreferences toggles. Theme colours
+   still belong in theme.css tokens; this just stops `dark:` silently doing
+   nothing (Tailwind v4's default is the OS media query, not the class).
+   Must stay below the @imports — anything before an @import voids it. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* tiny base tweaks */
 :root { color-scheme: light; }
 /* Theme is a manual .dark class toggle (usePreferences), not just OS
