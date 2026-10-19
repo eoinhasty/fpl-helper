@@ -47,8 +47,10 @@ jobs:
         with:
           python-version-file: .python-version
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r requirements.txt ruff pip-audit
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: ruff check .
       - name: Smoke test
         run: |

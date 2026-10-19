@@ -3,6 +3,12 @@
 target-version = "py313"
 line-length = 88
 
+[lint]
+# Pinned explicitly: ruff 0.17 widened its default rule set (pyupgrade, bugbear,
+# isort, …), which would otherwise change what passes whenever ruff is bumped.
+# Adopting more rules is a deliberate change, not a side effect of an upgrade.
+select = ["E4", "E7", "E9", "F"]
+
 [lint.per-file-ignores]
 # load_dotenv() has to run before app modules read env vars at import time
 "app/main.py" = ["E402"]
