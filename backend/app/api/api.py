@@ -643,7 +643,9 @@ async def football_international_news(
     try:
         ids = [int(x) for x in player_ids.split(",") if x.strip()][:30]
     except ValueError:
-        raise HTTPException(400, detail="player_ids must be a comma-separated list of ints.")
+        raise HTTPException(
+            400, detail="player_ids must be a comma-separated list of ints."
+        )
     if not ids:
         return {"source": "espn", "players": {}}
     # Not wrapped in the shared cache: the per-country roster/news lookups
