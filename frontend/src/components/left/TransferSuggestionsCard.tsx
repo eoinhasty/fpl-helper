@@ -2,7 +2,7 @@ import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import type { TransferSuggestion, TransferSuggestionsResponse } from "../../lib/types";
 import { fmtPrice, pct } from "../../lib/format";
-import { fdrDotClass } from "../../lib/utils";
+import { fdrDotClass, TONE_CLASS } from "../../lib/utils";
 import { isAuthenticated } from "../../lib/api";
 
 const POS_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
@@ -25,6 +25,18 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
     : `${parseFloat(p.form ?? "0").toFixed(1)} form`;
   const own = p.selected_by_percent != null ? `${Number(p.selected_by_percent).toFixed(1)}% own` : null;
 
+  // Why this beats the player it replaces: an owned player unlikely to play is
+  // the reason on its own; otherwise show the expected-points gap when positive.
+  const out = p.replaces;
+  const outXPts = out.ep_next ? parseFloat(out.ep_next) : null;
+  const xPtsGain = xPts != null && outXPts != null ? xPts - outXPts : null;
+  const reason =
+    out.start_probability < 0.5
+      ? { text: `${pct(out.start_probability)} to start`, cls: TONE_CLASS.destructive.text }
+      : xPtsGain != null && xPtsGain > 0
+      ? { text: `+${xPtsGain.toFixed(1)} xPts`, cls: TONE_CLASS.success.text }
+      : null;
+
   return (
     <li className="flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5 gap-2">
       <div className="flex items-center gap-2 min-w-0">
@@ -42,6 +54,10 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
             <span>·</span>
             {p.fixture && <FdrDot d={p.fixture.difficulty} />}
             <span className="truncate">{fxLabel}</span>
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate" title={`Sell ${out.name} (${fmtPrice(out.sell_price)})`}>
+            for {out.name}
+            {reason && <> · <span className={reason.cls}>{reason.text}</span></>}
           </div>
         </div>
       </div>
@@ -82,7 +98,7 @@ export default function TransferSuggestionsCard({ entry }: { entry: number | "" 
         </div>
       )}
       {data && data.season_status !== "pre_season" && data.suggestions.length === 0 && (
-        <div className="text-sm text-muted-foreground">No suggestions available.</div>
+        <div className="text-sm text-muted-foreground">No affordable upgrades on your current squad.</div>
       )}
       {data && data.suggestions.map((group) => (
         <div key={group.position} className="mb-3 last:mb-0">

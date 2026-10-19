@@ -41,6 +41,8 @@ TTL_PLAYERS = 30 * 60  # 30m fresh
 SWR_PLAYERS = 6 * 60 * 60  # +6h stale
 TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
+
+MAX_PER_CLUB = 3  # FPL squad rule
 # ESPN's public soccer endpoints are undocumented/unofficial (no key, no
 # published quota or contract — the shape could change without notice), but
 # unlike api-football's free tier they actually serve current-season data.
@@ -1578,16 +1580,19 @@ class FPLService:
 
         players_dict = {p["id"]: p for p in boot["elements"]}
         owned_ids: set = {p["element"] for p in picks_list}
-        # What selling each owned player actually returns: FPL keeps half of any
-        # price rise, so my_team's selling_price can be below now_cost. Public
-        # picks don't carry it, so that path falls back to now_cost (can
-        # overstate the budget for risen players).
-        sell_by_pos: Dict[int, List[int]] = {}
+        # Each owned player with what selling them actually returns: FPL keeps
+        # half of any price rise, so my_team's selling_price can be below
+        # now_cost. Public picks don't carry it, so that path falls back to
+        # now_cost (can overstate the budget for risen players).
+        owned_by_pos: Dict[int, List[Tuple[dict, int]]] = {}
+        club_counts: Dict[int, int] = defaultdict(int)
         for pick in picks_list:
-            pl = players_dict.get(pick["element"], {})
-            pos = pl.get("element_type", 4)
+            pl = players_dict.get(pick["element"])
+            if not pl:
+                continue
             sell = pick.get("selling_price") or pl.get("now_cost", 0)
-            sell_by_pos.setdefault(pos, []).append(sell)
+            owned_by_pos.setdefault(pl.get("element_type", 4), []).append((pl, sell))
+            club_counts[pl.get("team", 0)] += 1
 
         # Suggestions are for the next transfer, so score against the upcoming
         # GW's fixtures even when the squad itself came from current-GW picks.
@@ -1615,37 +1620,57 @@ class FPLService:
 
         suggestions = []
         for pos in [1, 2, 3, 4]:
-            sell_prices = sell_by_pos.get(pos, [])
-            if not sell_prices:
+            owned_here = owned_by_pos.get(pos, [])
+            if not owned_here:
                 continue
-            max_sell = max(sell_prices)
-            budget = bank + max_sell
 
-            candidates = [
+            buyable = [
                 p
                 for p in boot["elements"]
                 if p["id"] not in owned_ids
                 and p.get("element_type") == pos
-                and p.get("now_cost", 0) <= budget
                 and (p.get("minutes") or 0) > 0
                 # "u" = left the club; can't be bought (player_pool drops them too)
                 and p.get("status") != "u"
                 and fdr_by_team.get(p.get("team", 0))
             ]
-            if not candidates:
+            if not buyable:
                 continue
 
-            scored = sorted(
-                (
-                    (p, self._score_player(p, fdr_by_team, candidates, played_gws))
-                    for p in candidates
-                ),
-                key=lambda x: x[1],
-                reverse=True,
-            )
+            # A suggestion is a sell->buy pair: it has to beat the specific
+            # owned player it replaces, be affordable from *that* player's
+            # sale, and keep the squad within 3 per club. Score owned and
+            # buyable players against one shared pool — _score_player
+            # normalises within the pool it's given, so separate pools would
+            # put the two sides on different scales. Same rules as the
+            # season simulation in backend/scripts/backtest_transfers.py.
+            pool = [pl for pl, _ in owned_here] + buyable
+            score = {
+                p["id"]: self._score_player(p, fdr_by_team, pool, played_gws)
+                for p in pool
+            }
+            best: Dict[int, Tuple[float, dict, dict, int]] = {}
+            for owned, sell in owned_here:
+                for c in buyable:
+                    if c.get("now_cost", 0) > bank + sell:
+                        continue
+                    if (
+                        c.get("team") != owned.get("team")
+                        and club_counts[c.get("team", 0)] >= MAX_PER_CLUB
+                    ):
+                        continue
+                    gain = score[c["id"]] - score[owned["id"]]
+                    if gain <= 0:
+                        continue
+                    # Keep each buy once, paired with the sale it improves most
+                    if c["id"] not in best or gain > best[c["id"]][0]:
+                        best[c["id"]] = (gain, c, owned, sell)
+            if not best:
+                continue
+            ranked = sorted(best.values(), key=lambda x: x[0], reverse=True)
 
             shaped = []
-            for p, score in scored[:top_n]:
+            for gain, p, owned, sell in ranked[:top_n]:
                 t = teams.get(p.get("team", 0), {})
                 team_code = t.get("code")
                 suffix = "_1" if pos == 1 else ""
@@ -1663,16 +1688,32 @@ class FPLService:
                         "price": p.get("now_cost"),
                         "ep_next": p.get("ep_next"),
                         "form": p.get("form"),
-                        "score": round(score, 4),
+                        "score": round(score[p["id"]], 4),
+                        "gain": round(gain, 4),
                         "start_probability": self.start_prob_from(p, played_gws),
                         "selected_by_percent": p.get("selected_by_percent"),
                         "fixture": team_fixtures[0] if team_fixtures else None,
                         "has_dgw": len(team_fixtures) > 1,
                         "shirt_url": shirt_url,
+                        "replaces": {
+                            "element": owned["id"],
+                            "name": owned.get("web_name"),
+                            "sell_price": sell,
+                            "ep_next": owned.get("ep_next"),
+                            "start_probability": self.start_prob_from(
+                                owned, played_gws
+                            ),
+                        },
                     }
                 )
 
-            suggestions.append({"position": pos, "budget": budget, "players": shaped})
+            suggestions.append(
+                {
+                    "position": pos,
+                    "budget": bank + max(sell for _, sell in owned_here),
+                    "players": shaped,
+                }
+            )
 
         # Bootstrap (6h/12h TTL) is excluded from the reading set — it's
         # long-lived like /squad and /live exclude fixtures/entry, and
