@@ -9,11 +9,10 @@ they have finished ahead of a manager doing the same with a trivial signal?"
 
 Design (see the CAVEATS block printed at the end for the full list):
   - Three arms share an identical GW1 squad, drafted under real budget/quota
-    constraints: (A) follows the FIXED transfer-suggestion logic scored by
-    FPLService._score_player (the backlog's not-yet-shipped sell<->buy-pair
-    comparison against the owned player — the currently shipped logic
-    doesn't even gate on beating the owned player, so simulating "as shipped"
-    would mostly measure a known bug, not the scoring formula), (B) the
+    constraints: (A) follows the app's transfer-suggestion logic scored by
+    FPLService._score_player (sell<->buy pairs that must beat the owned
+    player they replace — the same rules FPLService.transfer_suggestions
+    has shipped since 2026-10-19), (B) the
     identical transfer engine scored by plain form (mean of the last 4 GWs'
     points), (C) never transfers.
   - A vs B is the real test: same engine, same budget/hits/club rules, only
@@ -535,9 +534,8 @@ def main() -> None:
     print("=" * 72)
     print("CAVEATS")
     print("=" * 72)
-    print("- Tests the FIXED transfer-suggestion logic (sell<->buy pair beats")
-    print("  the owned player), not the currently shipped logic, which lacks")
-    print("  that comparison entirely (backlog item).")
+    print("- Tests the shipped transfer-suggestion logic: a sell<->buy pair")
+    print("  must beat the owned player it replaces.")
     print("- ep_next is last GW's archived xP, shifted back one gameweek per")
     print("  the archive's own README warning against using it unshifted.")
     print("  The archive's xP appears to be recorded post-match, so this is a")
