@@ -1268,9 +1268,14 @@ class FPLService:
         news = (player.get("news") or "").lower()
 
         # Heuristic: status base blended with actual play-time ratio to catch rotation risk
-        status_base = {"a": 0.88, "d": 0.55, "i": 0.0, "s": 0.0, "n": 0.0}.get(
-            status, 0.5
-        )
+        status_base = {
+            "a": 0.88,
+            "d": 0.55,
+            "i": 0.0,
+            "s": 0.0,
+            "n": 0.0,
+            "u": 0.0,  # left the club (transferred, loaned out, released)
+        }.get(status, 0.5)
         minutes = player.get("minutes", 0)
         if status == "a" and played_gws > 0 and minutes > 0:
             time_ratio = min(minutes / (played_gws * 90), 0.99)
@@ -1472,7 +1477,8 @@ class FPLService:
         ict_vals = [float(c.get("ict_index") or 0) for c in candidates]
 
         ep = float(player.get("ep_next") or 0)
-        if any(v > 0 for v in ep_vals):
+        uses_ep = any(v > 0 for v in ep_vals)
+        if uses_ep:
             base = _norm(ep_vals, ep)
         else:
             base = (
@@ -1488,7 +1494,10 @@ class FPLService:
         fdr_factor = 1 - (avg_fdr - 1) / 4
         home_ratio = sum(1 for f in team_fixtures if f["home"]) / len(team_fixtures)
         home_boost = 1 + home_ratio * 0.08
-        dgw_boost = 1.8 if len(team_fixtures) > 1 else 1.0
+        # ep_next is already a whole-GW total (a DGW player's covers both fixtures
+        # — in the 2024-25 archive it's ~2x a single GW), so only the per-match
+        # form/ICT fallback needs the DGW boost.
+        dgw_boost = 1.8 if len(team_fixtures) > 1 and not uses_ep else 1.0
         pos_mult = {1: 0.65, 2: 0.72, 3: 0.92, 4: 1.0}.get(pos, 1.0)
         start_prob = FPLService.start_prob_from(player, played_gws)
 
@@ -1562,11 +1571,16 @@ class FPLService:
 
         players_dict = {p["id"]: p for p in boot["elements"]}
         owned_ids: set = {p["element"] for p in picks_list}
-        owned_by_pos: Dict[int, List[dict]] = {}
+        # What selling each owned player actually returns: FPL keeps half of any
+        # price rise, so my_team's selling_price can be below now_cost. Public
+        # picks don't carry it, so that path falls back to now_cost (can
+        # overstate the budget for risen players).
+        sell_by_pos: Dict[int, List[int]] = {}
         for pick in picks_list:
             pl = players_dict.get(pick["element"], {})
             pos = pl.get("element_type", 4)
-            owned_by_pos.setdefault(pos, []).append(pl)
+            sell = pick.get("selling_price") or pl.get("now_cost", 0)
+            sell_by_pos.setdefault(pos, []).append(sell)
 
         # Suggestions are for the next transfer, so score against the upcoming
         # GW's fixtures even when the squad itself came from current-GW picks.
@@ -1594,10 +1608,10 @@ class FPLService:
 
         suggestions = []
         for pos in [1, 2, 3, 4]:
-            owned_in_pos = owned_by_pos.get(pos, [])
-            if not owned_in_pos:
+            sell_prices = sell_by_pos.get(pos, [])
+            if not sell_prices:
                 continue
-            max_sell = max((p.get("now_cost", 0) for p in owned_in_pos), default=0)
+            max_sell = max(sell_prices)
             budget = bank + max_sell
 
             candidates = [
@@ -1607,6 +1621,8 @@ class FPLService:
                 and p.get("element_type") == pos
                 and p.get("now_cost", 0) <= budget
                 and (p.get("minutes") or 0) > 0
+                # "u" = left the club; can't be bought (player_pool drops them too)
+                and p.get("status") != "u"
                 and fdr_by_team.get(p.get("team", 0))
             ]
             if not candidates:
