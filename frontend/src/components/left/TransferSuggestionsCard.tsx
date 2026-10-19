@@ -18,10 +18,12 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
     ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp}`
     : "BGW";
 
+  // ep_next is already a whole-GW total, so a DGW needs no scaling
   const xPts = p.ep_next ? parseFloat(p.ep_next) : null;
   const statLabel = xPts != null && xPts > 0
-    ? `${(p.has_dgw ? xPts * 2 : xPts).toFixed(1)} xPts`
+    ? `${xPts.toFixed(1)} xPts`
     : `${parseFloat(p.form ?? "0").toFixed(1)} form`;
+  const own = p.selected_by_percent != null ? `${Number(p.selected_by_percent).toFixed(1)}% own` : null;
 
   return (
     <li className="flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5 gap-2">
@@ -45,7 +47,10 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
       </div>
       <div className="text-right shrink-0 text-xs text-muted-foreground space-y-0.5">
         <div className="font-semibold text-foreground">{statLabel}</div>
-        <div>{fmtPrice(p.price)}</div>
+        <div>
+          {fmtPrice(p.price)}
+          {own && <> · {own}</>}
+        </div>
         {p.start_probability < 0.75 && (
           <div className="text-[10px]">{pct(p.start_probability)} start</div>
         )}
