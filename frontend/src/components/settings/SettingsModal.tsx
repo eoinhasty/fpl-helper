@@ -26,7 +26,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
       open={open}
       onClose={onClose}
       labelledBy="settings-modal-title"
-      widthClass="w-[min(56rem,_94vw)]"
+      widthClass="w-[min(56rem,94vw)]"
       initialFocusRef={closeBtnRef}
     >
       {/* header */}

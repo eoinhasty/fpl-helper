@@ -33,10 +33,10 @@ function TopNum({ label, value, delta, accent }: { label: string; value: React.R
   return (
     <div>
       <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.14em] leading-none">{label}</div>
-      <div className={`text-[24px] font-bold tabular-nums tracking-[-0.02em] leading-tight mt-[3px] ${accent ? "text-primary" : "text-foreground"}`}>
+      <div className={`text-[24px] font-bold tabular-nums tracking-[-0.02em] leading-tight mt-0.75 ${accent ? "text-primary" : "text-foreground"}`}>
         {value ?? "—"}
       </div>
-      {delta && <div className="font-mono text-[10px] text-muted-foreground mt-[2px] leading-none">{delta}</div>}
+      {delta && <div className="font-mono text-[10px] text-muted-foreground mt-0.5 leading-none">{delta}</div>}
     </div>
   );
 }
@@ -56,7 +56,7 @@ function StatusBanner({ player, hideStartProbability }: { player: Player; hideSt
 
   return (
     <div className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${cfg.soft}`}>
-      <div className={`mt-[3px] w-2 h-2 rounded-full shrink-0 ${cfg.bg}`} />
+      <div className={`mt-0.75 w-2 h-2 rounded-full shrink-0 ${cfg.bg}`} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-sm font-medium ${cfg.text}`}>{statusToText(s)}</span>
@@ -113,7 +113,7 @@ function TightRank({ val, unit, rank, primary }: { val: React.ReactNode; unit: s
           <div className="mt-1.5 text-xs text-foreground/80 leading-none">
             #{rank.rank} <span className="text-muted-foreground">of {rank.of}</span>
           </div>
-          <div className="mt-1.5 h-[3px] rounded-full bg-border overflow-hidden">
+          <div className="mt-1.5 h-0.75 rounded-full bg-border overflow-hidden">
             <div
               className={`h-full rounded-full transition-none ${primary ? "bg-primary" : "bg-muted-foreground/60"}`}
               style={{ width: `${rank.pct}%` }}
@@ -134,7 +134,7 @@ function MarketRow({ label, value, valueClass, sub, right }: {
 }) {
   return (
     <div className="grid items-baseline gap-3" style={{ gridTemplateColumns: "90px 1fr auto" }}>
-      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.1em]">{label}</div>
+      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</div>
       <div className="flex items-baseline gap-2.5 min-w-0">
         <span className={`text-[20px] font-bold tabular-nums tracking-[-0.01em] ${valueClass ?? "text-foreground"}`}>{value}</span>
         {sub != null && <span className="text-xs leading-snug">{sub}</span>}
@@ -217,7 +217,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
       open={open}
       onClose={onClose}
       labelledBy="player-modal-title"
-      widthClass="w-[min(32rem,_94vw)]"
+      widthClass="w-[min(32rem,94vw)]"
       initialFocusRef={closeBtnRef}
     >
       {/* header */}
@@ -243,14 +243,14 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
 
         {/* identity row */}
         <div className="relative flex gap-3.5 px-4 sm:px-6 pt-5 pb-4">
-          <div className="w-[60px] h-[76px] shrink-0 rounded-[10px] bg-muted/50 border border-border flex items-center justify-center overflow-hidden">
+          <div className="w-15 h-19 shrink-0 rounded-[10px] bg-muted/50 border border-border flex items-center justify-center overflow-hidden">
             {player.shirt_url
               ? <img src={player.shirt_url} alt={`${player.team} shirt`} className="w-full h-full object-contain p-2" />
               : <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M5 7L9 4H19L23 7L21 12L18 11V23H10V11L7 12L5 7Z" fill="currentColor" opacity="0.4" /></svg>
             }
           </div>
           <div className="flex-1 min-w-0 pr-16">
-            <div className="flex gap-[5px] flex-wrap mb-[5px]">
+            <div className="flex gap-1.25 flex-wrap mb-1.25">
               {posLabel && (
                 <span className="text-[10px] font-semibold text-foreground/70 border border-border/60 px-2 py-0.5 rounded-full tracking-[0.06em]">
                   {posLabel}
@@ -264,17 +264,17 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
             </div>
             <h2
               id="player-modal-title"
-              className="text-[28px] font-bold leading-[1.0] tracking-[-0.025em] m-0"
+              className="text-[28px] font-bold leading-none tracking-tight m-0"
             >
               {nameParts.first && <span>{nameParts.first} </span>}
               <span className="text-primary">{nameParts.last}</span>
               {player.is_captain && (
-                <span className="inline-block align-middle ml-2 text-[11px] font-bold text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-[6px] tracking-[0.08em]">
+                <span className="inline-block align-middle ml-2 text-[11px] font-bold text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-md tracking-[0.08em]">
                   C
                 </span>
               )}
               {player.is_vice_captain && (
-                <span className="inline-block align-middle ml-2 text-[11px] font-bold text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-[6px] tracking-[0.08em]">
+                <span className="inline-block align-middle ml-2 text-[11px] font-bold text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-md tracking-[0.08em]">
                   VC
                 </span>
               )}
@@ -283,7 +283,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
         </div>
 
         {/* topline strip */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-[14px] px-4 sm:px-6 py-[14px] border-t border-border">
+        <div className="grid grid-cols-4 gap-2 sm:gap-3.5 px-4 sm:px-6 py-3.5 border-t border-border">
           <TopNum label="PRICE" value={fmtPrice(player.price)} delta={costChange ?? undefined} />
           <TopNum
             label={hasGwPoints ? "GW PTS" : "FORM"}
@@ -314,7 +314,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
           >
             {t}
             {tab === t && (
-              <span className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-primary rounded-full" />
+              <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary rounded-full" />
             )}
           </button>
         ))}
@@ -546,9 +546,9 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
       </div>
 
       {/* Sticky action bar */}
-      <div className="shrink-0 flex gap-2 px-[18px] py-3 border-t border-border bg-card">
+      <div className="shrink-0 flex gap-2 px-4.5 py-3 border-t border-border bg-card">
         <button
-          className="flex-1 bg-transparent border border-border/60 text-foreground/40 rounded-[10px] px-3.5 py-[11px] text-[13px] font-semibold cursor-not-allowed"
+          className="flex-1 bg-transparent border border-border/60 text-foreground/40 rounded-[10px] px-3.5 py-2.75 text-[13px] font-semibold cursor-not-allowed"
           disabled
           title="Compare — coming soon"
         >

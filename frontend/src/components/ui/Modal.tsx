@@ -6,7 +6,7 @@ type Props = {
   onClose: () => void;
   /** id of the element that names the dialog (its title) */
   labelledBy: string;
-  /** Width utility for the panel, e.g. "w-[min(32rem,_94vw)]" */
+  /** Width utility for the panel, e.g. "w-[min(32rem,94vw)]" */
   widthClass: string;
   /** Element to focus on open; defaults to the first focusable in the panel */
   initialFocusRef?: React.RefObject<HTMLElement | null>;

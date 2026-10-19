@@ -66,7 +66,7 @@ export function SelectMenu<T>({
             // button; plain's button is content-width and often narrow
             // ("GW 1"), so give the panel its own floor instead of
             // inheriting that narrowness and wrapping option labels.
-            variant === "plain" ? "min-w-[8rem]" : "w-[var(--button-width)]",
+            variant === "plain" ? "min-w-32" : "w-(--button-width)",
             "focus:outline-none",
             "transition duration-100 ease-out data-[closed]:opacity-0 data-[closed]:scale-95",
           ].join(" ")}
