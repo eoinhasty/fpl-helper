@@ -95,6 +95,13 @@ Practical rules:
 - The model knows about injuries only through recent minutes, FPL's
   chance-of-playing (applied to the first GW) and `--scenario`.
 - Leads beyond 5 GWs reuse the 5-GW-ahead behaviour.
+- **Last season tips close calls.** Overall it carries about a quarter of the
+  weight this season's numbers do, but for single players it moves a 5-GW
+  projection by 4–8 points, more than most gaps between options. Fading it out
+  faster as the season goes on was tested and didn't help (by GW7 this season's
+  pts/90 already predicts better, and the model learns that from `origin`), so
+  override it with judgement when a player's last season clearly doesn't apply.
+  A season spent at a PL club without playing counts as no data, not zero.
 - FPL's own `xP` in the archive isn't used as a benchmark: it tracks the same
   GW's points far better than the next GW's, so it was recorded after the games.
 
