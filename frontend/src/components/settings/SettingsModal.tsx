@@ -1,6 +1,7 @@
 import * as React from "react";
 import SettingsPanel from "./SettingsPanel";
 import Card from "../ui/Card";
+import Modal from "../ui/Modal";
 import { Segmented } from "../controls/Segmented";
 import { usePreferences, type Theme, type DefaultView, type SquadLayout } from "../../hooks/usePreferences";
 
@@ -14,190 +15,142 @@ type Props = {
 export default function SettingsModal({ open, onClose, entry, setEntry }: Props) {
   const { prefs, set, reset } = usePreferences();
   const [confirmingReset, setConfirmingReset] = React.useState(false);
-  const dialogRef = React.useRef<HTMLDivElement>(null);
   const closeBtnRef = React.useRef<HTMLButtonElement>(null);
-  const previouslyFocused = React.useRef<HTMLElement | null>(null);
-
-  // Move focus into the dialog on open, and back to whatever triggered it
-  // (the settings gear) on close — previously focus just stayed on the
-  // trigger behind the modal, which is a real keyboard/screen-reader trap.
-  React.useEffect(() => {
-    if (!open) return;
-    previouslyFocused.current = document.activeElement as HTMLElement | null;
-    closeBtnRef.current?.focus();
-    return () => previouslyFocused.current?.focus?.();
-  }, [open]);
-
-  React.useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      // Minimal focus trap: wrap Tab/Shift+Tab at the dialog's edges so
-      // keyboard focus can't leave the modal into the page behind it.
-      if (e.key === "Tab" && dialogRef.current) {
-        const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
   React.useEffect(() => {
     if (!open) setConfirmingReset(false);
   }, [open]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50">
-      {/* backdrop */}
-      <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]" onClick={onClose} aria-hidden="true" />
+    <Modal
+      open={open}
+      onClose={onClose}
+      labelledBy="settings-modal-title"
+      widthClass="w-[min(56rem,_94vw)]"
+      initialFocusRef={closeBtnRef}
+    >
+      {/* header */}
+      <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border shrink-0">
+        <h2 id="settings-modal-title" className="text-lg font-semibold">Settings</h2>
+        <button
+          ref={closeBtnRef}
+          onClick={onClose}
+          className="btn"
+          aria-label="Close settings"
+        >
+          Close
+        </button>
+      </div>
 
-      {/* modal */}
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal-title"
-        className="absolute left-1/2 top-4 lg:top-10 -translate-x-1/2 w-[min(56rem,_94vw)] max-h-[calc(100dvh-2rem-3.5rem-env(safe-area-inset-bottom))] lg:max-h-[calc(100vh-5rem)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col overflow-hidden"
-      >
-        {/* header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border shrink-0">
-          <h2 id="settings-modal-title" className="text-lg font-semibold">Settings</h2>
-          <button
-            ref={closeBtnRef}
-            onClick={onClose}
-            className="btn"
-            aria-label="Close settings"
-          >
-            Close
-          </button>
-        </div>
+      {/* body */}
+      <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-4 pb-3 overflow-y-auto flex-1 min-h-0">
+        {/* Account & Token */}
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-3">Account</div>
 
-        {/* body */}
-        <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-4 pb-3 overflow-y-auto flex-1 min-h-0">
-          {/* Account & Token */}
-          <Card className="p-4">
-            <div className="text-sm font-semibold mb-3">Account</div>
-
-            <label className="block text-sm mb-1">Your FPL Entry ID</label>
-            <div className="flex gap-2">
-              <input
-                className="input"
-                type="number"
-                placeholder="1234567"
-                value={entry}
-                onChange={(e) => setEntry(e.target.value === "" ? "" : Number(e.target.value))}
-                autoComplete="off"
-              />
-              <button onClick={() => setEntry("")} className="btn" type="button">
-                Clear
-              </button>
-            </div>
-            {entry !== "" && (!Number.isInteger(entry) || entry <= 0) && (
-              <p className="text-xs text-destructive mt-1">Entry ID must be a positive whole number.</p>
-            )}
-
-            <div className="text-sm font-semibold mt-5 mb-2">FPL Account</div>
-            <SettingsPanel />
-          </Card>
-
-          {/* Preferences */}
-          <Card className="p-4">
-            <div className="text-sm font-semibold mb-3">Preferences</div>
-
-            {/* Theme */}
-            <label className="block text-sm mb-1">Theme</label>
-            <Segmented<Theme>
-              value={prefs.theme}
-              onChange={(v) => set("theme", v)}
-              options={(["system", "light", "dark"] as Theme[]).map((t) => ({
-                value: t,
-                label: t[0].toUpperCase() + t.slice(1),
-              }))}
-              className="mb-3"
-              ariaLabel="Theme"
+          <label className="block text-sm mb-1">Your FPL Entry ID</label>
+          <div className="flex gap-2">
+            <input
+              className="input"
+              type="number"
+              placeholder="1234567"
+              value={entry}
+              onChange={(e) => setEntry(e.target.value === "" ? "" : Number(e.target.value))}
+              autoComplete="off"
             />
+            <button onClick={() => setEntry("")} className="btn" type="button">
+              Clear
+            </button>
+          </div>
+          {entry !== "" && (!Number.isInteger(entry) || entry <= 0) && (
+            <p className="text-xs text-destructive mt-1">Entry ID must be a positive whole number.</p>
+          )}
 
-            {/* Defaults */}
-            <div className="mt-4">
-              <label className="block text-sm mb-1">Default view</label>
-              <Segmented<DefaultView>
-                value={prefs.defaultView}
-                onChange={(v) => set("defaultView", v)}
-                options={(["squad", "live"] as DefaultView[]).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
-                ariaLabel="Default view"
-              />
-            </div>
+          <div className="text-sm font-semibold mt-5 mb-2">FPL Account</div>
+          <SettingsPanel />
+        </Card>
 
-            <div className="mt-4">
-              <label className="block text-sm mb-1">Squad layout</label>
-              <Segmented<SquadLayout>
-                value={prefs.squadLayout}
-                onChange={(v) => set("squadLayout", v)}
-                options={(["list", "pitch"] as SquadLayout[]).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
-                ariaLabel="Squad layout"
-              />
-            </div>
+        {/* Preferences */}
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-3">Preferences</div>
 
-            {/* Reset */}
-            <div className="mt-6 pt-4 border-t border-border">
-              {confirmingReset ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Reset theme, default view, and squad layout?</span>
-                  <button
-                    onClick={() => {
-                      reset();
-                      setConfirmingReset(false);
-                    }}
-                    className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
-                               focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                    type="button"
-                  >
-                    Confirm reset
-                  </button>
-                  <button
-                    onClick={() => setConfirmingReset(false)}
-                    className="btn"
-                    type="button"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
+          {/* Theme */}
+          <label className="block text-sm mb-1">Theme</label>
+          <Segmented<Theme>
+            value={prefs.theme}
+            onChange={(v) => set("theme", v)}
+            options={(["system", "light", "dark"] as Theme[]).map((t) => ({
+              value: t,
+              label: t[0].toUpperCase() + t.slice(1),
+            }))}
+            className="mb-3"
+            ariaLabel="Theme"
+          />
+
+          {/* Defaults */}
+          <div className="mt-4">
+            <label className="block text-sm mb-1">Default view</label>
+            <Segmented<DefaultView>
+              value={prefs.defaultView}
+              onChange={(v) => set("defaultView", v)}
+              options={(["squad", "live"] as DefaultView[]).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
+              ariaLabel="Default view"
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm mb-1">Squad layout</label>
+            <Segmented<SquadLayout>
+              value={prefs.squadLayout}
+              onChange={(v) => set("squadLayout", v)}
+              options={(["list", "pitch"] as SquadLayout[]).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
+              ariaLabel="Squad layout"
+            />
+          </div>
+
+          {/* Reset */}
+          <div className="mt-6 pt-4 border-t border-border">
+            {confirmingReset ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Reset theme, default view, and squad layout?</span>
                 <button
-                  onClick={() => setConfirmingReset(true)}
+                  onClick={() => {
+                    reset();
+                    setConfirmingReset(false);
+                  }}
                   className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
                              focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
                   type="button"
                 >
-                  Reset preferences
+                  Confirm reset
                 </button>
-              )}
-            </div>
-          </Card>
-        </div>
-        <p className="shrink-0 text-xs text-muted-foreground/60 text-center px-4 sm:px-5 py-3 border-t border-border">
-          Not affiliated with Fantasy Premier League or the Premier League.{" "}
-          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">
-            Privacy policy
-          </a>
-        </p>
+                <button
+                  onClick={() => setConfirmingReset(false)}
+                  className="btn"
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingReset(true)}
+                className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
+                           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                type="button"
+              >
+                Reset preferences
+              </button>
+            )}
+          </div>
+        </Card>
       </div>
-    </div>
+      <p className="shrink-0 text-xs text-muted-foreground/60 text-center px-4 sm:px-5 py-3 border-t border-border">
+        Not affiliated with Fantasy Premier League or the Premier League.{" "}
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">
+          Privacy policy
+        </a>
+      </p>
+    </Modal>
   );
 }
