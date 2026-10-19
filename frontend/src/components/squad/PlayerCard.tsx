@@ -31,8 +31,17 @@ export default function PlayerCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`${p.name} — details`}
       onClick={onOpen}
-      className="rounded-xl p-3 cursor-pointer transition bg-card border border-border hover:shadow-card"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen?.();
+        }
+      }}
+      className="rounded-xl p-3 cursor-pointer transition bg-card border border-border hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
       title="Click for details"
     >
       <div className="flex items-center justify-between gap-2">
