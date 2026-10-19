@@ -222,8 +222,15 @@ _SQUAD_NEWS_MAX_AGE_DAYS = 30
 _RECENT_MATCH_MAX_AGE_DAYS = 14
 
 
+# One honest User-Agent for FPL, its auth server and football-data.org. The
+# "Mozilla/5.0 (compatible; ...)" prefix is what the auth flow has always sent
+# and is known to get through every login step. ESPN is the exception
+# (_espn_ua below).
+USER_AGENT = "Mozilla/5.0 (compatible; FPL-Helper/1.0)"
+
+
 def _ua() -> Dict[str, str]:
-    return {"User-Agent": "Personal FPL Helper"}
+    return {"User-Agent": USER_AGENT}
 
 
 def _int_or_none(v: Any) -> Optional[int]:

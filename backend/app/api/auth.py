@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from app.deps import limiter, verify_api_key
+from app.services.service import USER_AGENT as _UA
 
 router = APIRouter(prefix="/api/auth", dependencies=[Depends(verify_api_key)])
 
@@ -49,8 +50,6 @@ _URLS = {
     "resume": "https://account.premierleague.com/as/resume",
     "token": "https://account.premierleague.com/as/token",
 }
-
-_UA = "Mozilla/5.0 (compatible; FPL-Helper/1.0)"
 
 
 def _code_verifier() -> str:
