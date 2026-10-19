@@ -8,15 +8,6 @@
     background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface-2) 100%);
   }
 
-  /* Surfaces */
-  .ds-surface {
-    @apply rounded-2xl border border-border shadow-card bg-[--color-elevated] text-foreground;
-  }
-  .ds-surface-plain { @apply bg-card text-card-foreground; }
-  .ds-border { @apply border-border; }
-  .ds-text { @apply text-foreground; }
-  .ds-text-weak { @apply text-muted-foreground; }
-
   /* Button */
   .btn {
     @apply inline-flex items-center justify-center rounded-lg border border-input
@@ -51,7 +42,5 @@
   }
 
   /* Status pills */
-  .pill-good { @apply bg-success/20 text-success; }
   .pill-warn { @apply bg-warning/20 text-warning; }
-  .pill-bad  { @apply bg-destructive/20 text-destructive; }
 }
