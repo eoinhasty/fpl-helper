@@ -1,7 +1,11 @@
 import json
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+
+# Output uses →/£/×; on Windows, stdout redirected to a file defaults to cp1252 and can't encode them
+sys.stdout.reconfigure(encoding="utf-8")
 
 DATA_DIR = Path(__file__).parent / "data"
 POS = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
