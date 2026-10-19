@@ -49,7 +49,9 @@ def last_season(pg: pd.DataFrame) -> pd.DataFrame:
         "ls_bonus90": s["bonus"] * p90, "ls_pts_pg": s["pts"] / s["n"],
         "ls_dc90": (s["dc"] * p90).where(s["dc_known"]),
     })
-    return out
+    # A season on a PL club's books without playing (loan, injury, new signing)
+    # is no evidence either way; leave it missing rather than as 0 pts/game
+    return out[s["mins"] > 0]
 
 
 def team_fixtures(matches: pd.DataFrame) -> pd.DataFrame:
