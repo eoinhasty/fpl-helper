@@ -7,6 +7,7 @@ on the real-points scale: it is fitted to actual points, so no extra calibration
 import pickle
 
 import pandas as pd
+import sklearn
 from sklearn.ensemble import HistGradientBoostingRegressor
 
 import history
@@ -74,9 +75,13 @@ class Projector:
     @staticmethod
     def _model(fb, season, next_gw):
         path = DATA_DIR / "points_model.pkl"
-        key = (sorted(fb.matches["season"].unique().tolist()), season, next_gw, len(fb.matches))
+        # sklearn's version is in the key: a model pickled under one version isn't safe to reuse under another
+        key = (sorted(fb.matches["season"].unique().tolist()), season, next_gw, len(fb.matches), sklearn.__version__)
         if path.exists():
-            cached = pickle.loads(path.read_bytes())
+            try:
+                cached = pickle.loads(path.read_bytes())
+            except Exception:  # pickled by an incompatible library version
+                cached = {"key": None}
             if cached["key"] == key:
                 return cached["model"]
         print("training points model (about a minute)...", flush=True)
