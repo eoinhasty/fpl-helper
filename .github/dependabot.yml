@@ -1,0 +1,39 @@
+# Weekly dependency update PRs. Minor/patch bumps are grouped into one PR per
+# ecosystem so the queue stays short; majors get their own PR since they're the
+# ones that need reading. Security fixes bypass the schedule and groups (opened
+# as soon as an advisory lands, via the repo's Dependabot security updates).
+# Every merge to main deploys, so these PRs are never auto-merged — CI must pass
+# and someone merges by hand.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Blocked until typescript-eslint supports TS 7 (see backlog, Dev tooling).
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      pip-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
