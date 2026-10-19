@@ -36,7 +36,7 @@ export default function StandingsCard() {
                 {data.rows.map((r) => (
                   <tr key={r.pos} className="odd:bg-card even:bg-muted/60">
                     <td className="px-3 py-2">{r.pos}</td>
-                    <td className="px-2 max-w-[7rem] sm:max-w-none lg:max-w-[5.5rem] xl:max-w-[6.5rem]">
+                    <td className="px-2 max-w-28 sm:max-w-none lg:max-w-22 xl:max-w-26">
                       <div className="flex items-center gap-1.5 min-w-0">
                         {r.crest && <img src={r.crest} alt="" className="w-4 h-4 object-contain shrink-0" loading="lazy" />}
                         <span className="truncate">{r.team}</span>

@@ -40,12 +40,12 @@ export default function MobileTabBar() {
             >
               {({ isActive }) => (
                 <span
-                  className={`relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 ${
+                  className={`relative flex min-h-13 flex-col items-center justify-center gap-0.5 ${
                     isActive ? "text-primary-strong" : "text-muted-foreground"
                   }`}
                 >
                   {isActive && (
-                    <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-primary" aria-hidden="true" />
+                    <span className="absolute top-0 h-0.75 w-8 rounded-b-full bg-primary" aria-hidden="true" />
                   )}
                   {isActive ? <Solid className="w-6 h-6" aria-hidden="true" /> : <Outline className="w-6 h-6" aria-hidden="true" />}
                   <span className="text-[10px] font-medium">{label}</span>

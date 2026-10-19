@@ -12,7 +12,7 @@ export default function StartMeter({ probability, showLabel = false, className }
 
   return (
     <div className={`flex items-center gap-1 ${className ?? ""}`}>
-      <div className="flex-1 h-[3px] rounded-full bg-muted overflow-hidden">
+      <div className="flex-1 h-0.75 rounded-full bg-muted overflow-hidden">
         <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${pct}%` }} />
       </div>
       {showLabel && (

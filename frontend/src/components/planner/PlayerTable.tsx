@@ -103,7 +103,7 @@ export default function PlayerTable({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search player…"
-          className="h-10 px-3 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground flex-1 min-w-[160px]"
+          className="h-10 px-3 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground flex-1 min-w-40"
           aria-label="Search players"
         />
         <SelectMenu
