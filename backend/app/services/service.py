@@ -1571,11 +1571,16 @@ class FPLService:
 
         players_dict = {p["id"]: p for p in boot["elements"]}
         owned_ids: set = {p["element"] for p in picks_list}
-        owned_by_pos: Dict[int, List[dict]] = {}
+        # What selling each owned player actually returns: FPL keeps half of any
+        # price rise, so my_team's selling_price can be below now_cost. Public
+        # picks don't carry it, so that path falls back to now_cost (can
+        # overstate the budget for risen players).
+        sell_by_pos: Dict[int, List[int]] = {}
         for pick in picks_list:
             pl = players_dict.get(pick["element"], {})
             pos = pl.get("element_type", 4)
-            owned_by_pos.setdefault(pos, []).append(pl)
+            sell = pick.get("selling_price") or pl.get("now_cost", 0)
+            sell_by_pos.setdefault(pos, []).append(sell)
 
         # Suggestions are for the next transfer, so score against the upcoming
         # GW's fixtures even when the squad itself came from current-GW picks.
@@ -1603,10 +1608,10 @@ class FPLService:
 
         suggestions = []
         for pos in [1, 2, 3, 4]:
-            owned_in_pos = owned_by_pos.get(pos, [])
-            if not owned_in_pos:
+            sell_prices = sell_by_pos.get(pos, [])
+            if not sell_prices:
                 continue
-            max_sell = max((p.get("now_cost", 0) for p in owned_in_pos), default=0)
+            max_sell = max(sell_prices)
             budget = bank + max_sell
 
             candidates = [
