@@ -1,4 +1,4 @@
 # CI/dev tooling only — not installed on Render. Pinned so CI lints with the
 # same versions as local development; Dependabot bumps these like any other dep.
-ruff==0.17.1
+ruff==0.17.2
 pip-audit==2.10.1
