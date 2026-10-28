@@ -81,6 +81,22 @@ export default function PlayerTable({
 
   const rows = filtered.slice(0, visible);
 
+  const filtersActive = position !== "ALL" || teamId !== "ALL" || query !== "";
+  const clearFilters = () => {
+    setPosition("ALL");
+    setTeamId("ALL");
+    setQuery("");
+  };
+  const clearFiltersButton = (
+    <button
+      type="button"
+      onClick={clearFilters}
+      className="-my-3.5 py-3.5 text-primary-strong font-medium cursor-pointer hover:underline"
+    >
+      Clear filters
+    </button>
+  );
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 sticky top-0 z-10 bg-card py-2 -mx-1 px-1 rounded-xl shadow-sm">
@@ -123,7 +139,10 @@ export default function PlayerTable({
         </button>
       </div>
 
-      <div className="text-xs text-muted-foreground">{filtered.length} players</div>
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span>{filtered.length} players</span>
+        {filtersActive && rows.length > 0 && clearFiltersButton}
+      </div>
 
       <div className="flex flex-col gap-2">
         {rows.map((p) => {
@@ -222,7 +241,10 @@ export default function PlayerTable({
           );
         })}
         {rows.length === 0 && (
-          <div className="text-sm text-muted-foreground text-center py-8">No players match these filters.</div>
+          <div className="text-sm text-muted-foreground text-center py-8 space-y-2">
+            <div>No players match these filters.</div>
+            {filtersActive && <div>{clearFiltersButton}</div>}
+          </div>
         )}
       </div>
 
