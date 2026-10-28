@@ -3,7 +3,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen page-bg">
       <div className="mx-auto max-w-2xl px-6 py-12 text-sm text-foreground leading-relaxed">
         <h1 className="text-2xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-muted-foreground mb-8">Last updated: June 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: October 2026</p>
 
         <section className="mb-6">
           <h2 className="font-semibold text-base mb-2">What we collect</h2>
@@ -92,6 +92,14 @@ export default function PrivacyPage() {
             <a href="mailto:privacy@eoinhasty.dev" className="underline hover:text-foreground">
               privacy@eoinhasty.dev
             </a>
+          </p>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="font-semibold text-base mb-2">Age requirement</h2>
+          <p className="text-muted-foreground">
+            This service is intended for users aged 16 and over (or the age of digital consent in
+            your jurisdiction). By using this app, you confirm you meet this requirement.
           </p>
         </section>
 
