@@ -60,10 +60,6 @@ npm install
 Create `backend/.env` (copy from `backend/.env.example`):
 
 ```env
-# Optional — server-side fallback bearer token, used only when a request
-# arrives without a logged-in user's token (e.g. scripted access).
-FPL_BEARER_TOKEN=
-
 # Optional — enables the live Premier League standings widget.
 # Leave empty to use stub data.
 FOOTBALL_DATA_API_KEY=

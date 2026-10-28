@@ -294,8 +294,9 @@ async def live(
         raise HTTPException(404, detail="No active gameweek found.")
     used_gw = used_event["id"]
 
-    # token: prefer per-request header, fall back to server env var
-    token = request.headers.get("x-fpl-token") or os.getenv("FPL_BEARER_TOKEN")
+    # The logged-in user's own token only. There's deliberately no server-side
+    # fallback token: anonymous callers would be acting as whoever's it was.
+    token = request.headers.get("x-fpl-token")
 
     # live (cached micro-TTL + bypass)
     live_data, mt_status, mt_age = await svc.my_team(
@@ -544,10 +545,9 @@ async def transfer_suggestions(
 ):
     svc: FPLService = request.app.state.svc
     top_n = max(1, min(int(top_n), 5))
-    # token: prefer per-request header, fall back to server env var — same
-    # pattern as /live, since my_team is auth-gated (see transfer_suggestions
-    # docstring for why my_team is preferred over picks when available).
-    token = request.headers.get("x-fpl-token") or os.getenv("FPL_BEARER_TOKEN")
+    # Same per-request token as /live, since my_team is auth-gated (see
+    # transfer_suggestions for why my_team is preferred over picks).
+    token = request.headers.get("x-fpl-token")
     data, readings, ttl = await svc.transfer_suggestions(
         entry_id, top_n=top_n, token=token
     )
