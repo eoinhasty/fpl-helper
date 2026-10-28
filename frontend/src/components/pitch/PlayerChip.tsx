@@ -4,10 +4,6 @@ import { BENCH_LABEL, CHIP } from "../../lib/constants";
 import StartMeter from "../squad/StartMeter";
 import { TONE_CLASS, statusTone } from "../../lib/utils";
 
-const PURPLE = "#38003C";
-
-const ROLE_TEXT = "#fcfcfc";  // light text for contrast on PURPLE
-
 function CaptainBadge({ c, v }: { c?: boolean; v?: boolean }) {
   if (!c && !v) return null;
 
@@ -16,8 +12,8 @@ function CaptainBadge({ c, v }: { c?: boolean; v?: boolean }) {
   return (
     <div
       className="absolute -top-2 -left-2 h-5 w-5 grid place-items-center
-                 rounded-full shadow ring-1 ring-black/15 text-[11px] font-bold"
-      style={{ backgroundColor: PURPLE, color: ROLE_TEXT }}
+                 rounded-full shadow ring-1 ring-black/15 text-[11px] font-bold
+                 bg-fpl-purple text-fpl-purple-foreground"
       title={c ? "Captain" : "Vice-captain"}
     >
       {label}
@@ -74,16 +70,11 @@ function Points({
     variant === "bench"
       ? "bg-muted text-muted-foreground"
       : isCaptain
-        ? "ring-1 ring-black/15 shadow-sm"
+        ? "bg-fpl-purple text-fpl-purple-foreground ring-1 ring-black/15 shadow-sm"
         : "bg-muted text-foreground shadow-sm";
 
-  const inlineStyle =
-    isCaptain && variant !== "bench"
-      ? { backgroundColor: PURPLE, color: ROLE_TEXT }
-      : undefined;
-
   return (
-    <div className={`${base} ${styles}`} style={inlineStyle} title={title}>
+    <div className={`${base} ${styles}`} title={title}>
       {n}
     </div>
   );
@@ -158,7 +149,7 @@ export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { 
 
             {isBench && benchLabel && <BenchOrderBadge label={benchLabel} />}
 
-            <div className="rounded-b-xl grid place-items-center text-white" style={{ backgroundColor: PURPLE, height: CHIP.BANNER_H }}>
+            <div className="rounded-b-xl grid place-items-center bg-fpl-purple text-fpl-purple-foreground" style={{ height: CHIP.BANNER_H }}>
               <div className="px-2 w-full flex items-center justify-center gap-1">
                 <span className="font-semibold leading-none" style={{ fontSize: CHIP.NAME_FS }}>{p.name}</span>
                 {p.team && <span className="opacity-80 tracking-wide" style={{ fontSize: CHIP.TEAM_FS }}>{p.team}</span>}
