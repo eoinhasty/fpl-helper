@@ -1,8 +1,9 @@
-import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Outlet } from "@tanstack/react-router";
 import App from "./app/App";
-import PrivacyPage from "./pages/PrivacyPage";
-import FixturesPage from "./pages/FixturesPage";
-import PlannerPage from "./pages/PlannerPage";
+
+// The dashboard is the landing page and stays in the main bundle; the other
+// pages load on demand so a dashboard visitor doesn't download the planner's
+// player table. Nav links preload a page's chunk on hover/touch ("intent").
 
 const rootRoute = createRootRoute({ component: Outlet });
 
@@ -15,20 +16,20 @@ const indexRoute = createRoute({
 const privacyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/privacy",
-  component: PrivacyPage,
+  component: lazyRouteComponent(() => import("./pages/PrivacyPage")),
 });
 
 const fixturesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/fixtures",
-  component: FixturesPage,
+  component: lazyRouteComponent(() => import("./pages/FixturesPage")),
 });
 
 const plannerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/planner",
-  component: PlannerPage,
+  component: lazyRouteComponent(() => import("./pages/PlannerPage")),
 });
 
 const routeTree = rootRoute.addChildren([indexRoute, privacyRoute, fixturesRoute, plannerRoute]);
-export const router = createRouter({ routeTree });
+export const router = createRouter({ routeTree, defaultPreload: "intent" });
