@@ -10,6 +10,10 @@
    * clears it. In dark mode --color-primary (sky-400) is already high
    * contrast against the dark background, so this just mirrors it there. */
   --color-primary-strong: var(--color-primary-700);
+  /* FPL's own brand purple — captain armband and pitch name banner. Same in
+   * both themes: it's a fixed brand colour, not a surface. */
+  --color-fpl-purple:            #38003c;
+  --color-fpl-purple-foreground: #fcfcfc;
 
   /* base surfaces (LIGHT) */
   --color-bg:            #f8fafc;    /* slate-50 */

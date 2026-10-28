@@ -14,8 +14,7 @@ export default function PlayerCard({
 }) {
   const cap = p.is_captain ? (
     <span
-      className="text-[11px] px-2 py-0.5 rounded-full ring-1 ring-black/15"
-      style={{ backgroundColor: "#38003C", color: "#fcfcfc" }}
+      className="text-[11px] px-2 py-0.5 rounded-full ring-1 ring-black/15 bg-fpl-purple text-fpl-purple-foreground"
     >
       C
     </span>
