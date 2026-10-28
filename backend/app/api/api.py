@@ -122,12 +122,8 @@ async def squad(
     events = boot["events"]
     season_status = FPLService.season_status(events)
     season = FPLService.season_label(events)
-    current_event = next((e for e in events if e["is_current"]), None)
-    next_event = next((e for e in events if e["is_next"]), None)
-    if not current_event and not next_event:
-        raise HTTPException(404, detail="No active gameweek found.")
-    current_gw_id = current_event["id"] if current_event else next_event["id"]
-    next_gw_id = next_event["id"] if next_event else current_event["id"]
+    current_event, next_event = FPLService.current_and_next(events)
+    current_gw_id, next_gw_id = FPLService.current_and_next_gw(events)
 
     # entry info first (cached long) — validates the ID so a bad entry stays a
     # genuine 404 even pre-season, when picks 404 for everyone
@@ -293,9 +289,7 @@ async def live(
 
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
-    used_event = next((e for e in events if e["is_next"]), None) or next(
-        (e for e in events if e["is_current"]), None
-    )
+    used_event = FPLService.upcoming_event(events)
     if used_event is None:
         raise HTTPException(404, detail="No active gameweek found.")
     used_gw = used_event["id"]
@@ -339,7 +333,7 @@ async def live(
     team_value = transfers.get("value")
     team_bank = transfers.get("bank")
 
-    current_event = next((e for e in events if e["is_current"]), None)
+    current_event, _ = FPLService.current_and_next(events)
     current_gw_id = current_event["id"] if current_event else used_gw
 
     # Report the older/worse of team data vs. live scoring — the badge should
@@ -376,9 +370,9 @@ async def team_next(request: Request, response: Response, team_id: int, count: i
 
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
-    base_event = next((e for e in events if e["is_next"]), None) or next(
-        e for e in events if e["is_current"]
-    )
+    base_event = FPLService.upcoming_event(events)
+    if base_event is None:
+        raise HTTPException(404, detail="No active gameweek found.")
     base_gw = base_event["id"]
 
     # get all fixtures (cached + SWR)
