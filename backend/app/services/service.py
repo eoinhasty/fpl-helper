@@ -345,9 +345,7 @@ class FPLService:
             teams = boot["teams"]
             team_names = {t["id"]: t for t in teams}
 
-            base_event = next((e for e in events if e["is_next"]), None) or next(
-                (e for e in events if e["is_current"]), None
-            )
+            base_event = self.upcoming_event(events)
             base_gw = base_event["id"] if base_event else 1
             gw_ids = list(range(base_gw, min(base_gw + horizon, 39)))
 
@@ -425,9 +423,7 @@ class FPLService:
         """Next n_fixtures per team (FixtureLite shape), from the current/next GW onward."""
         events = boot["events"]
         teams = {t["id"]: t for t in boot["teams"]}
-        base_event = next((e for e in events if e["is_next"]), None) or next(
-            (e for e in events if e["is_current"]), None
-        )
+        base_event = FPLService.upcoming_event(events)
         base_gw = base_event["id"] if base_event else 1
 
         by_team: Dict[int, List[dict]] = defaultdict(list)
@@ -585,9 +581,7 @@ class FPLService:
         # pick next event (else current), then earliest kickoff fixture
         boot, _, _ = await self.bootstrap()
         events = boot["events"]
-        ev = next((e for e in events if e["is_next"]), None) or next(
-            (e for e in events if e["is_current"]), None
-        )
+        ev = self.upcoming_event(events)
         if ev is None:
             raise HTTPException(
                 status_code=404, detail="No current or next gameweek found."
@@ -1240,6 +1234,29 @@ class FPLService:
         return "pre_season"
 
     @staticmethod
+    def current_and_next(events: list) -> Tuple[Optional[dict], Optional[dict]]:
+        """The (current, next) events. Pre-GW1 there's no current, after GW38
+        there's no next, and in FPL's summer window there may be neither."""
+        current = next((e for e in events if e["is_current"]), None)
+        nxt = next((e for e in events if e["is_next"]), None)
+        return current, nxt
+
+    @staticmethod
+    def upcoming_event(events: list) -> Optional[dict]:
+        """The GW whose fixtures matter next: the next GW, else the current one."""
+        current, nxt = FPLService.current_and_next(events)
+        return nxt or current
+
+    @staticmethod
+    def current_and_next_gw(events: list) -> Tuple[int, int]:
+        """(current, next) GW ids, each standing in for the other when missing.
+        404s when neither exists."""
+        current, nxt = FPLService.current_and_next(events)
+        if not current and not nxt:
+            raise HTTPException(404, detail="No active gameweek found.")
+        return (current or nxt)["id"], (nxt or current)["id"]
+
+    @staticmethod
     def season_label(events: list) -> Optional[str]:
         """e.g. '2026/27', derived from GW1's deadline year — bootstrap-static has
         no explicit season name field, but the season always starts (GW1 deadline)
@@ -1518,12 +1535,7 @@ class FPLService:
         boot, boot_status, boot_age = await self.bootstrap()
         played_gws = self.finished_gw_count(boot)
         events = boot["events"]
-        current_event = next((e for e in events if e["is_current"]), None)
-        next_event = next((e for e in events if e["is_next"]), None)
-        if not current_event and not next_event:
-            raise HTTPException(404, detail="No active gameweek found.")
-        current_gw = current_event["id"] if current_event else next_event["id"]
-        next_gw = next_event["id"] if next_event else current_event["id"]
+        current_gw, next_gw = self.current_and_next_gw(events)
 
         # Prefer my_team when a token is available — it's auth-gated but (1)
         # already reflects the drafted GW1 squad before picks exist for
