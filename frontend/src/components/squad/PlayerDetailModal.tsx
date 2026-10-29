@@ -207,6 +207,10 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
   const hasTransferData = player.transfers_in_event != null || player.transfers_out_event != null;
   const netSign = netTransfers > 0 ? "+" : netTransfers < 0 ? "−" : "";
   const netStr = netTransfers !== 0 ? `${netSign}${fmtCompact(netTransfers)}` : "0";
+  // transfer_rank is by net transfers, most-bought first — a net seller is
+  // ranked from the other end instead ("#3 most-sold"), with ❄️ mirroring 🔥.
+  const tr = player.transfer_rank;
+  const soldRank = tr && netTransfers < 0 ? tr.of - tr.rank + 1 : null;
   const transferSub = [
     player.transfers_in_event != null && `▲ ${fmtCompact(player.transfers_in_event)} in`,
     player.transfers_out_event != null && `▼ ${fmtCompact(player.transfers_out_event)} out`,
@@ -344,12 +348,16 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
                     <MarketRow
                       label="Transfers"
                       value={netStr}
-                      valueClass={netTransfers > 0 ? "text-success" : "text-muted-foreground"}
+                      valueClass={netTransfers > 0 ? "text-success" : netTransfers < 0 ? "text-destructive" : "text-muted-foreground"}
                       sub={<span className="text-muted-foreground">{transferSub}</span>}
                       right={
-                        player.transfer_rank != null ? (
-                          <span className={`flex items-center gap-1 ${player.transfer_rank.rank <= 5 ? "text-primary" : "text-muted-foreground"}`}>
-                            {player.transfer_rank.rank <= 5 && "🔥"}#{player.transfer_rank.rank} most-bought {posLabel}
+                        soldRank != null ? (
+                          <span className={`flex items-center gap-1 ${soldRank <= 5 ? "text-destructive" : "text-muted-foreground"}`}>
+                            {soldRank <= 5 && "❄️"}#{soldRank} most-sold {posLabel}
+                          </span>
+                        ) : tr != null ? (
+                          <span className={`flex items-center gap-1 ${tr.rank <= 5 ? "text-primary" : "text-muted-foreground"}`}>
+                            {tr.rank <= 5 && "🔥"}#{tr.rank} most-bought {posLabel}
                           </span>
                         ) : undefined
                       }
