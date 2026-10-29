@@ -13,7 +13,7 @@ export function Toggle({ checked, onChange, label }: Props) {
         onClick={() => onChange(!checked)}
         className={`w-12 h-7 shrink-0 rounded-full border border-border relative transition
           ${checked ? "bg-primary border-transparent" : "bg-muted border-border"}
-          focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
         `}
         aria-pressed={checked}
         aria-label={label}

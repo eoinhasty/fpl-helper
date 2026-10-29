@@ -41,7 +41,7 @@ export function SelectMenu<T>({
               // bordered box that used to fill that space was removed.
               ? "inline-flex min-h-11 items-center gap-1 px-1 text-sm text-foreground"
               : "flex h-11 w-full items-center justify-between gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
-            "transition focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
+            "transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             disabled ? "opacity-60 cursor-not-allowed" : variant === "plain" ? "hover:text-primary" : "hover:bg-muted/60",
           ].join(" ")}
         >
