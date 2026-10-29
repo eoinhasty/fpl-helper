@@ -63,6 +63,8 @@ export type TransferSuggestion = {
     shirt_url: string | null;
     /** Score improvement over the owned player it replaces (always > 0) */
     gain: number;
+    /** Which scoring factor contributes most to `gain` ("blank": the owned player has no fixture) */
+    driver: "form" | "fixture" | "dgw" | "minutes" | "blank";
     /** The owned player this buy is paired with — the sale that funds it */
     replaces: {
         element: number;

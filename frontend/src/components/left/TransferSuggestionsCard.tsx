@@ -25,17 +25,27 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
     : `${parseFloat(p.form ?? "0").toFixed(1)} form`;
   const own = p.selected_by_percent != null ? `${Number(p.selected_by_percent).toFixed(1)}% own` : null;
 
-  // Why this beats the player it replaces: an owned player unlikely to play is
-  // the reason on its own; otherwise show the expected-points gap when positive.
+  // Why this beats the player it replaces, from the factor the backend found
+  // contributes most to the score gain.
   const out = p.replaces;
   const outXPts = out.ep_next ? parseFloat(out.ep_next) : null;
   const xPtsGain = xPts != null && outXPts != null ? xPts - outXPts : null;
-  const reason =
-    out.start_probability < 0.5
-      ? { text: `${pct(out.start_probability)} to start`, cls: TONE_CLASS.destructive.text }
-      : xPtsGain != null && xPtsGain > 0
-      ? { text: `+${xPtsGain.toFixed(1)} xPts`, cls: TONE_CLASS.success.text }
-      : null;
+  const reason = (() => {
+    switch (p.driver) {
+      case "blank":
+        return { text: "blank GW", cls: TONE_CLASS.destructive.text };
+      case "minutes":
+        return { text: `${pct(out.start_probability)} to start`, cls: TONE_CLASS.destructive.text };
+      case "dgw":
+        return { text: "double GW", cls: TONE_CLASS.success.text };
+      case "fixture":
+        return { text: "easier fixture", cls: TONE_CLASS.success.text };
+      case "form":
+        return xPtsGain != null && xPtsGain > 0
+          ? { text: `+${xPtsGain.toFixed(1)} xPts`, cls: TONE_CLASS.success.text }
+          : { text: "better form", cls: TONE_CLASS.success.text };
+    }
+  })();
 
   return (
     <li className="flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5 gap-2">
