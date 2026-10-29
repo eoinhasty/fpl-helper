@@ -47,6 +47,15 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
     }
   })();
 
+  // What the swap does to the bank: suggestions are ranked on score gain alone
+  // (a cheaper-near-equivalent weighting lost points in the season backtest),
+  // so show the money side and leave that trade-off to the user.
+  const bankDelta = out.sell_price - p.price;
+  const bankLabel =
+    bankDelta === 0
+      ? "bank ±£0.0"
+      : `bank ${bankDelta > 0 ? "+" : "−"}£${Math.abs(bankDelta / 10).toFixed(1)}`;
+
   return (
     <li className="flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5 gap-2">
       <div className="flex items-center gap-2 min-w-0">
@@ -77,6 +86,7 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
           {fmtPrice(p.price)}
           {own && <> · {own}</>}
         </div>
+        <div className={bankDelta > 0 ? TONE_CLASS.success.text : undefined}>{bankLabel}</div>
         {p.start_probability < 0.75 && (
           <div className="text-[10px]">{pct(p.start_probability)} start</div>
         )}
