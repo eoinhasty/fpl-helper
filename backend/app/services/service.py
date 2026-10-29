@@ -44,6 +44,22 @@ TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
 
 MAX_PER_CLUB = 3  # FPL squad rule
+# Fixture multiplier by FDR, interpolated for a DGW's fractional average.
+# Deliberately gentle: ep_next already carries FPL's own fixture adjustment
+# between GWs (mostly at FDR 1 and 5), so this only has to nudge. Chosen
+# 2026-10-29 with backend/scripts/backtest*.py over 2024-25 and 2025-26
+# against the old linear 1.0 -> 0.0 curve, which zeroed every FDR 5 player:
+# best per-GW ranking in both seasons, +239 pts over the two simulated
+# seasons. Mirrored by fdrFactor() in frontend/src/lib/utils.ts.
+FDR_FACTOR = {1: 1.0, 2: 0.95, 3: 0.9, 4: 0.8, 5: 0.6}
+
+
+def fdr_factor(avg_fdr: float) -> float:
+    lo = max(1, min(4, int(avg_fdr)))
+    t = min(max(avg_fdr - lo, 0.0), 1.0)
+    return FDR_FACTOR[lo] + (FDR_FACTOR[lo + 1] - FDR_FACTOR[lo]) * t
+
+
 # ESPN's public soccer endpoints are undocumented/unofficial (no key, no
 # published quota or contract — the shape could change without notice), but
 # unlike api-football's free tier they actually serve current-season data.
@@ -1526,7 +1542,6 @@ class FPLService:
             return {}  # BGW
 
         avg_fdr = sum(f["difficulty"] for f in team_fixtures) / len(team_fixtures)
-        fdr_factor = 1 - (avg_fdr - 1) / 4
         home_ratio = sum(1 for f in team_fixtures if f["home"]) / len(team_fixtures)
         home_boost = 1 + home_ratio * 0.08
         # ep_next is already a whole-GW total (a DGW player's covers both fixtures
@@ -1538,7 +1553,7 @@ class FPLService:
 
         return {
             "base": base,
-            "fdr": fdr_factor,
+            "fdr": fdr_factor(avg_fdr),
             "home": home_boost,
             "dgw": dgw_boost,
             "start": start_prob,

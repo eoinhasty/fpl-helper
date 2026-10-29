@@ -38,6 +38,15 @@ export const fdrDotClass = (d?: number) =>
   d===4 ? "bg-destructive/60" :
   d===5 ? "bg-destructive" : "bg-muted-foreground/20";
 
+/** Captaincy/transfer fixture multiplier for an average FDR (fractional for a
+ * DGW). Mirrors FDR_FACTOR in backend service.py — change both together. */
+const FDR_FACTOR = [1.0, 0.95, 0.9, 0.8, 0.6];
+export function fdrFactor(avgFdr: number) {
+  const lo = Math.max(1, Math.min(4, Math.floor(avgFdr)));
+  const t = Math.min(Math.max(avgFdr - lo, 0), 1);
+  return FDR_FACTOR[lo - 1] + (FDR_FACTOR[lo] - FDR_FACTOR[lo - 1]) * t;
+}
+
 export function statusToText(s: string | undefined) {
   switch ((s || "").toLowerCase()) {
     case "a": return "Available";
