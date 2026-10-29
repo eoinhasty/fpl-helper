@@ -223,6 +223,17 @@ def _norm_name(s: Optional[str]) -> str:
     return s.lower().strip()
 
 
+# start_prob_from's positive-news floor. Whole words only: as substrings,
+# "fit" matched "lack of match fitness" (~200 doubtful player-GWs across the
+# 2024-26 archive, each read ~27 points too likely to start) and "available"
+# matched "unavailable"; bare "returned" matched departures ("has returned to
+# Getafe"). Every archived string that hit the old floor was one of these.
+_FIT_NEWS_RE = re.compile(
+    r"\b(?:back in training|returned to training|available|fit)\b"
+)
+_NOT_FIT_NEWS_RE = re.compile(r"\b(?:not|isn't|unlikely to be)\s+(?:available|fit)\b")
+
+
 # ESPN tags any article that so much as name-drops a player (Ballon d'Or
 # takes, "FC 100" rankings, unrelated quotes) with that athlete, which
 # drowns out the actual squad call-up/withdrawal/injury news this feature
@@ -1330,9 +1341,7 @@ class FPLService:
             base *= 0.2
         elif any(k in news for k in ["doubt", "late test", "assess"]):
             base *= 0.7
-        elif any(
-            k in news for k in ["back in training", "available", "returned", "fit"]
-        ):
+        elif _FIT_NEWS_RE.search(news) and not _NOT_FIT_NEWS_RE.search(news):
             base = max(base, 0.9)
 
         # FPL's chance field reflects availability, not starting likelihood — use as a multiplier
