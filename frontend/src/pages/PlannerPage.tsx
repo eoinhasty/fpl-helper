@@ -83,6 +83,7 @@ export default function PlannerPage() {
               budget={draft.budget}
               clubCounts={draft.clubCounts}
               violations={draft.violations}
+              warnings={draft.warnings}
               onRemove={draft.remove}
               onSelect={setSelected}
               onClear={draft.clear}

@@ -46,7 +46,7 @@ export default function PlayerTable({
 }: {
   players: PoolPlayer[];
   teams: PoolTeam[];
-  canAdd: (p: PoolPlayer) => { ok: boolean; reason?: string };
+  canAdd: (p: PoolPlayer) => { ok: boolean; reason?: string; warning?: string };
   onAdd: (p: PoolPlayer) => void;
   onSelect?: (p: PoolPlayer) => void;
 }) {
@@ -146,7 +146,7 @@ export default function PlayerTable({
 
       <div className="flex flex-col gap-2">
         {rows.map((p) => {
-          const { ok, reason } = canAdd(p);
+          const { ok, reason, warning } = canAdd(p);
           const alreadyAdded = reason === "Already in squad";
           return (
             <div
@@ -226,16 +226,19 @@ export default function PlayerTable({
                 type="button"
                 onClick={() => ok && onAdd(p)}
                 disabled={!ok}
-                title={!ok ? reason : undefined}
+                title={!ok ? reason : warning}
+                aria-label={warning ? `Add ${p.web_name} (${warning})` : undefined}
                 className={`shrink-0 h-10 px-3 rounded-lg text-xs font-semibold transition ${
-                  ok
+                  ok && warning
+                    ? `border ${TONE_CLASS.warning.soft} text-foreground cursor-pointer hover:opacity-90`
+                    : ok
                     ? "bg-primary text-primary-foreground cursor-pointer hover:opacity-90"
                     : alreadyAdded
                       ? "bg-primary/15 text-primary cursor-default"
                       : "bg-muted text-muted-foreground/50 cursor-not-allowed"
                 }`}
               >
-                {alreadyAdded ? "✓ Added" : "Add"}
+                {alreadyAdded ? "✓ Added" : warning ? "Add ⚠" : "Add"}
               </button>
             </div>
           );

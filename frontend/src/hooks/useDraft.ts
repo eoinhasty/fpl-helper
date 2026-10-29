@@ -110,7 +110,47 @@ export function useDraft(pool: PoolPlayer[] | undefined) {
     }
   }
 
-  function canAdd(p: PoolPlayer): { ok: boolean; reason?: string } {
+  // Cheapest way to fill the open slots from undrafted players (club limit
+  // ignored) — what FPL's own builder reserves so the last slots stay
+  // affordable. The planner warns rather than blocks: removal is one click.
+  const pricesByPos: Record<PoolPosition, PoolPlayer[]> = { GK: [], DEF: [], MID: [], FWD: [] };
+  const drafted = new Set(state.picks);
+  for (const p of pool ?? []) {
+    if (!drafted.has(p.code)) pricesByPos[p.position].push(p);
+  }
+  for (const pos of Object.keys(pricesByPos) as PoolPosition[]) {
+    pricesByPos[pos].sort((a, b) => a.now_cost - b.now_cost);
+  }
+  function fillCost(open: Record<PoolPosition, number>, skipCode?: number) {
+    let total = 0;
+    for (const pos of Object.keys(open) as PoolPosition[]) {
+      total += pricesByPos[pos]
+        .filter((p) => p.code !== skipCode)
+        .slice(0, open[pos])
+        .reduce((sum, p) => sum + p.now_cost, 0);
+    }
+    return total;
+  }
+  const openSlots = (extra?: PoolPosition) => {
+    const open = {} as Record<PoolPosition, number>;
+    for (const pos of Object.keys(QUOTAS) as PoolPosition[]) {
+      open[pos] = Math.max(0, QUOTAS[pos] - counts[pos] - (pos === extra ? 1 : 0));
+    }
+    return open;
+  };
+  const fmtM = (p10: number) => `£${(p10 / 10).toFixed(1)}m`;
+  const shortfallText = (left: number, open: Record<PoolPosition, number>, need: number) => {
+    const n = Object.values(open).reduce((a, b) => a + b, 0);
+    return `${fmtM(left)} left for ${n} open slot${n === 1 ? "" : "s"} — the cheapest fill costs ${fmtM(need)}`;
+  };
+
+  const reserve = fillCost(openSlots());
+  const warnings: string[] = [];
+  if (bank >= 0 && pool && bank < reserve) {
+    warnings.push(shortfallText(bank, openSlots(), reserve));
+  }
+
+  function canAdd(p: PoolPlayer): { ok: boolean; reason?: string; warning?: string } {
     if (state.picks.includes(p.code)) return { ok: false, reason: "Already in squad" };
     if (state.picks.length >= SQUAD_SIZE) return { ok: false, reason: "Squad full (15/15)" };
     if (counts[p.position] >= QUOTAS[p.position]) {
@@ -124,6 +164,14 @@ export function useDraft(pool: PoolPlayer[] | undefined) {
         ok: false,
         reason: `Not enough budget (need £${(p.now_cost / 10).toFixed(1)}m, have £${(bank / 10).toFixed(1)}m)`,
       };
+    }
+    const open = openSlots(p.position);
+    const need = fillCost(open, p.code);
+    const left = bank - p.now_cost;
+    // Only flag the add that breaks it: once the squad is already short, the
+    // panel warning covers it and every Add button turning amber would be noise.
+    if (left < need && bank >= reserve) {
+      return { ok: true, warning: shortfallText(left, open, need) };
     }
     return { ok: true };
   }
@@ -150,5 +198,6 @@ export function useDraft(pool: PoolPlayer[] | undefined) {
     counts,
     clubCounts,
     violations,
+    warnings,
   };
 }

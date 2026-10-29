@@ -1,6 +1,7 @@
 // components/planner/DraftPanel.tsx
 import type { PoolPlayer, PoolPosition } from "../../lib/types";
 import { fmtPrice } from "../../lib/format";
+import { TONE_CLASS } from "../../lib/utils";
 import { BUDGET, MAX_PER_CLUB, QUOTAS } from "../../hooks/useDraft";
 
 const POSITION_ORDER: PoolPosition[] = ["GK", "DEF", "MID", "FWD"];
@@ -10,6 +11,7 @@ export default function DraftPanel({
   budget,
   clubCounts,
   violations,
+  warnings,
   onRemove,
   onSelect,
   onClear,
@@ -18,6 +20,7 @@ export default function DraftPanel({
   budget: { spent: number; bank: number };
   clubCounts: Map<number, number>;
   violations: string[];
+  warnings: string[];
   onRemove: (code: number) => void;
   onSelect?: (p: PoolPlayer) => void;
   onClear: () => void;
@@ -48,6 +51,14 @@ export default function DraftPanel({
         <div className="rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2 space-y-1">
           {violations.map((v) => (
             <div key={v} className="text-xs text-destructive">{v}</div>
+          ))}
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className={`rounded-lg border px-3 py-2 space-y-1 ${TONE_CLASS.warning.soft}`}>
+          {warnings.map((w) => (
+            <div key={w} className="text-xs text-foreground">{w}</div>
           ))}
         </div>
       )}
