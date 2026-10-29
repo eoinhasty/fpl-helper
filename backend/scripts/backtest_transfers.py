@@ -37,9 +37,10 @@ Design (see the CAVEATS block printed at the end for the full list):
 
 Run from the backend/ directory:
 `python scripts/backtest_transfers.py [--season 2024-25] [--refresh]`
-Results swing by season: app-minus-form was +131 on 2024-25 and -173 on
-2025-26, so read any single season's number as noise until it agrees with
-another.
+Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
+app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
++77 and -173), so read any single season's number as noise until it agrees
+with another.
 """
 
 from __future__ import annotations

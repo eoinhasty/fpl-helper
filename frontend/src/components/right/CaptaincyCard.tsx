@@ -1,7 +1,7 @@
 import Card from "../ui/Card";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
-import { isStarting } from "../../lib/utils";
+import { fdrFactor, isStarting } from "../../lib/utils";
 
 function range(arr: number[]) {
   return { mn: Math.min(...arr), mx: Math.max(...arr) };
@@ -43,12 +43,11 @@ function score(players: Player[]) {
   return raw
     .map((r) => {
       const base = hasEp ? norm(r.ep, epRange) : norm(r.form, formRange) * 0.5 + norm(r.ict, ictRange) * 0.5;
-      const fdrFactor = 1 - (r.fdr - 1) / 4;
       const homeBoost = 1 + r.home * 0.08;
       // Only the per-match form/ICT fallback needs boosting; ep_next already counts both fixtures
       const dgwBoost = r.dgw && !hasEp ? 1.8 : 1.0;
       const bgwPenalty = r.bgw ? 0.1 : 1.0;
-      const s = base * fdrFactor * homeBoost * dgwBoost * bgwPenalty * r.sp * posMult(r.p.position);
+      const s = base * fdrFactor(r.fdr) * homeBoost * dgwBoost * bgwPenalty * r.sp * posMult(r.p.position);
       return { p: r.p, score: s, epDisplay: r.ep };
     })
     .sort((a, b) => b.score - a.score);
