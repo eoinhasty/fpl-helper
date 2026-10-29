@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
 from datetime import date, datetime, timedelta, timezone
+from math import log, prod
 from app.simple_cache import AsyncCache
 
 logger = logging.getLogger("uvicorn.error")
@@ -1491,6 +1492,14 @@ class FPLService:
         player: dict, fdr_by_team: dict, candidates: List[dict], played_gws: int
     ) -> float:
         """Score a player for transfer suggestions using the captaincy blend formula."""
+        factors = FPLService._score_factors(player, fdr_by_team, candidates, played_gws)
+        return prod(factors.values()) if factors else 0.0
+
+    @staticmethod
+    def _score_factors(
+        player: dict, fdr_by_team: dict, candidates: List[dict], played_gws: int
+    ) -> Dict[str, float]:
+        """_score_player's multiplicative terms by name; empty for a blank GW."""
 
         def _norm(vals: List[float], v: float) -> float:
             mn, mx = min(vals), max(vals)
@@ -1514,7 +1523,7 @@ class FPLService:
 
         team_fixtures = fdr_by_team.get(player.get("team", 0), [])
         if not team_fixtures:
-            return 0.0  # BGW
+            return {}  # BGW
 
         avg_fdr = sum(f["difficulty"] for f in team_fixtures) / len(team_fixtures)
         fdr_factor = 1 - (avg_fdr - 1) / 4
@@ -1527,7 +1536,43 @@ class FPLService:
         pos_mult = {1: 0.65, 2: 0.72, 3: 0.92, 4: 1.0}.get(pos, 1.0)
         start_prob = FPLService.start_prob_from(player, played_gws)
 
-        return base * fdr_factor * home_boost * dgw_boost * start_prob * pos_mult
+        return {
+            "base": base,
+            "fdr": fdr_factor,
+            "home": home_boost,
+            "dgw": dgw_boost,
+            "start": start_prob,
+            "pos": pos_mult,
+        }
+
+    @staticmethod
+    def _gain_driver(buy: Dict[str, float], sell: Dict[str, float]) -> str:
+        """Name the factor that most explains why `buy` outscores `sell`.
+
+        Scores are products, so each factor's share of the gain is its log
+        ratio. Fixture difficulty and home advantage are reported together as
+        "fixture"; position is shared by both sides and never differs.
+        """
+        if not sell:
+            return "blank"  # the owned player has no fixture this GW
+
+        def _ratio(*keys: str) -> float:
+            # The buy side is never zero (its score beats the sale's), so a
+            # zero here is the sale's — e.g. an FDR 5 fixture or a pool-minimum
+            # base — and that term alone sinks the owned score.
+            b = prod(buy[k] for k in keys)
+            s = prod(sell[k] for k in keys)
+            return log(b / s) if s > 0 else float("inf")
+
+        # max() keeps the first of a tie, so minutes leads: an unavailable
+        # player's ep_next is 0 too, and the absence is the real reason.
+        shares = {
+            "minutes": _ratio("start"),
+            "form": _ratio("base"),
+            "fixture": _ratio("fdr", "home"),
+            "dgw": _ratio("dgw"),
+        }
+        return max(shares, key=lambda k: shares[k])
 
     async def transfer_suggestions(
         self, entry_id: int, top_n: int = 3, *, token: Optional[str] = None
@@ -1657,10 +1702,11 @@ class FPLService:
             # put the two sides on different scales. Same rules as the
             # season simulation in backend/scripts/backtest_transfers.py.
             pool = [pl for pl, _ in owned_here] + buyable
-            score = {
-                p["id"]: self._score_player(p, fdr_by_team, pool, played_gws)
+            factors = {
+                p["id"]: self._score_factors(p, fdr_by_team, pool, played_gws)
                 for p in pool
             }
+            score = {pid: prod(f.values()) if f else 0.0 for pid, f in factors.items()}
             best: Dict[int, Tuple[float, dict, dict, int]] = {}
             for owned, sell in owned_here:
                 for c in buyable:
@@ -1692,6 +1738,12 @@ class FPLService:
                     else None
                 )
                 team_fixtures = fdr_by_team.get(p.get("team", 0), [])
+                driver = self._gain_driver(factors[p["id"]], factors[owned["id"]])
+                # ep_next already covers both DGW fixtures, so there the
+                # double gameweek surfaces as a form (base) gap, not a dgw term
+                owned_fixtures = fdr_by_team.get(owned.get("team", 0), [])
+                if driver == "form" and len(team_fixtures) > len(owned_fixtures) > 0:
+                    driver = "dgw"
                 shaped.append(
                     {
                         "element": p["id"],
@@ -1702,6 +1754,7 @@ class FPLService:
                         "form": p.get("form"),
                         "score": round(score[p["id"]], 4),
                         "gain": round(gain, 4),
+                        "driver": driver,
                         "start_probability": self.start_prob_from(p, played_gws),
                         "selected_by_percent": p.get("selected_by_percent"),
                         "fixture": team_fixtures[0] if team_fixtures else None,
