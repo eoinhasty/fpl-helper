@@ -28,7 +28,10 @@
 
   /* borders & rings (LIGHT) */
   --color-border:        rgba(2,6,23,0.18);
-  --color-ring:          rgba(2,132,199,0.35);
+  /* Solid, not translucent: a focus indicator needs >=3:1 against what's
+   * around it (WCAG 1.4.11). sky-700 is ~5.9:1 on white; with the ring offset
+   * it also reads clearly around primary-filled (blue) controls. */
+  --color-ring:          #0369a1; /* sky-700 */
 
   /* status */
   --success:             #16a34a;    /* green-600 */
@@ -79,7 +82,7 @@
   --color-invert:        #0b1022;
 
   --color-border:        rgba(255,255,255,0.12);
-  --color-ring:          rgba(56,189,248,0.35);
+  --color-ring:          #38bdf8; /* sky-400 */
 
   --success:             #4ade80; /* green-400 */
   --warning:             #fcd34d; /* amber-300 */

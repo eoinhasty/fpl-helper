@@ -39,7 +39,7 @@ export default function TopNav({
         >
           <Link
             to="/"
-            className="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg"
+            className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-lg"
             aria-label={`${title} home`}
           >
             <div className="w-9 h-9 rounded-lg grid place-content-center font-bold bg-primary text-primary-foreground">

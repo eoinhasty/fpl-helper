@@ -119,7 +119,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
                     setConfirmingReset(false);
                   }}
                   className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
-                             focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                             focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   type="button"
                 >
                   Confirm reset
@@ -136,7 +136,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
               <button
                 onClick={() => setConfirmingReset(true)}
                 className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
-                           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                           focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 type="button"
               >
                 Reset preferences
