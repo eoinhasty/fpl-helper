@@ -55,7 +55,24 @@ def solve(d, proj, state, gws, *, scenario=None, wildcard=None, max_now=None, no
     pts = build_points(d, proj, pool, gws, scenario)
     cost = {p: state.sell_price[p] if p in squad else d.els[p]["now_cost"] for p in pool}
     budget = sum(state.sell_price.values()) + state.bank
+    team = {p: d.els[p]["team"] for p in pool}
+    pos = {p: d.els[p]["element_type"] for p in pool}
+    plan = optimise(pool, pts, cost, budget, team, pos, state.squad, state.free_transfers, gws, wildcard=wildcard,
+                    max_now=max_now, no_hits=no_hits, force_out=force_out, keep=keep, bench_weight=bench_weight,
+                    time_limit=time_limit)
+    return plan, pts
 
+
+def optimise(pool, pts, cost, budget, team, pos, squad, free_transfers, gws, *, wildcard=None, max_now=None,
+             no_hits=False, force_out=(), keep=(), bench_weight=0.1, time_limit=120):
+    """The MILP itself, on plain inputs (so backend/scripts/backtest_transfers.py can drive it from the archive).
+
+    pool: candidate ids, including the current squad. pts[(id, gw)]: expected points. cost[id]: selling price
+    for squad players, buying price otherwise. team/pos: id -> club/element_type. Returns the plan, one dict
+    per GW: squad, xi, captain, hits, out, into, points.
+    """
+    initial = list(squad)
+    squad = set(squad)
     P, G = len(pool), len(gws)
     idx = {p: i for i, p in enumerate(pool)}
     nb = P * G
@@ -99,19 +116,19 @@ def solve(d, proj, state, gws, *, scenario=None, wildcard=None, max_now=None, no
 
     by_club, by_pos = {}, {}
     for p in pool:
-        by_club.setdefault(d.els[p]["team"], []).append(p)
-        by_pos.setdefault(d.els[p]["element_type"], []).append(p)
+        by_club.setdefault(team[p], []).append(p)
+        by_pos.setdefault(pos[p], []).append(p)
 
     wg = gws.index(wildcard) if wildcard else None
     for g in range(G):
         add({v(X, idx[p], g): cost[p] for p in pool}, 0, budget)
-        for pos, quota in SQUAD_QUOTA.items():
-            add({v(X, idx[p], g): 1 for p in by_pos[pos]}, quota, quota)
+        for el_type, quota in SQUAD_QUOTA.items():
+            add({v(X, idx[p], g): 1 for p in by_pos[el_type]}, quota, quota)
         for ps in by_club.values():
             add({v(X, idx[p], g): 1 for p in ps}, 0, 3)
         add({v(Y, idx[p], g): 1 for p in pool}, 11, 11)
-        for pos, (l, h) in XI_RANGE.items():
-            add({v(Y, idx[p], g): 1 for p in by_pos[pos]}, l, h)
+        for el_type, (l, h) in XI_RANGE.items():
+            add({v(Y, idx[p], g): 1 for p in by_pos[el_type]}, l, h)
         add({v(C, idx[p], g): 1 for p in pool}, 1, 1)
         for p in pool:
             i = idx[p]
@@ -129,7 +146,7 @@ def solve(d, proj, state, gws, *, scenario=None, wildcard=None, max_now=None, no
         add({F(g): 1, T(g): -1}, -np.inf, 0)
         add({H(g): 1, T(g): -1, F(g): 1}, -np.inf if g == wg else 0, np.inf)
         if g == 0:
-            add({FT(0): 1}, state.free_transfers, state.free_transfers)
+            add({FT(0): 1}, free_transfers, free_transfers)
         else:
             add({FT(g): 1, FT(g - 1): -1, F(g - 1): 1}, -np.inf, 1)
         ub[FT(g)] = MAX_FT
@@ -156,7 +173,7 @@ def solve(d, proj, state, gws, *, scenario=None, wildcard=None, max_now=None, no
         raise SystemExit(f"No feasible plan: {res.message}")
     x = res.x
 
-    plan, prev = [], list(state.squad)
+    plan, prev = [], initial
     for g, gw in enumerate(gws):
         sq = [p for p in pool if x[v(X, idx[p], g)] > 0.5]
         xi = [p for p in pool if x[v(Y, idx[p], g)] > 0.5]
@@ -164,12 +181,12 @@ def solve(d, proj, state, gws, *, scenario=None, wildcard=None, max_now=None, no
         hits = 0 if g == wg else round(x[H(g)])
         plan.append(dict(
             gw=gw, squad=sq, xi=xi, captain=cap, hits=hits,
-            out=sorted((p for p in prev if p not in sq), key=lambda p: d.els[p]["element_type"]),
-            into=sorted((p for p in sq if p not in prev), key=lambda p: d.els[p]["element_type"]),
+            out=sorted((p for p in prev if p not in sq), key=lambda p: pos[p]),
+            into=sorted((p for p in sq if p not in prev), key=lambda p: pos[p]),
             points=sum(pts[(p, gw)] for p in xi) + pts[(cap, gw)],
         ))
         prev = sq
-    return plan, pts
+    return plan
 
 
 def print_plan(d, plan, pts, wildcard=None):
