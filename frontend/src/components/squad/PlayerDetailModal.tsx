@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { Player, PlayerRank, PlayerSummaryResponse } from "../../lib/types";
-import { statusToText, fdrClass, TONE_CLASS, statusTone } from "../../lib/utils";
+import { statusToText, fdrClass, TONE_CLASS, statusTone, XGI_COPY, XGI_MIN_MINUTES, xgiSummary } from "../../lib/utils";
 import { fmtKickoff, fmtPrice, pct, fmtCompact, fmtPriceDelta } from "../../lib/format";
 import { useFetch } from "../../hooks/useFetch";
 import Modal from "../ui/Modal";
@@ -203,7 +203,10 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
     ? { first: "", last: name }
     : { first: name.slice(0, lastSpace), last: name.slice(lastSpace + 1) };
 
-  const netTransfers = (player.transfers_in_event ?? 0) - (player.transfers_out_event ?? 0);
+  const ga = (player.goals_scored ?? 0) + (player.assists ?? 0);
+  const xgiCopy = player.xgi_signal ? XGI_COPY[player.xgi_signal.direction] : null;
+
+  const netTransfers =(player.transfers_in_event ?? 0) - (player.transfers_out_event ?? 0);
   const hasTransferData = player.transfers_in_event != null || player.transfers_out_event != null;
   const netSign = netTransfers > 0 ? "+" : netTransfers < 0 ? "−" : "";
   const netStr = netTransfers !== 0 ? `${netSign}${fmtCompact(netTransfers)}` : "0";
@@ -445,6 +448,42 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
                 ].filter(Boolean).join(" · ")}
               </div>
             </section>
+
+            {/* Expected stats — outfield only; a GK's xGI is ~0 */}
+            {player.position !== 1 && player.expected_goal_involvements != null && (
+              <section>
+                <SectionHeader label="Actual vs expected" />
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { unit: "G", actual: player.goals_scored ?? 0, expected: player.expected_goals, xUnit: "xG" },
+                    { unit: "A", actual: player.assists ?? 0, expected: player.expected_assists, xUnit: "xA" },
+                    { unit: "G+A", actual: ga, expected: player.expected_goal_involvements, xUnit: "xGI" },
+                  ].map(({ unit, actual, expected, xUnit }) => (
+                    <div key={unit} className="p-3 rounded-xl border border-border/40 bg-muted/30">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[22px] font-bold text-foreground tabular-nums leading-none tracking-tight">{actual}</span>
+                        <span className="text-[10px] font-semibold text-muted-foreground tracking-widest uppercase">{unit}</span>
+                      </div>
+                      <div className="mt-1.5 text-xs text-foreground/80 leading-none tabular-nums">
+                        {Number(expected ?? 0).toFixed(1)} <span className="text-muted-foreground">{xUnit}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {player.xgi_signal && xgiCopy ? (
+                  <div className={`mt-2 px-3 py-2.5 rounded-lg border text-xs leading-snug ${TONE_CLASS[xgiCopy.tone].soft}`}>
+                    <span className={`font-semibold ${TONE_CLASS[xgiCopy.tone].text}`}>{xgiCopy.label}</span>
+                    <span className="text-muted-foreground"> · {xgiSummary(player.xgi_signal, ga, player.expected_goal_involvements)}</span>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    {(player.minutes ?? 0) < XGI_MIN_MINUTES
+                      ? "Too few minutes to judge finishing yet."
+                      : "Returns in line with chances created."}
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* Per 90 */}
             <section>

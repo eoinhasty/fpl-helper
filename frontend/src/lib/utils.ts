@@ -1,5 +1,5 @@
 // lib/utils.ts
-import type { Player } from "./types";
+import type { Player, XgiSignal } from "./types";
 
 export const isStarting = (p: Player): boolean => (p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11;
 
@@ -45,6 +45,20 @@ export function fdrFactor(avgFdr: number) {
   const lo = Math.max(1, Math.min(4, Math.floor(avgFdr)));
   const t = Math.min(Math.max(avgFdr - lo, 0), 1);
   return FDR_FACTOR[lo - 1] + (FDR_FACTOR[lo] - FDR_FACTOR[lo - 1]) * t;
+}
+
+/** Mirrors XGI_MIN_MINUTES in backend scoring.py — below it there's no xgi_signal. */
+export const XGI_MIN_MINUTES = 270;
+
+/** xgi_signal copy. "over" scores above their chances (likely to cool off — a
+ * sell-high risk); "under" isn't converting chances yet (a buy-low). */
+export const XGI_COPY: Record<XgiSignal["direction"], { label: string; tone: Tone; outlook: string }> = {
+  over: { label: "Running hot", tone: "warning", outlook: "likely to cool off" },
+  under: { label: "Unlucky", tone: "success", outlook: "likely to pick up" },
+};
+
+export function xgiSummary(s: XgiSignal, ga: number, xgi: string | undefined): string {
+  return `${ga} G+A from ${Number(xgi ?? 0).toFixed(1)} xGI — ${XGI_COPY[s.direction].outlook}`;
 }
 
 export function statusToText(s: string | undefined) {

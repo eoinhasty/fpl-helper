@@ -5,6 +5,7 @@ import { fmtPrice } from "../../lib/format";
 import { fdrClass, statusToText, TONE_CLASS, statusTone } from "../../lib/utils";
 import { Segmented } from "../controls/Segmented";
 import { SelectMenu } from "../controls/SelectMenu";
+import XgiBadge from "../squad/XgiBadge";
 
 /** Badge styling for a non-available status; null when available. */
 function statusBadgeClass(s: string | undefined): string | null {
@@ -195,6 +196,11 @@ export default function PlayerTable({
                         FK{p.freekicks_order}
                       </span>
                     )}
+                    <XgiBadge
+                      signal={p.xgi_signal}
+                      ga={(p.goals_scored ?? 0) + (p.assists ?? 0)}
+                      xgi={p.expected_goal_involvements}
+                    />
                   </div>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {(p.fixtures ?? []).slice(0, 3).map((f, i) => (
