@@ -1,5 +1,7 @@
-httpx>=0.27
-numpy>=1.26
-scipy>=1.11
-pandas>=2.0
-scikit-learn>=1.3
+# Pinned: the scheduled projections workflow installs these, so a new release
+# should arrive as a Dependabot PR rather than silently change published numbers
+httpx==0.28.1
+numpy==2.5.4
+scipy==1.18.1
+pandas==3.0.6
+scikit-learn==1.9.1

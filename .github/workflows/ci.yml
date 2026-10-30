@@ -62,3 +62,21 @@ jobs:
           "
       - name: Audit dependencies
         run: pip-audit -r requirements.txt
+
+  # The offline model and the projections workflow's scripts; mainly so a
+  # Dependabot bump to tools/analysis/requirements.txt gets a pass/fail signal
+  analysis:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/analysis
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: tools/analysis/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Import every script
+        run: python -c "import common, evaluate, features, history, points_model, projections, publish_projections, solver, team_model"

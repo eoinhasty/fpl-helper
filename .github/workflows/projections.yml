@@ -1,0 +1,76 @@
+# Retrain the points model (tools/analysis/points_model.py) once each gameweek's
+# data is final, and publish its projections as an asset on the `projections`
+# pre-release. The backend reads them from there; Render's free tier can't fit
+# scikit-learn or a minute of training, and a release asset (unlike a commit)
+# doesn't redeploy anything. Most runs stop after the cheap --check step.
+name: Projections
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Retrain and publish even if the published file is current
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # create the release and upload its asset
+
+concurrency:
+  group: projections
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: projections
+  PUBLISHED_URL: https://github.com/${{ github.repository }}/releases/download/projections/projections.json
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/analysis
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: tools/analysis/requirements.txt
+      - run: pip install -r requirements.txt
+
+      - name: Check for a newer finished gameweek
+        id: check
+        run: python publish_projections.py --check "$PUBLISHED_URL"
+
+      # Past seasons never change; re-download only when the season list does
+      - name: Restore past-season history
+        if: steps.check.outputs.stale == 'true' || inputs.force
+        id: history
+        uses: actions/cache@v6
+        with:
+          path: tools/analysis/data/history
+          key: fpl-history-${{ hashFiles('tools/analysis/fetch_history.py') }}
+      - name: Fetch past seasons
+        if: (steps.check.outputs.stale == 'true' || inputs.force) && steps.history.outputs.cache-hit != 'true'
+        run: python fetch_history.py
+
+      - name: Fetch this season and train
+        if: steps.check.outputs.stale == 'true' || inputs.force
+        run: |
+          python fetch_data.py
+          python publish_projections.py --out projections.json
+
+      - name: Publish
+        if: steps.check.outputs.stale == 'true' || inputs.force
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --prerelease --target "$GITHUB_SHA" \
+              --title "Points model projections" \
+              --notes "Machine-published by the Projections workflow after each gameweek; read by the app's backend. Not a software release."
+          fi
+          gh release upload "$RELEASE_TAG" projections.json --clobber
