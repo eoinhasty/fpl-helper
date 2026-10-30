@@ -546,6 +546,11 @@ class FPLService:
                     "bonus": p.get("bonus"),
                     "ranks": pos_ranks.get(p["id"]),
                     "transfer_rank": transfer_ranks.get(p["id"]),
+                    # PlayerDetailModal's Market section (transfers + price)
+                    "transfers_in_event": p.get("transfers_in_event"),
+                    "transfers_out_event": p.get("transfers_out_event"),
+                    "cost_change_start": p.get("cost_change_start"),
+                    "cost_change_event": p.get("cost_change_event"),
                 }
                 players.append(
                     {

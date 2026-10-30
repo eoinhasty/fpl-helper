@@ -164,6 +164,10 @@ export type PoolPlayer = {
     bonus?: number;
     ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
     transfer_rank?: { rank: number; of: number };
+    transfers_in_event?: number;
+    transfers_out_event?: number;
+    cost_change_start?: number;
+    cost_change_event?: number;
 };
 
 export type PoolTeam = { id: number; name: string; short_name: string };
