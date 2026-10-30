@@ -14,7 +14,7 @@ import json
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import httpx
 
@@ -31,12 +31,17 @@ def _raw_base() -> str:
     return f"https://raw.githubusercontent.com/{REPO}/master/data/{SEASON}"
 
 
-def configure(description: str) -> argparse.Namespace:
-    """Parse the shared --season/--refresh flags and point the loaders at
-    that season. Cache is per season; --refresh re-downloads, which the
-    in-progress season needs since the archive gains a GW every week."""
+def configure(
+    description: str, add_args: Optional[Callable] = None
+) -> argparse.Namespace:
+    """Parse the shared --season/--refresh flags (plus any a script adds via
+    add_args(parser)) and point the loaders at that season. Cache is per
+    season; --refresh re-downloads, which the in-progress season needs since
+    the archive gains a GW every week."""
     global SEASON, REFRESH
     parser = argparse.ArgumentParser(description=description)
+    if add_args:
+        add_args(parser)
     parser.add_argument(
         "--season",
         default=SEASON,

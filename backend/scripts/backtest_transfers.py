@@ -37,6 +37,12 @@ Design (see the CAVEATS block printed at the end for the full list):
 
 Run from the backend/ directory:
 `python scripts/backtest_transfers.py [--season 2024-25] [--refresh]`
+`--projections FILE` (from tools/analysis/export_walkforward.py) adds arms
+fed the points model's walk-forward projections: as ep_next through the app's
+formula, on their own, and summed over the next 3 or 5 GWs. 2026-10-30, vs
+the app arm (2024-25 / 2025-26): formula +41/-116, raw +46/-150, 3gw
++58/+0.4 (with ~2x the hits), 5gw +23/-55 — no arm a clear win, so the app
+wasn't switched.
 Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
 app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
 +77 and -173), so read any single season's number as noise until it agrees
@@ -45,6 +51,7 @@ with another.
 
 from __future__ import annotations
 
+import json
 import random
 import statistics
 import sys
@@ -88,6 +95,23 @@ Scorer = Callable[[dict, dict, List[dict], int], float]
 
 def form_scorer(cand: dict, fdr: dict, pool: List[dict], played_gws: int) -> float:
     return cand["form"]
+
+
+# Multi-GW arms: rank on the projection summed over this many GWs
+MODEL_WINDOWS = (3, 5)
+
+
+def model_arms() -> List[tuple]:
+    return [("model", "model formula"), ("model_raw", "model raw")] + [
+        (f"model_raw_{w}", f"model raw {w}gw") for w in MODEL_WINDOWS
+    ]
+
+
+def raw_ep_scorer(cand: dict, fdr: dict, pool: List[dict], played_gws: int) -> float:
+    # The projection alone: no FDR/home/DGW terms (the model prices fixtures).
+    # start_prob is left out too, but it's constant here anyway — the sim's
+    # candidate dicts carry no status/news/minutes (see CAVEATS).
+    return cand["ep_next"]
 
 
 def draft_squad(gw1_players: List[dict], seed: int) -> Optional[Dict[int, dict]]:
@@ -230,10 +254,20 @@ def run_transfer_policy(
     snapshots,
     kickoffs,
     scorer: Optional[Scorer],
+    projections: Optional[Dict[int, Dict[int, List[float]]]] = None,
+    window: int = 1,
 ) -> dict:
     """Walk the season week by week, applying the fixed transfer-suggestion
     logic ranked by `scorer` (None = never transfer), and return season
-    totals."""
+    totals. `projections` ({gw: {element: [pts this GW, next GW, ...]}})
+    replaces the scorer's ep_next with the sum of its first `window` GWs; the
+    starting XI and captain still use predicted_ep in every arm.
+    """
+
+    def scoring_ep(el: int, gw: int) -> float:
+        if projections is not None:
+            return sum(projections.get(gw, {}).get(el, [])[:window])
+        return predicted_ep(el, gw, merged_gw, recent_points)
 
     # Copy each player dict too: prices are updated in place below, and the
     # squad's dicts are shared with gw1_players — a shallow copy leaked one
@@ -280,7 +314,7 @@ def run_transfer_policy(
                             "id": e,
                             "element_type": positions_of(owned, latest_position, e),
                             "team": owned[e]["team"],
-                            "ep_next": predicted_ep(e, gw, merged_gw, recent_points),
+                            "ep_next": scoring_ep(e, gw),
                             "form": form_of(e, recent_points),
                             "ict_index": cum_ict.get(e, 0.0),
                         }
@@ -292,9 +326,7 @@ def run_transfer_policy(
                             "id": c["id"],
                             "element_type": pos,
                             "team": c["team"],
-                            "ep_next": predicted_ep(
-                                c["id"], gw, merged_gw, recent_points
-                            ),
+                            "ep_next": scoring_ep(c["id"], gw),
                             "form": form_of(c["id"], recent_points),
                             "ict_index": cum_ict.get(c["id"], 0.0),
                         }
@@ -413,7 +445,21 @@ _teams_cache: Dict[str, int] = {}
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    _fpl_archive.configure("Simulate a season of following transfer suggestions.")
+    args = _fpl_archive.configure(
+        "Simulate a season of following transfer suggestions.",
+        lambda p: p.add_argument(
+            "--projections",
+            help="walk-forward model predictions for this season "
+            "(tools/analysis/export_walkforward.py); adds model-driven arms",
+        ),
+    )
+    projections = None
+    if args.projections:
+        with open(args.projections) as f:
+            projections = {
+                int(gw): {int(el): pts for el, pts in by_el.items()}
+                for gw, by_el in json.load(f).items()
+            }
     print(
         f"Simulating {_fpl_archive.SEASON}: (fixed) transfer suggestions scored by the "
         "app's formula vs. by plain form vs. never transferring...\n"
@@ -465,7 +511,7 @@ def main() -> None:
                 {p["id"]: p["price"] for p in gw1_players},  # latest_value
             )
 
-        def simulate(scorer: Optional[Scorer]) -> dict:
+        def simulate(scorer: Optional[Scorer], proj=None, window: int = 1) -> dict:
             cm, ci, rp, lp, lt, lv = fresh_state()
             return run_transfer_policy(
                 dict(squad),
@@ -481,12 +527,19 @@ def main() -> None:
                 snapshots,
                 kickoffs,
                 scorer=scorer,
+                projections=proj,
+                window=window,
             )
 
         app = simulate(score_player)
         form = simulate(form_scorer)
         none = simulate(None)
         results.append({"seed": seed, "app": app, "form": form, "none": none})
+        if projections is not None:
+            results[-1]["model"] = simulate(score_player, projections)
+            results[-1]["model_raw"] = simulate(raw_ep_scorer, projections)
+            for w in MODEL_WINDOWS:
+                results[-1][f"model_raw_{w}"] = simulate(raw_ep_scorer, projections, w)
         print(
             f"Squad {drafted} (seed {seed}): app={app['total_points']}  "
             f"form={form['total_points']}  "
@@ -495,6 +548,16 @@ def main() -> None:
             f"transfers app/form={app['transfers_made']}/{form['transfers_made']}  "
             f"hits app/form={app['total_hits']}/{form['total_hits']}"
         )
+        if projections is not None:
+            print(
+                "    "
+                + "  ".join(
+                    f"{label}={results[-1][arm]['total_points']} "
+                    f"(transfers {results[-1][arm]['transfers_made']}, "
+                    f"hits {results[-1][arm]['total_hits']})"
+                    for arm, label in model_arms()
+                )
+            )
 
     print()
     print("=" * 72)
@@ -526,6 +589,26 @@ def main() -> None:
         f"(hits {mean_of('app', 'total_hits'):.1f}), form "
         f"{mean_of('form', 'transfers_made'):.1f} (hits {mean_of('form', 'total_hits'):.1f})"
     )
+    if projections is not None:
+        print("MODEL — the same engine and formula fed the points model's")
+        print("walk-forward projections as ep_next ('formula'), or ranking on the")
+        print("projection alone ('raw'), over the next GW or the next N GWs ('Ngw');")
+        print("an Ngw hit needs N-GW projected gain over the 4-point cost:")
+        for arm, label in model_arms():
+            vs_form = [
+                r[arm]["total_points"] - r["form"]["total_points"] for r in results
+            ]
+            vs_app = [
+                r[arm]["total_points"] - r["app"]["total_points"] for r in results
+            ]
+            sd = statistics.stdev(vs_app) if len(vs_app) > 1 else 0.0
+            print(
+                f"  {label}: {mean_of(arm):.1f} pts/season   - form "
+                f"{statistics.mean(vs_form):+.1f}   - app {statistics.mean(vs_app):+.1f} "
+                f"(stdev {sd:.1f}, beat app in {sum(1 for d in vs_app if d > 0)}/"
+                f"{len(vs_app)})   transfers {mean_of(arm, 'transfers_made'):.1f} "
+                f"(hits {mean_of(arm, 'total_hits'):.1f})"
+            )
     print(
         f"Context only: never transferring scored {mean_of('none'):.1f} pts/season — "
         "random squads left alone rot, so beating this says nothing about the formula."
