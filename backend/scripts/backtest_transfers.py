@@ -294,9 +294,21 @@ def run_transfer_policy(
     starting XI and captain still use predicted_ep in every arm.
     """
 
+    def model_pts(el: int, gw: int) -> List[float]:
+        # Projections assume the player is available; like solver.py live,
+        # scale the first GW by FPL's chance of playing at that deadline
+        # (`snap`, set each GW below). The app arm's archived xP is already 0
+        # for injured players, so without this the model arms kept buying
+        # and holding injured players.
+        pts = list(projections.get(gw, {}).get(el, []))
+        chance = snap.get(el, {}).get("chance_of_playing_next_round")
+        if pts and chance is not None:
+            pts[0] *= chance / 100
+        return pts
+
     def scoring_ep(el: int, gw: int) -> float:
         if projections is not None:
-            return sum(projections.get(gw, {}).get(el, [])[:window])
+            return sum(model_pts(el, gw)[:window])
         return predicted_ep(el, gw, merged_gw, recent_points)
 
     # Copy each player dict too: prices are updated in place below, and the
@@ -321,10 +333,9 @@ def run_transfer_policy(
             # Re-plan the next `window` GWs from the current squad with the
             # MILP, then make only this GW's moves (a rolling horizon).
             gws = list(range(gw, min(gw + window, max_gw + 1)))
-            proj_gw = projections.get(gw, {})
 
             def window_pts(el: int) -> List[float]:
-                return (proj_gw.get(el, []) + [0.0] * len(gws))[: len(gws)]
+                return (model_pts(el, gw) + [0.0] * len(gws))[: len(gws)]
 
             # Not eligible_pool: a player blanking this GW can still be worth
             # planning around, so no fixture this GW is required here.
@@ -507,7 +518,10 @@ def run_transfer_policy(
             free_transfers = min(FT_MAX_BANK, max(0, free_transfers - made_free) + 1)
 
         # ---- lineup + score this GW ----
-        ep = {el: predicted_ep(el, gw, merged_gw, recent_points) for el in owned}
+        if projections is not None and _own_lineup:
+            ep = {el: (model_pts(el, gw) or [0.0])[0] for el in owned}
+        else:
+            ep = {el: predicted_ep(el, gw, merged_gw, recent_points) for el in owned}
         xi, captain = pick_best_xi(
             list(owned.keys()), {el: owned[el]["element_type"] for el in owned}, ep
         )
@@ -547,6 +561,7 @@ def form_of(el, recent_points):
 
 _teams_cache: Dict[str, int] = {}
 _allow_hits = True
+_own_lineup = False  # --own-lineup: model arms pick XI/captain on the model too
 
 # Every arm, by name: (scorer, fed the model's projections?, GW window).
 # Each (squad, arm) run is independent, so main() farms them out to a pool.
@@ -567,9 +582,14 @@ _world: dict = {}
 
 
 def _init_world(
-    season: str, refresh: bool, projections_path: Optional[str], allow_hits: bool
+    season: str,
+    refresh: bool,
+    projections_path: Optional[str],
+    allow_hits: bool,
+    own_lineup: bool = False,
 ) -> None:
-    global _teams_cache, _allow_hits
+    global _teams_cache, _allow_hits, _own_lineup
+    _own_lineup = own_lineup
     _fpl_archive.SEASON, _fpl_archive.REFRESH = season, refresh
     _allow_hits = allow_hits
     merged_gw = load_merged_gw()
@@ -651,6 +671,18 @@ def main() -> None:
             action="store_true",
             help="skip the model arms other than those asked for (e.g. just --solver)",
         )
+        p.add_argument(
+            "--own-lineup",
+            action="store_true",
+            help="model arms pick their XI and captain on the model's projections, "
+            "not the shared archived-xP rule (which is the app arm's own signal)",
+        )
+        p.add_argument(
+            "--first-seed",
+            type=int,
+            default=1,
+            help="draft seeds run from here (e.g. 21 for a fresh set of squads)",
+        )
         p.add_argument("--workers", type=int, default=os.cpu_count())
 
     args = _fpl_archive.configure(
@@ -661,6 +693,7 @@ def main() -> None:
         _fpl_archive.REFRESH,
         args.projections,
         not args.no_hits,
+        args.own_lineup,
     )
     print(
         f"Simulating {_fpl_archive.SEASON}: (fixed) transfer suggestions scored by the "
@@ -672,7 +705,7 @@ def main() -> None:
     print(f"Loaded {len(gw1_players)} draftable players at GW1 prices.\n")
 
     squads = {}
-    for seed in range(1, args.squads + 1):
+    for seed in range(args.first_seed, args.first_seed + args.squads):
         for attempt_seed in range(seed * 1000, seed * 1000 + 20):
             squad = draft_squad(gw1_players, attempt_seed)
             if squad:
