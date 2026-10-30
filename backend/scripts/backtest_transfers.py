@@ -37,10 +37,12 @@ Design (see the CAVEATS block printed at the end for the full list):
 
 Run from the backend/ directory:
 `python scripts/backtest_transfers.py [--season 2024-25] [--refresh]`
-`--projections FILE` (from tools/analysis/export_walkforward.py) adds two
-arms fed the points model's walk-forward projections as ep_next: through the
-app's formula, and on their own. 2026-10-30: vs the app arm, +41/+46 on
-2024-25 but -116/-150 on 2025-26 (0/5 squads), so the app wasn't switched.
+`--projections FILE` (from tools/analysis/export_walkforward.py) adds arms
+fed the points model's walk-forward projections: as ep_next through the app's
+formula, on their own, and summed over the next 3 or 5 GWs. 2026-10-30, vs
+the app arm (2024-25 / 2025-26): formula +41/-116, raw +46/-150, 3gw
++58/+0.4 (with ~2x the hits), 5gw +23/-55 — no arm a clear win, so the app
+wasn't switched.
 Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
 app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
 +77 and -173), so read any single season's number as noise until it agrees
@@ -93,6 +95,16 @@ Scorer = Callable[[dict, dict, List[dict], int], float]
 
 def form_scorer(cand: dict, fdr: dict, pool: List[dict], played_gws: int) -> float:
     return cand["form"]
+
+
+# Multi-GW arms: rank on the projection summed over this many GWs
+MODEL_WINDOWS = (3, 5)
+
+
+def model_arms() -> List[tuple]:
+    return [("model", "model formula"), ("model_raw", "model raw")] + [
+        (f"model_raw_{w}", f"model raw {w}gw") for w in MODEL_WINDOWS
+    ]
 
 
 def raw_ep_scorer(cand: dict, fdr: dict, pool: List[dict], played_gws: int) -> float:
@@ -242,17 +254,19 @@ def run_transfer_policy(
     snapshots,
     kickoffs,
     scorer: Optional[Scorer],
-    projections: Optional[Dict[int, Dict[int, float]]] = None,
+    projections: Optional[Dict[int, Dict[int, List[float]]]] = None,
+    window: int = 1,
 ) -> dict:
     """Walk the season week by week, applying the fixed transfer-suggestion
     logic ranked by `scorer` (None = never transfer), and return season
-    totals. `projections` ({gw: {element: pts}}) replaces the scorer's
-    ep_next; the starting XI and captain still use predicted_ep in every arm.
+    totals. `projections` ({gw: {element: [pts this GW, next GW, ...]}})
+    replaces the scorer's ep_next with the sum of its first `window` GWs; the
+    starting XI and captain still use predicted_ep in every arm.
     """
 
     def scoring_ep(el: int, gw: int) -> float:
         if projections is not None:
-            return projections.get(gw, {}).get(el, 0.0)
+            return sum(projections.get(gw, {}).get(el, [])[:window])
         return predicted_ep(el, gw, merged_gw, recent_points)
 
     # Copy each player dict too: prices are updated in place below, and the
@@ -497,7 +511,7 @@ def main() -> None:
                 {p["id"]: p["price"] for p in gw1_players},  # latest_value
             )
 
-        def simulate(scorer: Optional[Scorer], proj=None) -> dict:
+        def simulate(scorer: Optional[Scorer], proj=None, window: int = 1) -> dict:
             cm, ci, rp, lp, lt, lv = fresh_state()
             return run_transfer_policy(
                 dict(squad),
@@ -514,6 +528,7 @@ def main() -> None:
                 kickoffs,
                 scorer=scorer,
                 projections=proj,
+                window=window,
             )
 
         app = simulate(score_player)
@@ -523,6 +538,8 @@ def main() -> None:
         if projections is not None:
             results[-1]["model"] = simulate(score_player, projections)
             results[-1]["model_raw"] = simulate(raw_ep_scorer, projections)
+            for w in MODEL_WINDOWS:
+                results[-1][f"model_raw_{w}"] = simulate(raw_ep_scorer, projections, w)
         print(
             f"Squad {drafted} (seed {seed}): app={app['total_points']}  "
             f"form={form['total_points']}  "
@@ -532,12 +549,14 @@ def main() -> None:
             f"hits app/form={app['total_hits']}/{form['total_hits']}"
         )
         if projections is not None:
-            model, raw = results[-1]["model"], results[-1]["model_raw"]
             print(
-                f"    model formula={model['total_points']} "
-                f"(transfers {model['transfers_made']}, hits {model['total_hits']})  "
-                f"model raw={raw['total_points']} "
-                f"(transfers {raw['transfers_made']}, hits {raw['total_hits']})"
+                "    "
+                + "  ".join(
+                    f"{label}={results[-1][arm]['total_points']} "
+                    f"(transfers {results[-1][arm]['transfers_made']}, "
+                    f"hits {results[-1][arm]['total_hits']})"
+                    for arm, label in model_arms()
+                )
             )
 
     print()
@@ -573,8 +592,9 @@ def main() -> None:
     if projections is not None:
         print("MODEL — the same engine and formula fed the points model's")
         print("walk-forward projections as ep_next ('formula'), or ranking on the")
-        print("projection alone ('raw'):")
-        for arm, label in (("model", "model formula"), ("model_raw", "model raw")):
+        print("projection alone ('raw'), over the next GW or the next N GWs ('Ngw');")
+        print("an Ngw hit needs N-GW projected gain over the 4-point cost:")
+        for arm, label in model_arms():
             vs_form = [
                 r[arm]["total_points"] - r["form"]["total_points"] for r in results
             ]
