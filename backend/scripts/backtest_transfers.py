@@ -10,7 +10,7 @@ they have finished ahead of a manager doing the same with a trivial signal?"
 Design (see the CAVEATS block printed at the end for the full list):
   - Three arms share an identical GW1 squad, drafted under real budget/quota
     constraints: (A) follows the app's transfer-suggestion logic scored by
-    FPLService._score_player (sell<->buy pairs that must beat the owned
+    scoring.score_player (sell<->buy pairs that must beat the owned
     player they replace — the same rules FPLService.transfer_suggestions
     has shipped since 2026-10-19), (B) the
     identical transfer engine scored by plain form (mean of the last 4 GWs'
@@ -53,7 +53,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app.services.service import FPLService  # noqa: E402
+from app.services.scoring import score_player  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _fpl_archive  # noqa: E402
@@ -82,7 +82,7 @@ FORMATIONS = [
 ]
 
 # (candidate, fdr_by_team, scoring_pool, played_gws) -> score; same shape as
-# FPLService._score_player so the arms only differ in this one function.
+# scoring.score_player so the arms only differ in this one function.
 Scorer = Callable[[dict, dict, List[dict], int], float]
 
 
@@ -483,7 +483,7 @@ def main() -> None:
                 scorer=scorer,
             )
 
-        app = simulate(FPLService._score_player)
+        app = simulate(score_player)
         form = simulate(form_scorer)
         none = simulate(None)
         results.append({"seed": seed, "app": app, "form": form, "none": none})

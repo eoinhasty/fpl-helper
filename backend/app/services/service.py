@@ -3,15 +3,28 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-import re
-import unicodedata
 from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
-from datetime import date, datetime, timedelta, timezone
-from math import log, prod
+from datetime import datetime, timezone
+from math import prod
 from app.simple_cache import AsyncCache
+from app.services.espn import EspnService
+from app.services.gameweeks import (
+    current_and_next_gw,
+    finished_gw_count,
+    season_label,
+    season_status,
+    upcoming_event,
+)
+from app.services.scoring import (
+    gain_driver,
+    position_ranks,
+    score_factors,
+    start_prob_from,
+    transfer_ranks,
+)
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -44,244 +57,17 @@ TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
 
 MAX_PER_CLUB = 3  # FPL squad rule
-# Fixture multiplier by FDR, interpolated for a DGW's fractional average.
-# Deliberately gentle: ep_next already carries FPL's own fixture adjustment
-# between GWs (mostly at FDR 1 and 5), so this only has to nudge. Chosen
-# 2026-10-29 with backend/scripts/backtest*.py over 2024-25 and 2025-26
-# against the old linear 1.0 -> 0.0 curve, which zeroed every FDR 5 player:
-# best per-GW ranking in both seasons, +239 pts over the two simulated
-# seasons. Mirrored by fdrFactor() in frontend/src/lib/utils.ts.
-FDR_FACTOR = {1: 1.0, 2: 0.95, 3: 0.9, 4: 0.8, 5: 0.6}
-
-
-def fdr_factor(avg_fdr: float) -> float:
-    lo = max(1, min(4, int(avg_fdr)))
-    t = min(max(avg_fdr - lo, 0.0), 1.0)
-    return FDR_FACTOR[lo] + (FDR_FACTOR[lo + 1] - FDR_FACTOR[lo]) * t
-
-
-# ESPN's public soccer endpoints are undocumented/unofficial (no key, no
-# published quota or contract — the shape could change without notice), but
-# unlike api-football's free tier they actually serve current-season data.
-# Verified live against all six competitions below on 2026-09-21.
-TTL_ESPN_FOOTBALL = 15 * 60  # 15m fresh
-SWR_ESPN_FOOTBALL = 3 * 60 * 60  # +3h stale
-# Lineups only exist once a match is close to kickoff or under way, and
-# change fast (announced XI, then subs as the game goes on) — a much
-# shorter TTL than the fixture-list cache above.
-TTL_ESPN_LINEUPS = 2 * 60  # 2m fresh
-SWR_ESPN_LINEUPS = 15 * 60  # +15m stale
-
-ESPN_SOCCER_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
-
-# ESPN's "core" API tier — used only to find a national team's most recent
-# or next fixture. The site API's own teams/{id}/schedule looked like the
-# obvious tool for that, but it's bugged: it silently caps at the first
-# half of the calendar year (verified against both Brazil and England —
-# both stopped dead at June, missing real September fixtures) and ignores
-# every season/half param tried. This core-API events list doesn't have
-# that bug, but a team's matches are scoped per-competition here (a
-# country's Nations League and friendly fixtures are genuinely separate
-# lists, not merged), so both get checked.
-ESPN_CORE_BASE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues"
-NATIONAL_TEAM_COMPETITIONS = [
-    ("nations-league", "uefa.nations"),
-    ("international-friendlies", "fifa.friendly"),
-]
-
-# ESPN league slugs for the competitions this app cares about beyond the
-# Premier League (which football-data.org already covers).
-ESPN_LEAGUES: Dict[str, str] = {
-    "champions-league": "uefa.champions",
-    "europa-league": "uefa.europa",
-    "conference-league": "uefa.europa.conf",
-    "nations-league": "uefa.nations",
-    "international-friendlies": "fifa.friendly",
-    "preseason-friendlies": "club.friendly",
-}
-# Days either side of the scoreboard's anchor day to also fetch. The day
-# before catches ESPN anchoring on a matchday's second day; two days after
-# covers a matchday's remaining days when it anchors on the first.
-MATCHDAY_NEIGHBOUR_DAYS = (-1, 1, 2)
-
-# International squad news: whether a player has been called up to or
-# withdrawn from their national team, surfaced for squad players during
-# international breaks. Checking every ESPN national-team roster for every
-# player would be impolite (200+ teams) and pointless (most PL players
-# only represent a handful of footballing nations), so nationality is
-# looked up first via FPL's own (undocumented) `region` code on each
-# player, decoded against this table built by cross-referencing ESPN
-# national rosters against FPL's player pool, then extended by resolving
-# individual players' ESPN `citizenship` directly (the roster-based method
-# alone undercounts — it only reflects one active call-up window, missing
-# uncapped/fringe internationals) — verified clean (no conflicting country
-# for the same code, across 51 codes / 594 of the 667 PL players, 89.1%)
-# as of 2026-09-23. `region` reflects birth/federation nationality, not
-# necessarily which country a player currently turns out for
-# internationally (dual nationals can differ — confirmed one real case,
-# Thierno Barry: region says France, he actually plays for Guinea) — so
-# this table is a good first guess, not a guarantee, for that edge case.
-# Players whose region isn't in this table (~11% of the pool, all
-# single- or few-player nationalities) are simply skipped rather than
-# guessed at.
-TTL_ESPN_SQUAD_NEWS = 2 * 60 * 60  # 2h fresh
-SWR_ESPN_SQUAD_NEWS = 24 * 60 * 60  # +24h stale
-
-FPL_REGION_TO_ESPN_COUNTRY: Dict[int, Tuple[str, str]] = {
-    3: ("Algeria", "624"),
-    10: ("Argentina", "202"),
-    13: ("Australia", "628"),
-    14: ("Austria", "474"),
-    21: ("Belgium", "459"),
-    27: ("Bosnia and Herzegovina", "452"),
-    30: ("Brazil", "205"),
-    38: ("Cameroon", "656"),
-    39: ("Canada", "206"),
-    44: ("Chile", "207"),
-    48: ("Colombia", "208"),
-    50: ("DR Congo", "2850"),
-    54: ("Ivory Coast", "4789"),
-    57: ("Czechia", "450"),
-    58: ("Denmark", "479"),
-    62: ("Ecuador", "209"),
-    63: ("Egypt", "2620"),
-    73: ("France", "478"),
-    79: ("Georgia", "584"),
-    80: ("Germany", "481"),
-    81: ("Ghana", "4469"),
-    83: ("Greece", "455"),
-    97: ("Croatia", "477"),
-    98: ("Hungary", "480"),
-    104: ("Republic of Ireland", "476"),
-    106: ("Italy", "162"),
-    107: ("Jamaica", "1038"),
-    108: ("Japan", "627"),
-    132: ("Mali", "2849"),
-    145: ("Morocco", "2869"),
-    152: ("Netherlands", "449"),
-    154: ("New Zealand", "2666"),
-    157: ("Nigeria", "657"),
-    161: ("Norway", "464"),
-    168: ("Paraguay", "210"),
-    172: ("Poland", "471"),
-    173: ("Portugal", "482"),
-    189: ("Senegal", "654"),
-    190: ("Serbia", "6757"),
-    194: ("Slovakia", "468"),
-    195: ("Slovenia", "472"),
-    200: ("Spain", "164"),
-    206: ("Sweden", "466"),
-    207: ("Switzerland", "475"),
-    219: ("Turkey", "465"),
-    225: ("Ukraine", "457"),
-    229: ("United States", "660"),
-    230: ("Uruguay", "212"),
-    241: ("England", "448"),
-    242: ("Northern Ireland", "586"),
-    243: ("Scotland", "580"),
-    244: ("Wales", "578"),
-}
-
-# FPL team id -> (name, ESPN eng.1 club id). Stable for the season (only
-# changes on promotion/relegation), built once by cross-referencing FPL's
-# own team list against ESPN's — same durability assumption as the
-# nationality table above.
-FPL_TEAM_TO_ESPN_CLUB: Dict[int, Tuple[str, str]] = {
-    1: ("Arsenal", "359"),
-    2: ("Aston Villa", "362"),
-    3: ("Bournemouth", "349"),
-    4: ("Brentford", "337"),
-    5: ("Brighton", "331"),
-    6: ("Chelsea", "363"),
-    7: ("Coventry City", "388"),
-    8: ("Crystal Palace", "384"),
-    9: ("Everton", "368"),
-    10: ("Fulham", "370"),
-    11: ("Hull City", "306"),
-    12: ("Ipswich Town", "373"),
-    13: ("Leeds", "357"),
-    14: ("Liverpool", "364"),
-    15: ("Man City", "382"),
-    16: ("Man Utd", "360"),
-    17: ("Newcastle", "361"),
-    18: ("Nott'm Forest", "393"),
-    19: ("Spurs", "367"),
-    20: ("Sunderland", "366"),
-}
-
-
-class _EspnUnavailable(Exception):
-    """Raised inside a cached fetch when ESPN returned 403 (throttling or
-    UA rejection). Never let this get cached as a false-negative empty
-    result — raising here means AsyncCache.get_or_set doesn't store
-    anything, so the next request just tries again instead of being
-    stuck with "no data" for the full TTL window."""
-
-
-def _norm_name(s: Optional[str]) -> str:
-    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
-    return s.lower().strip()
-
-
-# start_prob_from's positive-news floor. Whole words only: as substrings,
-# "fit" matched "lack of match fitness" (~200 doubtful player-GWs across the
-# 2024-26 archive, each read ~27 points too likely to start) and "available"
-# matched "unavailable"; bare "returned" matched departures ("has returned to
-# Getafe"). Every archived string that hit the old floor was one of these.
-_FIT_NEWS_RE = re.compile(
-    r"\b(?:back in training|returned to training|available|fit)\b"
-)
-_NOT_FIT_NEWS_RE = re.compile(r"\b(?:not|isn't|unlikely to be)\s+(?:available|fit)\b")
-
-
-# ESPN tags any article that so much as name-drops a player (Ballon d'Or
-# takes, "FC 100" rankings, unrelated quotes) with that athlete, which
-# drowns out the actual squad call-up/withdrawal/injury news this feature
-# is for. Narrow to headlines that are plausibly about squad status itself.
-_SQUAD_NEWS_RE = re.compile(
-    r"injur|withdraw|knock\b|doubt|fitness|\bscan\b|surgery|ruled out|"
-    r"sideline|recall|call-up|called up|call up|snub|omit|left out|\baxe|"
-    r"\breplace|\bmiss(es|ed|ing)?\b|setback|return to training|operation",
-    re.IGNORECASE,
-)
-# The keyword match alone isn't enough — e.g. a 2024 Euros injury story
-# about a teammate matches "injur" just as well as this week's actual
-# squad news. International squad status is only ever current for the
-# length of a break, so anything older than this is stale by definition.
-_SQUAD_NEWS_MAX_AGE_DAYS = 30
-_RECENT_MATCH_MAX_AGE_DAYS = 14
 
 
 # One honest User-Agent for FPL, its auth server and football-data.org. The
 # "Mozilla/5.0 (compatible; ...)" prefix is what the auth flow has always sent
 # and is known to get through every login step. ESPN is the exception
-# (_espn_ua below).
+# (_espn_ua in espn.py).
 USER_AGENT = "Mozilla/5.0 (compatible; FPL-Helper/1.0)"
 
 
 def _ua() -> Dict[str, str]:
     return {"User-Agent": USER_AGENT}
-
-
-def _int_or_none(v: Any) -> Optional[int]:
-    try:
-        return int(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def _parse_date(v: Optional[str]) -> Optional[date]:
-    try:
-        return date.fromisoformat((v or "")[:10])
-    except ValueError:
-        return None
-
-
-# ESPN's edge blocks our normal descriptive User-Agent (and browser-spoofed
-# ones) with a 403, but accepts httpx's own default signature — so ESPN
-# calls explicitly restore it instead of inheriting self.public's default.
-def _espn_ua() -> Dict[str, str]:
-    return {"User-Agent": f"python-httpx/{httpx.__version__}"}
 
 
 def _auth_headers_from(token: Optional[str]) -> Dict[str, str]:
@@ -296,17 +82,13 @@ class FPLService:
     def __init__(self) -> None:
         self.public = httpx.AsyncClient(base_url=FPL_BASE, headers=_ua(), timeout=20.0)
         self.cache = AsyncCache()
-        # _position_ranks/_transfer_ranks are pure functions of `boot`, which only
+        # position_ranks/transfer_ranks are pure functions of `boot`, which only
         # changes when the bootstrap cache actually refetches — cache by object
         # identity so repeated squad/live requests within the same 6h window don't
         # redo the same sort on every load.
         self._rank_cache_boot_id: Optional[int] = None
         self._rank_cache: Optional[Tuple[dict, dict]] = None
-        # ESPN has no published rate limit or concurrency guidance for
-        # these endpoints (checked — nothing documented anywhere), so this
-        # caps how many ESPN requests this app has in flight at once
-        # rather than trusting a number nobody publishes.
-        self._espn_semaphore = asyncio.Semaphore(4)
+        self.espn = EspnService(self.public, self.cache)
 
     async def _get_json_auth(
         self, path: str, token: Optional[str], params: Optional[dict] = None
@@ -373,7 +155,7 @@ class FPLService:
             teams = boot["teams"]
             team_names = {t["id"]: t for t in teams}
 
-            base_event = self.upcoming_event(events)
+            base_event = upcoming_event(events)
             base_gw = base_event["id"] if base_event else 1
             gw_ids = list(range(base_gw, min(base_gw + horizon, 39)))
 
@@ -451,7 +233,7 @@ class FPLService:
         """Next n_fixtures per team (FixtureLite shape), from the current/next GW onward."""
         events = boot["events"]
         teams = {t["id"]: t for t in boot["teams"]}
-        base_event = FPLService.upcoming_event(events)
+        base_event = upcoming_event(events)
         base_gw = base_event["id"] if base_event else 1
 
         by_team: Dict[int, List[dict]] = defaultdict(list)
@@ -569,7 +351,7 @@ class FPLService:
                 "count": len(players),
                 "teams": team_rows,
                 "players": players,
-                "season": self.season_label(boot.get("events", [])),
+                "season": season_label(boot.get("events", [])),
             }
 
         return await self.cache.get_or_set(key, _fetch, TTL_PLAYERS, SWR_PLAYERS)
@@ -614,7 +396,7 @@ class FPLService:
         # pick next event (else current), then earliest kickoff fixture
         boot, _, _ = await self.bootstrap()
         events = boot["events"]
-        ev = self.upcoming_event(events)
+        ev = upcoming_event(events)
         if ev is None:
             raise HTTPException(
                 status_code=404, detail="No current or next gameweek found."
@@ -629,7 +411,7 @@ class FPLService:
     async def hot_news(self, days: int, limit: int) -> list[dict]:
         boot, _, _ = await self.bootstrap()
         teams = {t["id"]: t for t in boot["teams"]}
-        played_gws = self.finished_gw_count(boot)
+        played_gws = finished_gw_count(boot)
         out = []
         now = datetime.now(timezone.utc)
         for p in boot["elements"]:
@@ -663,7 +445,7 @@ class FPLService:
                     "news": news,
                     "news_added": added,
                     "status": p["status"],
-                    "start_probability": self.start_prob_from(p, played_gws),
+                    "start_probability": start_prob_from(p, played_gws),
                 }
             )
         # simple relevance: newest first, then “injury/transfer” hints first
@@ -769,479 +551,6 @@ class FPLService:
             ],
         }
 
-    # ----------------- ESPN (international / preseason / UEFA) -----------------
-    async def _espn_get(self, url: str, **kwargs) -> Optional[httpx.Response]:
-        """GET an ESPN endpoint, capped for concurrency and tolerant of a
-        403. ESPN's 403 is ambiguous — could be the UA rejection we've
-        already worked around, or could be undocumented throttling (both
-        are known to happen; there's no documented rate limit either way)
-        — so callers get None back and can skip/degrade that one piece
-        gracefully instead of the whole request 500ing."""
-        kwargs.setdefault("headers", _espn_ua())
-        async with self._espn_semaphore:
-            r = await self.public.get(url, **kwargs)
-        if r.status_code == 403:
-            logger.warning("ESPN returned 403 (throttling or UA rejection) for %s", url)
-            return None
-        r.raise_for_status()
-        return r
-
-    async def football_fixtures(self, competition: str) -> dict:
-        slug = ESPN_LEAGUES.get(competition)
-        if not slug:
-            raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
-
-        url = f"{ESPN_SOCCER_BASE}/{slug}/scoreboard"
-        r = await self._espn_get(url)
-        if r is None:
-            return {"source": "espn", "competition": competition, "fixtures": []}
-        js = r.json()
-        events = {e["id"]: e for e in js.get("events", []) if e.get("id")}
-
-        # The undated scoreboard only covers the single day ESPN considers
-        # current (the next match day, or the last one between rounds), but
-        # a UEFA matchday spans several — e.g. the 20–21 Oct 2026 Champions
-        # League matchday has 9 games each day, and the undated call
-        # returned only the first. ESPN rejects a `dates=` range (400), so fetch the days
-        # around that anchor individually and merge them in.
-        anchor = _parse_date((js.get("day") or {}).get("date"))
-        if anchor:
-            extra = await asyncio.gather(
-                *[
-                    self._espn_get(
-                        url,
-                        params={
-                            "dates": (anchor + timedelta(days=d)).strftime("%Y%m%d")
-                        },
-                    )
-                    for d in MATCHDAY_NEIGHBOUR_DAYS
-                ],
-                return_exceptions=True,
-            )
-            for er in extra:
-                # A neighbouring day failing isn't worth losing the anchor
-                # day's fixtures over — just show what did come back.
-                if isinstance(er, Exception):
-                    logger.warning(
-                        "ESPN neighbouring-day fetch failed for %s: %s", slug, er
-                    )
-                elif er is not None:
-                    for e in er.json().get("events", []):
-                        if e.get("id"):
-                            events.setdefault(e["id"], e)
-
-        fixtures = []
-        for e in sorted(events.values(), key=lambda e: e.get("date") or ""):
-            comp = (e.get("competitions") or [{}])[0]
-            competitors = comp.get("competitors") or []
-            home = next((c for c in competitors if c.get("homeAway") == "home"), None)
-            away = next((c for c in competitors if c.get("homeAway") == "away"), None)
-            if not home or not away:
-                continue
-            status = comp.get("status", {}).get("type", {})
-            fixtures.append(
-                {
-                    "id": e.get("id"),
-                    "date": e.get("date"),
-                    "completed": bool(status.get("completed")),
-                    "status_detail": status.get("shortDetail"),
-                    "round": comp.get("altGameNote"),
-                    "home": {
-                        "name": (home.get("team") or {}).get("displayName"),
-                        "short_name": (home.get("team") or {}).get("shortDisplayName"),
-                        "logo": (home.get("team") or {}).get("logo"),
-                    },
-                    "away": {
-                        "name": (away.get("team") or {}).get("displayName"),
-                        "short_name": (away.get("team") or {}).get("shortDisplayName"),
-                        "logo": (away.get("team") or {}).get("logo"),
-                    },
-                    "home_goals": _int_or_none(home.get("score")),
-                    "away_goals": _int_or_none(away.get("score")),
-                }
-            )
-        return {"source": "espn", "competition": competition, "fixtures": fixtures}
-
-    async def football_lineups(self, competition: str, event_id: str) -> dict:
-        slug = ESPN_LEAGUES.get(competition)
-        if not slug:
-            raise HTTPException(400, detail=f"Unknown competition '{competition}'.")
-
-        r = await self._espn_get(
-            f"{ESPN_SOCCER_BASE}/{slug}/summary", params={"event": event_id}
-        )
-        if r is None:
-            return {
-                "source": "espn",
-                "competition": competition,
-                "event": event_id,
-                "teams": [],
-                "available": False,
-            }
-        js = r.json()
-
-        def _shape_team(roster: dict) -> dict:
-            players = []
-            for p in roster.get("roster") or []:
-                athlete = p.get("athlete") or {}
-                stats = {
-                    s.get("name"): s.get("displayValue") for s in p.get("stats", [])
-                }
-                players.append(
-                    {
-                        "id": athlete.get("id"),
-                        "name": athlete.get("fullName"),
-                        "jersey": p.get("jersey"),
-                        "position": (p.get("position") or {}).get("abbreviation"),
-                        "starter": bool(p.get("starter")),
-                        "subbed_in": bool(p.get("subbedIn")),
-                        "subbed_out": bool(p.get("subbedOut")),
-                        "goals": stats.get("totalGoals"),
-                        "assists": stats.get("goalAssists"),
-                        "yellow_cards": stats.get("yellowCards"),
-                        "red_cards": stats.get("redCards"),
-                    }
-                )
-            team = roster.get("team") or {}
-            return {
-                "team": team.get("displayName"),
-                "home_away": roster.get("homeAway"),
-                "formation": roster.get("formation"),
-                "players": players,
-            }
-
-        teams = [_shape_team(r) for r in (js.get("rosters") or [])]
-        return {
-            "source": "espn",
-            "competition": competition,
-            "event": event_id,
-            "teams": teams,
-            "available": any(t["players"] for t in teams),
-        }
-
-    async def _espn_country_roster_names(self, espn_team_id: str) -> set[str]:
-        key = f"espn:nat-roster:{espn_team_id}"
-
-        async def _fetch():
-            r = await self._espn_get(
-                f"{ESPN_SOCCER_BASE}/fifa.friendly/teams/{espn_team_id}/roster"
-            )
-            if r is None:
-                raise _EspnUnavailable(espn_team_id)
-            js = r.json()
-            return [_norm_name(a.get("fullName")) for a in js.get("athletes") or []]
-
-        names, _, _ = await self.cache.get_or_set(
-            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
-        )
-        return set(names)
-
-    async def _espn_team_news(
-        self, league_slug: str, espn_team_id: str, cache_ns: str
-    ) -> list[dict]:
-        """Squad-relevant news for an ESPN team, whether that's a country
-        (fifa.friendly) or a PL club (eng.1). A story about a player's
-        international withdrawal/injury can get filed under either feed
-        depending on how the outlet framed it (e.g. "leaves Sweden camp"
-        vs. "returns to Liverpool") — confirmed live: Alexander Isak's
-        September 2026 injury only showed up under Liverpool's feed, not
-        Sweden's, so both need checking, not just the country."""
-        key = f"espn:{cache_ns}-news:{espn_team_id}"
-
-        async def _fetch():
-            r = await self._espn_get(
-                f"{ESPN_SOCCER_BASE}/{league_slug}/news",
-                params={"team": espn_team_id, "limit": 50},
-            )
-            if r is None:
-                raise _EspnUnavailable(espn_team_id)
-            js = r.json()
-            now = datetime.now(timezone.utc)
-            out = []
-            for a in js.get("articles") or []:
-                headline = a.get("headline") or ""
-                if not _SQUAD_NEWS_RE.search(headline):
-                    continue
-                # No timestamp (or an unparseable one) means we can't
-                # verify this is recent — exclude it, same fail-closed
-                # reasoning as the news_added handling in hot_news().
-                published = a.get("published")
-                if not published:
-                    continue
-                try:
-                    age_days = (
-                        now - datetime.fromisoformat(published.replace("Z", "+00:00"))
-                    ).days
-                    if age_days > _SQUAD_NEWS_MAX_AGE_DAYS:
-                        continue
-                except ValueError:
-                    continue
-                athletes = [
-                    _norm_name(c.get("description"))
-                    for c in a.get("categories") or []
-                    if c.get("type") == "athlete"
-                ]
-                out.append(
-                    {
-                        "headline": headline,
-                        "published": a.get("published"),
-                        "link": (a.get("links") or {}).get("web", {}).get("href"),
-                        "athletes": athletes,
-                    }
-                )
-            return out
-
-        data, _, _ = await self.cache.get_or_set(
-            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
-        )
-        return data
-
-    async def _espn_country_news(self, espn_team_id: str) -> list[dict]:
-        return await self._espn_team_news("fifa.friendly", espn_team_id, "nat")
-
-    async def _espn_club_news(self, espn_club_id: str) -> list[dict]:
-        return await self._espn_team_news("eng.1", espn_club_id, "club")
-
-    async def _espn_country_recent_or_next_match(
-        self, espn_team_id: str
-    ) -> Optional[Tuple[str, str]]:
-        """A country's most recently completed match, or its next one if
-        none has been played yet this window. Returns (competition, event_id)."""
-        key = f"espn:nat-events:{espn_team_id}"
-
-        async def _resolve_ref(ref: str) -> Optional[dict]:
-            # A single event among several failing (403) isn't worth
-            # losing the whole lookup over — skip just that one.
-            er = await self._espn_get(ref)
-            return er.json() if er is not None else None
-
-        async def _fetch():
-            found: Dict[str, Tuple[str, str, str]] = {}
-            for comp_key, slug in NATIONAL_TEAM_COMPETITIONS:
-                # The core events list only carries upcoming matches, and the
-                # site schedule only carries played ones — need both to know
-                # the most recent match mid-window as well as the next one.
-                upcoming, played = await asyncio.gather(
-                    self._espn_get(
-                        f"{ESPN_CORE_BASE}/{slug}/teams/{espn_team_id}/events",
-                        params={"limit": 50},
-                    ),
-                    self._espn_get(
-                        f"{ESPN_SOCCER_BASE}/{slug}/teams/{espn_team_id}/schedule"
-                    ),
-                )
-                if upcoming is None or played is None:
-                    # Losing a whole list (as opposed to one event in it) is a
-                    # bigger deal — don't cache a competition as "no matches"
-                    # when we just couldn't ask.
-                    raise _EspnUnavailable(espn_team_id)
-                for ev in played.json().get("events") or []:
-                    if ev.get("id") and ev.get("date"):
-                        found[ev["id"]] = (comp_key, ev["id"], ev["date"])
-                refs = [
-                    item.get("$ref")
-                    for item in upcoming.json().get("items") or []
-                    if item.get("$ref")
-                ]
-                # Each upcoming entry needs its own follow-up request to get a
-                # date — resolve those concurrently rather than one at a time.
-                for ejs in await asyncio.gather(*[_resolve_ref(ref) for ref in refs]):
-                    if ejs and ejs.get("id") and ejs.get("date"):
-                        found.setdefault(ejs["id"], (comp_key, ejs["id"], ejs["date"]))
-            return list(found.values())
-
-        events, _, _ = await self.cache.get_or_set(
-            key, _fetch, TTL_ESPN_SQUAD_NEWS, SWR_ESPN_SQUAD_NEWS
-        )
-        if not events:
-            return None
-
-        def _parse(d: str) -> datetime:
-            return datetime.fromisoformat(d.replace("Z", "+00:00"))
-
-        now = datetime.now(timezone.utc)
-        cutoff = now - timedelta(days=_RECENT_MATCH_MAX_AGE_DAYS)
-        # A match from a previous window (e.g. June's friendlies) says nothing
-        # about this one, so only count recent results.
-        recent = [e for e in events if cutoff <= _parse(e[2]) <= now]
-        upcoming = [e for e in events if _parse(e[2]) > now]
-        if recent:
-            comp_key, event_id, _ = max(recent, key=lambda e: _parse(e[2]))
-        elif upcoming:
-            comp_key, event_id, _ = min(upcoming, key=lambda e: _parse(e[2]))
-        else:
-            return None
-        return comp_key, event_id
-
-    async def _espn_player_match_involvement(
-        self, espn_team_id: str, candidate_names: set[str]
-    ) -> Optional[dict]:
-        match = await self._espn_country_recent_or_next_match(espn_team_id)
-        if not match:
-            return None
-        competition, event_id = match
-        key = f"espn:lineups:{competition}:{event_id}"
-
-        async def _fetch():
-            return await self.football_lineups(competition, event_id)
-
-        lineup, _, _ = await self.cache.get_or_set(
-            key, _fetch, TTL_ESPN_LINEUPS, SWR_ESPN_LINEUPS
-        )
-        if not lineup.get("available"):
-            return None  # lineup not announced yet — nothing to report either way
-
-        for team in lineup.get("teams", []):
-            for p in team["players"]:
-                if _norm_name(p.get("name")) in candidate_names:
-                    opponent = next(
-                        (
-                            t.get("team")
-                            for t in lineup.get("teams", [])
-                            if t is not team
-                        ),
-                        None,
-                    )
-                    return {
-                        "competition": competition,
-                        "opponent": opponent,
-                        "in_squad": True,
-                        "starter": p["starter"],
-                        "subbed_in": p["subbed_in"],
-                        "subbed_out": p["subbed_out"],
-                    }
-        # Lineup is out but this player isn't in it at all — an unused
-        # squad member (or not selected), a stronger signal than "unknown".
-        return {"competition": competition, "opponent": None, "in_squad": False}
-
-    async def international_squad_news(self, player_ids: List[int]) -> dict:
-        boot, _, _ = await self.bootstrap()
-        by_id = {p["id"]: p for p in boot["elements"]}
-
-        # Resolve each requested player's country and PL club, then only
-        # fetch each distinct one once — a 15-player squad is usually
-        # 8-12 countries but at most 20 clubs (often far fewer), not 15
-        # separate lookups either way.
-        wanted = [by_id[i] for i in player_ids if i in by_id]
-        by_country: Dict[str, List[dict]] = defaultdict(list)
-        by_club: Dict[str, List[dict]] = defaultdict(list)
-        results: Dict[int, dict] = {}
-        news_by_player: Dict[int, List[dict]] = defaultdict(list)
-        for p in wanted:
-            results[p["id"]] = {
-                "country": None,
-                "on_squad": None,
-                "news": [],
-                "recent_match": None,
-            }
-            entry = FPL_REGION_TO_ESPN_COUNTRY.get(p.get("region"))
-            if entry:
-                country, espn_team_id = entry
-                by_country[espn_team_id].append(p)
-                results[p["id"]]["country"] = country
-            club_entry = FPL_TEAM_TO_ESPN_CLUB.get(p.get("team"))
-            if club_entry:
-                _, espn_club_id = club_entry
-                by_club[espn_club_id].append(p)
-
-        def _player_names(p: dict) -> set[str]:
-            web = _norm_name(p.get("web_name"))
-            # first_name/second_name can be present but explicitly null
-            # (not just absent), which .get(key, "") doesn't guard
-            # against — `or ""` does.
-            first = _norm_name(p.get("first_name")).split()
-            second = _norm_name(p.get("second_name")).split()
-            names = {web, " ".join(first + second)}
-            # FPL carries full legal names, ESPN the playing name — for
-            # compound Portuguese/Brazilian names those never match exactly
-            # ("Bruno Borges Fernandes" vs "Bruno Fernandes", "Gabriel dos
-            # Santos Magalhães" vs "Gabriel Magalhães"), which wrongly showed
-            # called-up players as dropped. First + last name bridges that.
-            if first and second:
-                names.add(f"{first[0]} {second[-1]}")
-            names.discard("")
-            return names
-
-        async def _process_country(espn_team_id: str, players: List[dict]) -> None:
-            try:
-                roster_names, news = await asyncio.gather(
-                    self._espn_country_roster_names(espn_team_id),
-                    self._espn_country_news(espn_team_id),
-                )
-            except _EspnUnavailable:
-                # This one country is throttled/unreachable right now —
-                # its players keep the already-initialized "no data yet"
-                # defaults rather than failing every other country's
-                # results in the same batch.
-                logger.warning(
-                    "ESPN unavailable for country %s, skipping", espn_team_id
-                )
-                return
-            for p in players:
-                names = _player_names(p)
-                on_squad = not names.isdisjoint(roster_names)
-                results[p["id"]]["on_squad"] = on_squad
-                news_by_player[p["id"]].extend(
-                    a for a in news if not names.isdisjoint(a["athletes"])
-                )
-                # Only worth checking match involvement for players actually
-                # on the current squad list — if they're not called up at
-                # all, there's nothing to check whether they played in.
-                if on_squad:
-                    try:
-                        results[p["id"]][
-                            "recent_match"
-                        ] = await self._espn_player_match_involvement(
-                            espn_team_id, names
-                        )
-                    except _EspnUnavailable:
-                        logger.warning(
-                            "ESPN unavailable resolving match involvement for %s, skipping",
-                            espn_team_id,
-                        )
-
-        async def _process_club(espn_club_id: str, players: List[dict]) -> None:
-            # A story about international-duty withdrawal/injury can be
-            # filed under either the player's country feed or their club's
-            # ("leaves Sweden camp" vs. "returns to Liverpool") — confirmed
-            # live (Alexander Isak, Sep 2026: only under Liverpool's feed).
-            # Check both rather than assume which one an outlet chose.
-            try:
-                news = await self._espn_club_news(espn_club_id)
-            except _EspnUnavailable:
-                logger.warning("ESPN unavailable for club %s, skipping", espn_club_id)
-                return
-            for p in players:
-                names = _player_names(p)
-                news_by_player[p["id"]].extend(
-                    a for a in news if not names.isdisjoint(a["athletes"])
-                )
-
-        # Countries and clubs are all independent — resolve everything
-        # concurrently rather than one at a time.
-        await asyncio.gather(
-            *[_process_country(tid, players) for tid, players in by_country.items()],
-            *[_process_club(cid, players) for cid, players in by_club.items()],
-        )
-
-        for pid, articles in news_by_player.items():
-            seen_links = set()
-            deduped = []
-            for a in sorted(articles, key=lambda a: a["published"] or "", reverse=True):
-                if a["link"] in seen_links:
-                    continue
-                seen_links.add(a["link"])
-                deduped.append(
-                    {
-                        "headline": a["headline"],
-                        "published": a["published"],
-                        "link": a["link"],
-                    }
-                )
-            results[pid]["news"] = deduped[:3]
-
-        return {"source": "espn", "players": results}
-
     async def live_event(
         self, gw: int, ttl: float = TTL_PICKS, stale_ttl: float = SWR_PICKS
     ) -> Tuple[dict, str, float]:
@@ -1256,167 +565,12 @@ class FPLService:
             stale_ttl,
         )
 
-    # ----------------- utilities for shaping data -----------------
-    @staticmethod
-    def season_status(events: list) -> str:
-        """'in_season' once any GW is current or finished; 'pre_season' otherwise
-        (covers FPL's summer window where is_current/is_next can both be false)."""
-        for e in events:
-            if e.get("is_current") or e.get("finished"):
-                return "in_season"
-        return "pre_season"
-
-    @staticmethod
-    def current_and_next(events: list) -> Tuple[Optional[dict], Optional[dict]]:
-        """The (current, next) events. Pre-GW1 there's no current, after GW38
-        there's no next, and in FPL's summer window there may be neither."""
-        current = next((e for e in events if e["is_current"]), None)
-        nxt = next((e for e in events if e["is_next"]), None)
-        return current, nxt
-
-    @staticmethod
-    def upcoming_event(events: list) -> Optional[dict]:
-        """The GW whose fixtures matter next: the next GW, else the current one."""
-        current, nxt = FPLService.current_and_next(events)
-        return nxt or current
-
-    @staticmethod
-    def current_and_next_gw(events: list) -> Tuple[int, int]:
-        """(current, next) GW ids, each standing in for the other when missing.
-        404s when neither exists."""
-        current, nxt = FPLService.current_and_next(events)
-        if not current and not nxt:
-            raise HTTPException(404, detail="No active gameweek found.")
-        return (current or nxt)["id"], (nxt or current)["id"]
-
-    @staticmethod
-    def season_label(events: list) -> Optional[str]:
-        """e.g. '2026/27', derived from GW1's deadline year — bootstrap-static has
-        no explicit season name field, but the season always starts (GW1 deadline)
-        in the calendar year it's named after.
-
-        Pre-season, bootstrap's per-element season totals (goals_scored,
-        points_per_game, etc.) haven't reset yet — they're still last season's
-        final numbers until GW1 actually kicks off, same rollover-lag as
-        StandingsCard's is_previous_season_table. So the label reported here
-        must lag by one season too, or it would claim e.g. "2026/27" next to
-        stats that are actually 2025/26's."""
-        if not events:
-            return None
-        deadline = events[0].get("deadline_time")
-        if not deadline:
-            return None
-        year = int(deadline[:4])
-        if FPLService.season_status(events) == "pre_season":
-            year -= 1
-        return f"{year}/{(year + 1) % 100:02d}"
-
-    @staticmethod
-    def finished_gw_count(boot: dict) -> int:
-        """Finished GWs this season (min 1) — the denominator start_prob_from
-        needs to turn cumulative minutes into a per-GW play-time ratio."""
-        return max(1, sum(1 for e in boot.get("events", []) if e.get("finished")))
-
-    @staticmethod
-    def start_prob_from(player: dict, played_gws: int) -> float:
-        # played_gws is deliberately required: it used to default to 1, and
-        # three callers relied on that, so from GW2 on any player past ~90
-        # season minutes pinned time_ratio at its cap and a ~40-min/game
-        # rotation risk read as ~93% to start instead of ~60%.
-        status = player.get("status", "a")
-        news = (player.get("news") or "").lower()
-
-        # Heuristic: status base blended with actual play-time ratio to catch rotation risk
-        status_base = {
-            "a": 0.88,
-            "d": 0.55,
-            "i": 0.0,
-            "s": 0.0,
-            "n": 0.0,
-            "u": 0.0,  # left the club (transferred, loaned out, released)
-        }.get(status, 0.5)
-        minutes = player.get("minutes", 0)
-        if status == "a" and played_gws > 0 and minutes > 0:
-            time_ratio = min(minutes / (played_gws * 90), 0.99)
-            base = (status_base + time_ratio) / 2
-        else:
-            base = status_base
-
-        if any(k in news for k in ["ruled out", "surgery", "setback"]):
-            base *= 0.2
-        elif any(k in news for k in ["doubt", "late test", "assess"]):
-            base *= 0.7
-        elif _FIT_NEWS_RE.search(news) and not _NOT_FIT_NEWS_RE.search(news):
-            base = max(base, 0.9)
-
-        # FPL's chance field reflects availability, not starting likelihood — use as a multiplier
-        chance = player.get("chance_of_playing_next_round")
-        if chance is not None:
-            base *= chance / 100
-
-        return round(max(0.0, min(0.99, base)), 2)
-
-    @staticmethod
-    def _position_ranks(boot: dict) -> dict:
-        """Compute within-position stat ranks for active players (minutes > 0)."""
-
-        by_pos: dict = defaultdict(list)
-        for p in boot.get("elements", []):
-            if (p.get("minutes") or 0) > 0:
-                by_pos[p["element_type"]].append(p)
-
-        result: dict = {}
-        for group in by_pos.values():
-            n = len(group)
-            if n == 0:
-                continue
-
-            def rank_by(stat_fn, key: str, grp=group, total=n):
-                for i, p in enumerate(sorted(grp, key=stat_fn, reverse=True)):
-                    r = i + 1
-                    pct = round((1 - (r - 1) / total) * 100) if total > 1 else 100
-                    result.setdefault(p["id"], {})[key] = {
-                        "rank": r,
-                        "of": total,
-                        "pct": pct,
-                    }
-
-            rank_by(lambda p: p.get("goals_scored") or 0, "goals")
-            rank_by(lambda p: p.get("assists") or 0, "assists")
-            rank_by(lambda p: p.get("clean_sheets") or 0, "clean_sheets")
-            rank_by(lambda p: p.get("saves") or 0, "saves")
-            rank_by(lambda p: float(p.get("points_per_game") or 0), "ppg")
-
-        return result
-
-    @staticmethod
-    def _transfer_ranks(boot: dict) -> dict:
-        """Compute within-position rank by net transfers (in - out) for the current GW."""
-
-        by_pos: dict = defaultdict(list)
-        for p in boot.get("elements", []):
-            by_pos[p["element_type"]].append(p)
-
-        result: dict = {}
-        for group in by_pos.values():
-            n = len(group)
-
-            def net(p: dict) -> int:
-                return (p.get("transfers_in_event") or 0) - (
-                    p.get("transfers_out_event") or 0
-                )
-
-            for i, p in enumerate(sorted(group, key=net, reverse=True)):
-                result[p["id"]] = {"rank": i + 1, "of": n}
-
-        return result
-
     def _cached_ranks(self, boot: dict) -> Tuple[dict, dict]:
         boot_id = id(boot)
         if self._rank_cache_boot_id != boot_id:
             self._rank_cache = (
-                FPLService._position_ranks(boot),
-                FPLService._transfer_ranks(boot),
+                position_ranks(boot),
+                transfer_ranks(boot),
             )
             self._rank_cache_boot_id = boot_id
         return self._rank_cache
@@ -1430,7 +584,7 @@ class FPLService:
             for e in (live.get("elements") or [])
         }
 
-        played_gws = FPLService.finished_gw_count(boot)
+        played_gws = finished_gw_count(boot)
 
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
@@ -1484,7 +638,7 @@ class FPLService:
                     "total_points": p.get("total_points"),
                     "gw_points": live_points.get(el),
                     "selected_by_percent": p.get("selected_by_percent"),
-                    "start_probability": FPLService.start_prob_from(p, played_gws),
+                    "start_probability": start_prob_from(p, played_gws),
                     "form": p.get("form"),
                     "ict_index": p.get("ict_index"),
                     "minutes": p.get("minutes"),
@@ -1517,99 +671,13 @@ class FPLService:
         eh = picks.get("entry_history") or {}
         return enriched, eh.get("value"), eh.get("bank")
 
-    @staticmethod
-    def _score_player(
-        player: dict, fdr_by_team: dict, candidates: List[dict], played_gws: int
-    ) -> float:
-        """Score a player for transfer suggestions using the captaincy blend formula."""
-        factors = FPLService._score_factors(player, fdr_by_team, candidates, played_gws)
-        return prod(factors.values()) if factors else 0.0
-
-    @staticmethod
-    def _score_factors(
-        player: dict, fdr_by_team: dict, candidates: List[dict], played_gws: int
-    ) -> Dict[str, float]:
-        """_score_player's multiplicative terms by name; empty for a blank GW."""
-
-        def _norm(vals: List[float], v: float) -> float:
-            mn, mx = min(vals), max(vals)
-            return 0.5 if mx == mn else (v - mn) / (mx - mn)
-
-        pos = player.get("element_type", 4)
-
-        ep_vals = [float(c.get("ep_next") or 0) for c in candidates]
-        form_vals = [float(c.get("form") or 0) for c in candidates]
-        ict_vals = [float(c.get("ict_index") or 0) for c in candidates]
-
-        ep = float(player.get("ep_next") or 0)
-        uses_ep = any(v > 0 for v in ep_vals)
-        if uses_ep:
-            base = _norm(ep_vals, ep)
-        else:
-            base = (
-                _norm(form_vals, float(player.get("form") or 0)) * 0.5
-                + _norm(ict_vals, float(player.get("ict_index") or 0)) * 0.5
-            )
-
-        team_fixtures = fdr_by_team.get(player.get("team", 0), [])
-        if not team_fixtures:
-            return {}  # BGW
-
-        avg_fdr = sum(f["difficulty"] for f in team_fixtures) / len(team_fixtures)
-        home_ratio = sum(1 for f in team_fixtures if f["home"]) / len(team_fixtures)
-        home_boost = 1 + home_ratio * 0.08
-        # ep_next is already a whole-GW total (a DGW player's covers both fixtures
-        # — in the 2024-25 archive it's ~2x a single GW), so only the per-match
-        # form/ICT fallback needs the DGW boost.
-        dgw_boost = 1.8 if len(team_fixtures) > 1 and not uses_ep else 1.0
-        pos_mult = {1: 0.65, 2: 0.72, 3: 0.92, 4: 1.0}.get(pos, 1.0)
-        start_prob = FPLService.start_prob_from(player, played_gws)
-
-        return {
-            "base": base,
-            "fdr": fdr_factor(avg_fdr),
-            "home": home_boost,
-            "dgw": dgw_boost,
-            "start": start_prob,
-            "pos": pos_mult,
-        }
-
-    @staticmethod
-    def _gain_driver(buy: Dict[str, float], sell: Dict[str, float]) -> str:
-        """Name the factor that most explains why `buy` outscores `sell`.
-
-        Scores are products, so each factor's share of the gain is its log
-        ratio. Fixture difficulty and home advantage are reported together as
-        "fixture"; position is shared by both sides and never differs.
-        """
-        if not sell:
-            return "blank"  # the owned player has no fixture this GW
-
-        def _ratio(*keys: str) -> float:
-            # The buy side is never zero (its score beats the sale's), so a
-            # zero here is the sale's — e.g. an FDR 5 fixture or a pool-minimum
-            # base — and that term alone sinks the owned score.
-            b = prod(buy[k] for k in keys)
-            s = prod(sell[k] for k in keys)
-            return log(b / s) if s > 0 else float("inf")
-
-        # max() keeps the first of a tie, so minutes leads: an unavailable
-        # player's ep_next is 0 too, and the absence is the real reason.
-        shares = {
-            "minutes": _ratio("start"),
-            "form": _ratio("base"),
-            "fixture": _ratio("fdr", "home"),
-            "dgw": _ratio("dgw"),
-        }
-        return max(shares, key=lambda k: shares[k])
-
     async def transfer_suggestions(
         self, entry_id: int, top_n: int = 3, *, token: Optional[str] = None
     ) -> Tuple[dict, List[Tuple[str, float]], int]:
         boot, boot_status, boot_age = await self.bootstrap()
-        played_gws = self.finished_gw_count(boot)
+        played_gws = finished_gw_count(boot)
         events = boot["events"]
-        current_gw, next_gw = self.current_and_next_gw(events)
+        current_gw, next_gw = current_and_next_gw(events)
 
         # Prefer my_team when a token is available — it's auth-gated but (1)
         # already reflects the drafted GW1 squad before picks exist for
@@ -1639,8 +707,8 @@ class FPLService:
         if reading_status is None:
             picks_result = await self.picks_with_fallback(entry_id, next_gw, current_gw)
             if picks_result is None:
-                season_status = self.season_status(events)
-                if season_status != "pre_season":
+                status = season_status(events)
+                if status != "pre_season":
                     raise HTTPException(404, detail="No picks found for this entry.")
                 # Pre-season, no token: no picks exist for anyone yet —
                 # nothing to base suggestions on, so return an empty (not
@@ -1653,7 +721,7 @@ class FPLService:
                         "entry_id": entry_id,
                         "bank": 0,
                         "suggestions": [],
-                        "season_status": season_status,
+                        "season_status": status,
                     },
                     [(boot_status, boot_age)],
                     TTL_PICKS,
@@ -1726,14 +794,13 @@ class FPLService:
             # A suggestion is a sell->buy pair: it has to beat the specific
             # owned player it replaces, be affordable from *that* player's
             # sale, and keep the squad within 3 per club. Score owned and
-            # buyable players against one shared pool — _score_player
+            # buyable players against one shared pool — score_player
             # normalises within the pool it's given, so separate pools would
             # put the two sides on different scales. Same rules as the
             # season simulation in backend/scripts/backtest_transfers.py.
             pool = [pl for pl, _ in owned_here] + buyable
             factors = {
-                p["id"]: self._score_factors(p, fdr_by_team, pool, played_gws)
-                for p in pool
+                p["id"]: score_factors(p, fdr_by_team, pool, played_gws) for p in pool
             }
             score = {pid: prod(f.values()) if f else 0.0 for pid, f in factors.items()}
             best: Dict[int, Tuple[float, dict, dict, int]] = {}
@@ -1767,7 +834,7 @@ class FPLService:
                     else None
                 )
                 team_fixtures = fdr_by_team.get(p.get("team", 0), [])
-                driver = self._gain_driver(factors[p["id"]], factors[owned["id"]])
+                driver = gain_driver(factors[p["id"]], factors[owned["id"]])
                 # ep_next already covers both DGW fixtures, so there the
                 # double gameweek surfaces as a form (base) gap, not a dgw term
                 owned_fixtures = fdr_by_team.get(owned.get("team", 0), [])
@@ -1784,7 +851,7 @@ class FPLService:
                         "score": round(score[p["id"]], 4),
                         "gain": round(gain, 4),
                         "driver": driver,
-                        "start_probability": self.start_prob_from(p, played_gws),
+                        "start_probability": start_prob_from(p, played_gws),
                         "selected_by_percent": p.get("selected_by_percent"),
                         "fixture": team_fixtures[0] if team_fixtures else None,
                         "has_dgw": len(team_fixtures) > 1,
@@ -1794,9 +861,7 @@ class FPLService:
                             "name": owned.get("web_name"),
                             "sell_price": sell,
                             "ep_next": owned.get("ep_next"),
-                            "start_probability": self.start_prob_from(
-                                owned, played_gws
-                            ),
+                            "start_probability": start_prob_from(owned, played_gws),
                         },
                     }
                 )

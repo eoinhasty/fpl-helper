@@ -18,13 +18,16 @@ from app.services.service import (
     TTL_FDR,
     TTL_PLAYERS,
     TTL_PLAYER_SUMMARY,
+    SWR_NEXTMATCH,
+    SWR_NEWS,
+    SWR_STANDINGS,
+)
+from app.services import gameweeks
+from app.services.espn import (
     TTL_ESPN_FOOTBALL,
     SWR_ESPN_FOOTBALL,
     TTL_ESPN_LINEUPS,
     SWR_ESPN_LINEUPS,
-    SWR_NEXTMATCH,
-    SWR_NEWS,
-    SWR_STANDINGS,
 )
 import logging
 
@@ -120,10 +123,10 @@ async def squad(
     # bootstrap (cached)
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
-    season_status = FPLService.season_status(events)
-    season = FPLService.season_label(events)
-    current_event, next_event = FPLService.current_and_next(events)
-    current_gw_id, next_gw_id = FPLService.current_and_next_gw(events)
+    season_status = gameweeks.season_status(events)
+    season = gameweeks.season_label(events)
+    current_event, next_event = gameweeks.current_and_next(events)
+    current_gw_id, next_gw_id = gameweeks.current_and_next_gw(events)
 
     # entry info first (cached long) — validates the ID so a bad entry stays a
     # genuine 404 even pre-season, when picks 404 for everyone
@@ -289,7 +292,7 @@ async def live(
 
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
-    used_event = FPLService.upcoming_event(events)
+    used_event = gameweeks.upcoming_event(events)
     if used_event is None:
         raise HTTPException(404, detail="No active gameweek found.")
     used_gw = used_event["id"]
@@ -334,7 +337,7 @@ async def live(
     team_value = transfers.get("value")
     team_bank = transfers.get("bank")
 
-    current_event, _ = FPLService.current_and_next(events)
+    current_event, _ = gameweeks.current_and_next(events)
     current_gw_id = current_event["id"] if current_event else used_gw
 
     # Report the older/worse of team data vs. live scoring — the badge should
@@ -350,8 +353,8 @@ async def live(
         "player_name": player_name,
         "overall_rank": overall_rank,
         "favourite_team": fav_team,
-        "season_status": FPLService.season_status(events),
-        "season": FPLService.season_label(events),
+        "season_status": gameweeks.season_status(events),
+        "season": gameweeks.season_label(events),
         "requested_gw": used_gw,
         "used_gw": used_gw,
         "current_gw": current_gw_id,
@@ -371,7 +374,7 @@ async def team_next(request: Request, response: Response, team_id: int, count: i
 
     boot, _, _ = await svc.bootstrap()
     events = boot["events"]
-    base_event = FPLService.upcoming_event(events)
+    base_event = gameweeks.upcoming_event(events)
     if base_event is None:
         raise HTTPException(404, detail="No active gameweek found.")
     base_gw = base_event["id"]
@@ -601,7 +604,7 @@ async def football_fixtures(request: Request, response: Response, competition: s
     key = f"espn:fixtures:{competition}"
 
     async def _fetch():
-        return await svc.football_fixtures(competition)
+        return await svc.espn.football_fixtures(competition)
 
     data, status, age = await svc.cache.get_or_set(
         key, _fetch, TTL_ESPN_FOOTBALL, SWR_ESPN_FOOTBALL
@@ -619,7 +622,7 @@ async def football_lineups(
     key = f"espn:lineups:{competition}:{event}"
 
     async def _fetch():
-        return await svc.football_lineups(competition, event)
+        return await svc.espn.football_lineups(competition, event)
 
     data, status, age = await svc.cache.get_or_set(
         key, _fetch, TTL_ESPN_LINEUPS, SWR_ESPN_LINEUPS
@@ -646,4 +649,5 @@ async def football_international_news(
     # this calls into are already cached individually (that's the actual
     # ESPN traffic), so there's nothing expensive left to cache here, and
     # caching by an arbitrary set of player_ids would just grow unbounded.
-    return await svc.international_squad_news(ids)
+    boot, _, _ = await svc.bootstrap()
+    return await svc.espn.international_squad_news(boot["elements"], ids)

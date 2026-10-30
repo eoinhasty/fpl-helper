@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Dict, List
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app.services.service import FPLService  # noqa: E402
+from app.services.scoring import score_player, start_prob_from  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _fpl_archive  # noqa: E402
@@ -133,7 +133,7 @@ def main() -> None:
                 if len(cands) < 3:
                     continue
                 for c in cands:
-                    score = FPLService._score_player(c, fdr, cands, max(1, gw - 1))
+                    score = score_player(c, fdr, cands, max(1, gw - 1))
                     all_scored.append((c["id"], score))
 
             # ---- Start-probability check for every player active this season ----
@@ -155,7 +155,7 @@ def main() -> None:
                     ],
                     "minutes": cum_minutes.get(el, 0),
                 }
-                pred = FPLService.start_prob_from(player, played_gws=max(1, gw - 1))
+                pred = start_prob_from(player, played_gws=max(1, gw - 1))
                 actual_minutes = gw_rows.get(el, {}).get("minutes", 0)
                 actual_started = 1.0 if actual_minutes >= 60 else 0.0
                 brier_terms.append((pred - actual_started) ** 2)
@@ -225,7 +225,7 @@ def main() -> None:
     # ---------------- Report ----------------
     print("=" * 72)
     print("CAPTAINCY / TRANSFER-SUGGESTION SCORING BACKTEST")
-    print(f"(scoring FPLService._score_player against {season} realized points)")
+    print(f"(scoring score_player against {season} realized points)")
     print("=" * 72)
     n = len(captaincy_rows)
     if n == 0:
@@ -277,7 +277,7 @@ def main() -> None:
     print()
     print("=" * 72)
     print("START-PROBABILITY HEURISTIC BACKTEST")
-    print("(FPLService.start_prob_from vs. actual minutes >= 60)")
+    print("(start_prob_from vs. actual minutes >= 60)")
     print("=" * 72)
     if brier_terms:
         brier = statistics.mean(brier_terms)
