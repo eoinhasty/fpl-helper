@@ -24,6 +24,7 @@ from app.services.scoring import (
     score_factors,
     start_prob_from,
     transfer_ranks,
+    xgi_signal,
 )
 
 logger = logging.getLogger("uvicorn.error")
@@ -326,6 +327,10 @@ class FPLService:
                     "clean_sheets": p.get("clean_sheets"),
                     "saves": p.get("saves"),
                     "bonus": p.get("bonus"),
+                    "expected_goals": p.get("expected_goals"),
+                    "expected_assists": p.get("expected_assists"),
+                    "expected_goal_involvements": p.get("expected_goal_involvements"),
+                    "xgi_signal": xgi_signal(p),
                     "ranks": pos_ranks.get(p["id"]),
                     "transfer_rank": transfer_ranks.get(p["id"]),
                     # PlayerDetailModal's Market section (transfers + price)
@@ -649,6 +654,10 @@ class FPLService:
                     "clean_sheets": p.get("clean_sheets"),
                     "saves": p.get("saves"),
                     "bonus": p.get("bonus"),
+                    "expected_goals": p.get("expected_goals"),
+                    "expected_assists": p.get("expected_assists"),
+                    "expected_goal_involvements": p.get("expected_goal_involvements"),
+                    "xgi_signal": xgi_signal(p),
                     "transfers_in_event": p.get("transfers_in_event"),
                     "transfers_out_event": p.get("transfers_out_event"),
                     "cost_change_start": p.get("cost_change_start"),  # 0.1m units

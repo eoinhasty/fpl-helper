@@ -2,6 +2,7 @@ import type { Player } from "../../lib/types";
 import { fmtPrice } from "../../lib/format";
 import StartMeter from "./StartMeter";
 import FixturePill from "./FixturePill";
+import XgiBadge from "./XgiBadge";
 
 export default function PlayerCard({
   p,
@@ -54,8 +55,13 @@ export default function PlayerCard({
             <div className="font-semibold leading-tight truncate text-foreground">
               {p.name}
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {p.team} • {fmtPrice(p.price)}
+              <XgiBadge
+                signal={p.xgi_signal}
+                ga={(p.goals_scored ?? 0) + (p.assists ?? 0)}
+                xgi={p.expected_goal_involvements}
+              />
             </div>
           </div>
         </div>

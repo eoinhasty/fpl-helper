@@ -212,3 +212,32 @@ def transfer_ranks(boot: dict) -> dict:
             result[p["id"]] = {"rank": i + 1, "of": n}
 
     return result
+
+
+# xgi_signal thresholds. Chosen 2026-10-30 against the 2023-24..2025-26
+# archive (2022-23's xGI column is mostly blank), checkpoints GW6-30, next
+# 6 GWs: versus players with the same past pts/90 and G+A/90, flagged
+# overperformers scored 0.47 pts/90 less and underperformers 0.90 more.
+# The 35% share keeps late-season flags proportionate — raw gaps grow with
+# minutes. GKs are skipped: their xGI is ~0 and they don't earn points from it.
+XGI_MIN_MINUTES = 270
+XGI_MIN_GAP = 2.0
+XGI_MIN_SHARE = 0.35
+
+
+def xgi_signal(player: dict) -> dict | None:
+    """G+A well above or below xGI: a regression flag, or None.
+
+    "over" (scoring above their chances) tends to cool off; "under" (chances
+    not yet converting) tends to pick up.
+    """
+
+    if player.get("element_type") == 1:
+        return None
+    if (player.get("minutes") or 0) < XGI_MIN_MINUTES:
+        return None
+    xgi = float(player.get("expected_goal_involvements") or 0)
+    gap = (player.get("goals_scored") or 0) + (player.get("assists") or 0) - xgi
+    if abs(gap) < XGI_MIN_GAP or abs(gap) < XGI_MIN_SHARE * xgi:
+        return None
+    return {"gap": round(gap, 2), "direction": "over" if gap > 0 else "under"}

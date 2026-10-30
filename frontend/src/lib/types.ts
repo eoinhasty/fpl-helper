@@ -11,6 +11,11 @@ export type FixtureLite = {
     opp: string; home: boolean; difficulty: 1 | 2 | 3 | 4 | 5; kickoff?: string;
 };
 
+/** G+A well above ("over") or below ("under") xGI — see xgi_signal in
+ * backend scoring.py. `gap` is G+A − xGI. Absent for GKs, low minutes, or
+ * players finishing roughly in line with their chances. */
+export type XgiSignal = { gap: number; direction: "over" | "under" };
+
 export type Player = {
     element: number;
     name: string;
@@ -31,6 +36,10 @@ export type Player = {
     clean_sheets?: number;
     saves?: number;
     bonus?: number;
+    expected_goals?: string;
+    expected_assists?: string;
+    expected_goal_involvements?: string;
+    xgi_signal?: XgiSignal | null;
     cost_change_event?: number;
     transfer_rank?: { rank: number; of: number };
     transfers_in_event?: number;
@@ -162,6 +171,10 @@ export type PoolPlayer = {
     clean_sheets?: number;
     saves?: number;
     bonus?: number;
+    expected_goals?: string;
+    expected_assists?: string;
+    expected_goal_involvements?: string;
+    xgi_signal?: XgiSignal;
     ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
     transfer_rank?: { rank: number; of: number };
     transfers_in_event?: number;
