@@ -38,6 +38,10 @@ export function poolPlayerToPlayer(p: PoolPlayer, slot: number): Player {
     bonus: p.bonus,
     ranks: p.ranks,
     transfer_rank: p.transfer_rank,
+    transfers_in_event: p.transfers_in_event,
+    transfers_out_event: p.transfers_out_event,
+    cost_change_start: p.cost_change_start,
+    cost_change_event: p.cost_change_event,
   };
 }
 

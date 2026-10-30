@@ -55,7 +55,7 @@ export default function TopNav({
               <Link
                 key={link.to}
                 to={link.to}
-                className="px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition"
+                className="px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 activeProps={{ className: "px-3 py-2 rounded-xl text-sm bg-primary text-primary-foreground shadow-sm" }}
                 activeOptions={link.exact ? { exact: true } : undefined}
               >
