@@ -22,6 +22,8 @@ python evaluate.py                    # optional: re-test the model (~5 min)
 | `fetch_history.py` | Downloads past seasons' per-fixture player data (2022-23 on, when FPL added xG) from [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League) (MIT). |
 | `points_model.py` | **The projection model.** Gradient-boosted trees trained on past seasons' match logs; `python points_model.py` shows your squad, `python points_model.py Semenyo Rogers --gws 6` compares players. |
 | `evaluate.py` | Walk-forward test of `points_model.py` against points-per-game form on held-out seasons. |
+| `export_walkforward.py` | Walk-forward predictions for a past season (each GW plus the next 5, from each deadline), for `backend/scripts/backtest_transfers.py --projections`. |
+| `publish_projections.py` | Writes the model's projections for the next 6 GWs as a small JSON (`--out`), or checks whether a newer finished GW is available (`--check`). Run by the manual-only Projections workflow, which uploads it to the `projections` pre-release. The app doesn't read it: in the transfer backtest it didn't beat the app's current scoring (2026-10-30, see that script's docstring). |
 | `history.py`, `features.py` | Load all seasons into one table; build the model's inputs from data available at each deadline only. |
 | `team_model.py` | *Legacy model.* Team attack/defence ratings from match xG (shrunk toward average), projected score and clean-sheet odds for next GW's fixtures. |
 | `projections.py` | *Legacy model* (`solver.py --legacy`). Expected points per player per GW, by scoring route. `python projections.py` shows your squad; `python projections.py Wissa Gonzalo --gws 10` compares players. |
