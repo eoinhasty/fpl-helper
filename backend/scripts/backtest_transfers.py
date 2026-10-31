@@ -286,6 +286,7 @@ def run_transfer_policy(
     scorer: Optional[Scorer],
     projections: Optional[Dict[int, Dict[int, List[float]]]] = None,
     window: int = 1,
+    lineup_projections: Optional[Dict[int, Dict[int, List[float]]]] = None,
 ) -> dict:
     """Walk the season week by week, applying the fixed transfer-suggestion
     logic ranked by `scorer` (None = never transfer), and return season
@@ -305,6 +306,17 @@ def run_transfer_policy(
         if pts and chance is not None:
             pts[0] *= chance / 100
         return pts
+
+    def lineup_ep(el: int, gw: int) -> float:
+        """Points estimate for picking this GW's XI and captain (see --lineup)."""
+        chance = snap.get(el, {}).get("chance_of_playing_next_round")
+        avail = 1.0 if chance is None else chance / 100
+        on_model = _lineup == "model" or (_lineup == "own" and projections is not None)
+        if on_model and lineup_projections is not None:
+            pts = lineup_projections.get(gw, {}).get(el, [])
+            return pts[0] * avail if pts else 0.0
+        ep = predicted_ep(el, gw, merged_gw, recent_points)
+        return ep * avail if _lineup == "xp-avail" else ep
 
     def scoring_ep(el: int, gw: int) -> float:
         if projections is not None:
@@ -518,10 +530,7 @@ def run_transfer_policy(
             free_transfers = min(FT_MAX_BANK, max(0, free_transfers - made_free) + 1)
 
         # ---- lineup + score this GW ----
-        if projections is not None and _own_lineup:
-            ep = {el: (model_pts(el, gw) or [0.0])[0] for el in owned}
-        else:
-            ep = {el: predicted_ep(el, gw, merged_gw, recent_points) for el in owned}
+        ep = {el: lineup_ep(el, gw) for el in owned}
         xi, captain = pick_best_xi(
             list(owned.keys()), {el: owned[el]["element_type"] for el in owned}, ep
         )
@@ -561,7 +570,14 @@ def form_of(el, recent_points):
 
 _teams_cache: Dict[str, int] = {}
 _allow_hits = True
-_own_lineup = False  # --own-lineup: model arms pick XI/captain on the model too
+# --lineup: how every arm picks its XI and captain each GW.
+#   xp       last GW's archived xP (the app arm's own transfer signal), no
+#            availability — fields players injured since that xP was taken
+#   xp-avail the same, times FPL's chance of playing at the deadline
+#   model    the points model's projection times chance of playing, every arm
+#   own      model arms on the model, the rest on xp (favours the model arms)
+LINEUPS = ("xp", "xp-avail", "model", "own")
+_lineup = "xp"
 
 # Every arm, by name: (scorer, fed the model's projections?, GW window).
 # Each (squad, arm) run is independent, so main() farms them out to a pool.
@@ -586,10 +602,10 @@ def _init_world(
     refresh: bool,
     projections_path: Optional[str],
     allow_hits: bool,
-    own_lineup: bool = False,
+    lineup: str = "xp",
 ) -> None:
-    global _teams_cache, _allow_hits, _own_lineup
-    _own_lineup = own_lineup
+    global _teams_cache, _allow_hits, _lineup
+    _lineup = lineup
     _fpl_archive.SEASON, _fpl_archive.REFRESH = season, refresh
     _allow_hits = allow_hits
     merged_gw = load_merged_gw()
@@ -640,6 +656,7 @@ def _simulate(task: tuple) -> tuple:
         w["kickoffs"],
         scorer=scorer,
         projections=w["projections"] if uses_projections else None,
+        lineup_projections=w["projections"],
         window=window,
     )
     return seed, arm, result
@@ -672,10 +689,11 @@ def main() -> None:
             help="skip the model arms other than those asked for (e.g. just --solver)",
         )
         p.add_argument(
-            "--own-lineup",
-            action="store_true",
-            help="model arms pick their XI and captain on the model's projections, "
-            "not the shared archived-xP rule (which is the app arm's own signal)",
+            "--lineup",
+            choices=LINEUPS,
+            default="xp",
+            help="how every arm picks its XI and captain (see LINEUPS); 'model' "
+            "needs --projections",
         )
         p.add_argument(
             "--first-seed",
@@ -693,7 +711,7 @@ def main() -> None:
         _fpl_archive.REFRESH,
         args.projections,
         not args.no_hits,
-        args.own_lineup,
+        args.lineup,
     )
     print(
         f"Simulating {_fpl_archive.SEASON}: (fixed) transfer suggestions scored by the "
