@@ -8,6 +8,12 @@ blank is 0, and lists stop at the season's last GW. Players are keyed by that
 season's element id, which is what backend/scripts/backtest_transfers.py
 --projections reads.
 
+Like the live projections, each player is projected at the club he's at on the
+deadline, for that club's scheduled fixtures. (Taking fixtures from the match
+logs instead projected 5-40 player-GWs per deadline around January with the club
+a player later moved to.) The archive's fixture list does carry postponed games'
+final GWs, so a later-arranged double is known in advance.
+
     python export_walkforward.py 2025 --out wf-2025-26.json
 """
 import argparse
@@ -17,7 +23,7 @@ import pandas as pd
 
 import history
 import points_model as pm
-from features import MAX_LEAD, FeatureBuilder
+from features import MAX_LEAD, FeatureBuilder, player_state
 
 
 def main():
@@ -28,7 +34,7 @@ def main():
     ap.add_argument("--horizon", type=int, default=MAX_LEAD + 1, help="gameweeks per prediction list")
     args = ap.parse_args()
 
-    matches, _, _ = history.load()
+    matches, schedule, _ = history.load()
     fb = FeatureBuilder(matches)
     season = args.season
     train = sorted(s for s in matches["season"].unique() if s < season)
@@ -43,7 +49,9 @@ def main():
         model = pm.fit(table)
         for origin in range(start, min(start + args.every, last_gw + 1)):
             gws = list(range(origin, min(origin + args.horizon, last_gw + 1)))
-            rows = fb.training_rows(season, origin, max_lead=len(gws) - 1)
+            state = player_state(fb.pg, fb.ls, season, origin)
+            roster = state[["code", "team", "price", "sel_pct", "pos", "element"]]
+            rows = fb.live_rows(season, origin, schedule, roster, len(gws))
             rows["pred"] = pm.predict(model, rows)
             pts = rows.groupby(["code", "gw"])["pred"].sum().unstack("gw").reindex(columns=gws).fillna(0.0)
             out[str(origin)] = {str(int(element[c])): [round(float(p), 2) for p in r] for c, r in pts.iterrows()}

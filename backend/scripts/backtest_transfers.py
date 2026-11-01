@@ -39,10 +39,24 @@ Run from the backend/ directory:
 `python scripts/backtest_transfers.py [--season 2024-25] [--refresh]`
 `--projections FILE` (from tools/analysis/export_walkforward.py) adds arms
 fed the points model's walk-forward projections: as ep_next through the app's
-formula, on their own, and summed over the next 3 or 5 GWs. 2026-10-30, vs
-the app arm (2024-25 / 2025-26): formula +41/-116, raw +46/-150, 3gw
-+58/+0.4 (with ~2x the hits), 5gw +23/-55 — no arm a clear win, so the app
-wasn't switched.
+formula, on their own, and summed over the next 3 or 5 GWs; `--solver` adds
+tools/analysis/solver.py's MILP re-planning 5 GWs each GW (run with
+tools/analysis/.venv's Python, which has scipy). `--squads N` (default 5),
+`--no-hits` (no arm takes hits), `--lineup` (how every arm picks its XI and
+captain), `--first-seed` and `--workers` (arms run in a process pool; use 4 on
+a 16 GB laptop — 8 ran it out of memory).
+Results, 20 squads, solver arm vs the app arm, pts/season (2024-25 / 2025-26),
+with model projections scaled by chance of playing (2026-11-01):
+  --lineup model, hits:            +218 / +147  (beat app in 20/20, 19/20)
+  --lineup model, no hits:         +181 / +66   (19/20, 15/20)
+  --lineup model, no hits, seeds 21-40: +204 / +80 (20/20, 17/20)
+  --lineup xp-avail, no hits:      +130 / -54   (it only wins with model XIs)
+Picking every arm's XI and captain on the model instead of last-GW xP adds
++110 / +220 to every arm on its own (app 1918 -> 2029, 1624 -> 1847, no
+hits). The greedy model arms never beat the app consistently. Earlier runs
+without chance of playing, on the xp lineup, read as no clear win — both were
+handicapping the model arms. Caveat: the archive's fixture list carries
+postponed games' final GWs, so a multi-GW arm sees later-arranged doubles early.
 Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
 app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
 +77 and -173), so read any single season's number as noise until it agrees
@@ -52,6 +66,8 @@ with another.
 from __future__ import annotations
 
 import json
+import multiprocessing
+import os
 import random
 import statistics
 import sys
@@ -81,8 +97,7 @@ FT_START = 1
 FT_MAX_BANK = 5
 HIT_COST = 4
 HIT_EP_THRESHOLD = 4.0  # only take a hit if predicted EP gain exceeds the cost
-N_SQUADS = 5
-SEEDS = [1, 2, 3, 4, 5]
+N_SQUADS = 5  # default for --squads; seeds are 1..N
 
 FORMATIONS = [
     (d, 10 - d - f, f) for d in range(3, 6) for f in range(1, 4) if 2 <= 10 - d - f <= 5
@@ -100,11 +115,32 @@ def form_scorer(cand: dict, fdr: dict, pool: List[dict], played_gws: int) -> flo
 # Multi-GW arms: rank on the projection summed over this many GWs
 MODEL_WINDOWS = (3, 5)
 
+# --solver arm: tools/analysis/solver.py's MILP re-plans the next
+# SOLVER_WINDOW GWs every GW, over the current squad plus the best
+# SOLVER_POOL_PER_POS players per position by projected points in that window.
+SOLVER = "solver"
+SOLVER_WINDOW = 5
+SOLVER_POOL_PER_POS = 25
+SOLVER_TIME_LIMIT = 30  # seconds per solve; a pruned pool usually takes ~1s
+ANALYSIS_DIR = Path(__file__).resolve().parents[2] / "tools" / "analysis"
+
+
+def _milp():
+    """tools/analysis/solver.py, imported only for the --solver arm: it needs
+    scipy, so run the script with tools/analysis/.venv's Python for that."""
+    if str(ANALYSIS_DIR) not in sys.path:
+        sys.path.append(str(ANALYSIS_DIR))
+    import solver
+
+    return solver
+
 
 def model_arms() -> List[tuple]:
-    return [("model", "model formula"), ("model_raw", "model raw")] + [
-        (f"model_raw_{w}", f"model raw {w}gw") for w in MODEL_WINDOWS
-    ]
+    return (
+        [("model", "model formula"), ("model_raw", "model raw")]
+        + [(f"model_raw_{w}", f"model raw {w}gw") for w in MODEL_WINDOWS]
+        + [("model_solver", f"model solver {SOLVER_WINDOW}gw")]
+    )
 
 
 def raw_ep_scorer(cand: dict, fdr: dict, pool: List[dict], played_gws: int) -> float:
@@ -256,6 +292,7 @@ def run_transfer_policy(
     scorer: Optional[Scorer],
     projections: Optional[Dict[int, Dict[int, List[float]]]] = None,
     window: int = 1,
+    lineup_projections: Optional[Dict[int, Dict[int, List[float]]]] = None,
 ) -> dict:
     """Walk the season week by week, applying the fixed transfer-suggestion
     logic ranked by `scorer` (None = never transfer), and return season
@@ -264,9 +301,32 @@ def run_transfer_policy(
     starting XI and captain still use predicted_ep in every arm.
     """
 
+    def model_pts(el: int, gw: int) -> List[float]:
+        # Projections assume the player is available; like solver.py live,
+        # scale the first GW by FPL's chance of playing at that deadline
+        # (`snap`, set each GW below). The app arm's archived xP is already 0
+        # for injured players, so without this the model arms kept buying
+        # and holding injured players.
+        pts = list(projections.get(gw, {}).get(el, []))
+        chance = snap.get(el, {}).get("chance_of_playing_next_round")
+        if pts and chance is not None:
+            pts[0] *= chance / 100
+        return pts
+
+    def lineup_ep(el: int, gw: int) -> float:
+        """Points estimate for picking this GW's XI and captain (see --lineup)."""
+        chance = snap.get(el, {}).get("chance_of_playing_next_round")
+        avail = 1.0 if chance is None else chance / 100
+        on_model = _lineup == "model" or (_lineup == "own" and projections is not None)
+        if on_model and lineup_projections is not None:
+            pts = lineup_projections.get(gw, {}).get(el, [])
+            return pts[0] * avail if pts else 0.0
+        ep = predicted_ep(el, gw, merged_gw, recent_points)
+        return ep * avail if _lineup == "xp-avail" else ep
+
     def scoring_ep(el: int, gw: int) -> float:
         if projections is not None:
-            return sum(projections.get(gw, {}).get(el, [])[:window])
+            return sum(model_pts(el, gw)[:window])
         return predicted_ep(el, gw, merged_gw, recent_points)
 
     # Copy each player dict too: prices are updated in place below, and the
@@ -287,7 +347,82 @@ def run_transfer_policy(
         deadline_proxy = kickoffs.get(gw, "9999")
         snap = snapshot_before(snapshots, deadline_proxy)
 
-        if scorer is not None and gw >= 2:
+        if scorer == SOLVER and gw >= 2:
+            # Re-plan the next `window` GWs from the current squad with the
+            # MILP, then make only this GW's moves (a rolling horizon).
+            gws = list(range(gw, min(gw + window, max_gw + 1)))
+
+            def window_pts(el: int) -> List[float]:
+                return (model_pts(el, gw) + [0.0] * len(gws))[: len(gws)]
+
+            # Not eligible_pool: a player blanking this GW can still be worth
+            # planning around, so no fixture this GW is required here.
+            cands = [
+                el
+                for el, pos in latest_position.items()
+                if pos in (1, 2, 3, 4)
+                and el not in owned
+                and cum_minutes.get(el, 0) > 0
+                and snap.get(el, {}).get("status", "a") != "u"
+            ]
+            pool = set(owned)
+            for pos in (1, 2, 3, 4):
+                ranked = sorted(
+                    (el for el in cands if latest_position[el] == pos),
+                    key=lambda el: sum(window_pts(el)),
+                    reverse=True,
+                )
+                pool.update(ranked[:SOLVER_POOL_PER_POS])
+            pool = sorted(pool)
+            pos_of = {
+                el: owned[el]["element_type"] if el in owned else latest_position[el]
+                for el in pool
+            }
+            team_of = {
+                el: owned[el]["team"] if el in owned else latest_team_id[el]
+                for el in pool
+            }
+            sell = {
+                el: sell_price(purchase_price[el], owned[el]["price"]) for el in owned
+            }
+            cost = {el: sell[el] if el in owned else latest_value[el] for el in pool}
+            pts = {(el, g): p for el in pool for g, p in zip(gws, window_pts(el))}
+            try:
+                step = _milp().optimise(
+                    pool,
+                    pts,
+                    cost,
+                    bank + sum(sell.values()),
+                    team_of,
+                    pos_of,
+                    list(owned),
+                    free_transfers,
+                    gws,
+                    no_hits=not _allow_hits,
+                    time_limit=SOLVER_TIME_LIMIT,
+                )[0]
+            except SystemExit:  # infeasible (e.g. a club over 3 after moves): hold
+                step = {"out": [], "into": []}
+            for el in step["out"]:
+                bank += sell[el]
+                del owned[el]
+                del purchase_price[el]
+            for el in step["into"]:
+                bank -= latest_value[el]
+                owned[el] = {
+                    "element_type": pos_of[el],
+                    "team": team_of[el],
+                    "price": latest_value[el],
+                }
+                purchase_price[el] = latest_value[el]
+            made_free = min(len(step["into"]), free_transfers)
+            hits = len(step["into"]) - made_free
+            total_hits += hits
+            total_points -= HIT_COST * hits
+            transfers_made += len(step["into"])
+            free_transfers = min(FT_MAX_BANK, max(0, free_transfers - made_free) + 1)
+
+        elif scorer is not None and gw >= 2:
             made_free = 0
             made_hit = False
             for _ in range(free_transfers + 1):  # up to all FTs, plus 1 possible hit
@@ -376,7 +511,7 @@ def run_transfer_policy(
                 owned_el, c_info, score_gain, ep_gain = best_swap
                 will_hit = made_free >= free_transfers
                 if will_hit:
-                    if made_hit or ep_gain <= HIT_EP_THRESHOLD:
+                    if not _allow_hits or made_hit or ep_gain <= HIT_EP_THRESHOLD:
                         break
                     made_hit = True
                     total_hits += 1
@@ -401,7 +536,7 @@ def run_transfer_policy(
             free_transfers = min(FT_MAX_BANK, max(0, free_transfers - made_free) + 1)
 
         # ---- lineup + score this GW ----
-        ep = {el: predicted_ep(el, gw, merged_gw, recent_points) for el in owned}
+        ep = {el: lineup_ep(el, gw) for el in owned}
         xi, captain = pick_best_xi(
             list(owned.keys()), {el: owned[el]["element_type"] for el in owned}, ep
         )
@@ -440,122 +575,207 @@ def form_of(el, recent_points):
 
 
 _teams_cache: Dict[str, int] = {}
+_allow_hits = True
+# --lineup: how every arm picks its XI and captain each GW.
+#   xp       last GW's archived xP (the app arm's own transfer signal), no
+#            availability — fields players injured since that xP was taken
+#   xp-avail the same, times FPL's chance of playing at the deadline
+#   model    the points model's projection times chance of playing, every arm
+#   own      model arms on the model, the rest on xp (favours the model arms)
+LINEUPS = ("xp", "xp-avail", "model", "own")
+_lineup = "xp"
+
+# Every arm, by name: (scorer, fed the model's projections?, GW window).
+# Each (squad, arm) run is independent, so main() farms them out to a pool.
+ARMS = {
+    "app": (score_player, False, 1),
+    "form": (form_scorer, False, 1),
+    "none": (None, False, 1),
+}
+MODEL_ARMS = {
+    "model": (score_player, True, 1),
+    "model_raw": (raw_ep_scorer, True, 1),
+    **{f"model_raw_{w}": (raw_ep_scorer, True, w) for w in MODEL_WINDOWS},
+    "model_solver": (SOLVER, True, SOLVER_WINDOW),
+}
+
+# Season data, loaded once per process by _init_world (main and each worker)
+_world: dict = {}
+
+
+def _init_world(
+    season: str,
+    refresh: bool,
+    projections_path: Optional[str],
+    allow_hits: bool,
+    lineup: str = "xp",
+) -> None:
+    global _teams_cache, _allow_hits, _lineup
+    _lineup = lineup
+    _fpl_archive.SEASON, _fpl_archive.REFRESH = season, refresh
+    _allow_hits = allow_hits
+    merged_gw = load_merged_gw()
+    _teams_cache = load_teams()
+    projections = None
+    if projections_path:
+        with open(projections_path) as f:
+            projections = {
+                int(gw): {int(el): pts for el, pts in by_el.items()}
+                for gw, by_el in json.load(f).items()
+            }
+    _world.update(
+        merged_gw=merged_gw,
+        fixtures_by_event=load_fixtures(),
+        snapshots=load_status_snapshots(),
+        kickoffs=first_kickoff_by_gw(),
+        projections=projections,
+        gw1_players=[
+            {
+                "id": el,
+                "element_type": row["position"],
+                "team": _teams_cache.get(row["team_name"]),
+                "price": row["value"],
+            }
+            for el, row in merged_gw[1].items()
+            if row["position"] and _teams_cache.get(row["team_name"])
+        ],
+    )
+
+
+def _simulate(task: tuple) -> tuple:
+    seed, squad, arm = task
+    scorer, uses_projections, window = {**ARMS, **MODEL_ARMS}[arm]
+    w = _world
+    gw1 = w["gw1_players"]
+    result = run_transfer_policy(
+        dict(squad),
+        max(w["merged_gw"].keys()),
+        w["merged_gw"],
+        w["fixtures_by_event"],
+        {p["id"]: p["element_type"] for p in gw1},  # latest_position
+        {p["id"]: p["team"] for p in gw1},  # latest_team_id
+        {p["id"]: p["price"] for p in gw1},  # latest_value
+        defaultdict(int),  # cum_minutes
+        defaultdict(float),  # cum_ict
+        defaultdict(list),  # recent_points
+        w["snapshots"],
+        w["kickoffs"],
+        scorer=scorer,
+        projections=w["projections"] if uses_projections else None,
+        lineup_projections=w["projections"],
+        window=window,
+    )
+    return seed, arm, result
 
 
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    args = _fpl_archive.configure(
-        "Simulate a season of following transfer suggestions.",
-        lambda p: p.add_argument(
+
+    def add_args(p):
+        p.add_argument(
             "--projections",
             help="walk-forward model predictions for this season "
             "(tools/analysis/export_walkforward.py); adds model-driven arms",
-        ),
+        )
+        p.add_argument("--squads", type=int, default=N_SQUADS)
+        p.add_argument(
+            "--no-hits",
+            action="store_true",
+            help="no arm takes hits, so hit-taking can't drive the deltas",
+        )
+        p.add_argument(
+            "--solver",
+            action="store_true",
+            help="add the MILP planner arm (needs --projections and scipy)",
+        )
+        p.add_argument(
+            "--only-model",
+            action="store_true",
+            help="skip the model arms other than those asked for (e.g. just --solver)",
+        )
+        p.add_argument(
+            "--lineup",
+            choices=LINEUPS,
+            default="xp",
+            help="how every arm picks its XI and captain (see LINEUPS); 'model' "
+            "needs --projections",
+        )
+        p.add_argument(
+            "--first-seed",
+            type=int,
+            default=1,
+            help="draft seeds run from here (e.g. 21 for a fresh set of squads)",
+        )
+        p.add_argument("--workers", type=int, default=os.cpu_count())
+
+    args = _fpl_archive.configure(
+        "Simulate a season of following transfer suggestions.", add_args
     )
-    projections = None
-    if args.projections:
-        with open(args.projections) as f:
-            projections = {
-                int(gw): {int(el): pts for el, pts in by_el.items()}
-                for gw, by_el in json.load(f).items()
-            }
+    world_args = (
+        _fpl_archive.SEASON,
+        _fpl_archive.REFRESH,
+        args.projections,
+        not args.no_hits,
+        args.lineup,
+    )
     print(
         f"Simulating {_fpl_archive.SEASON}: (fixed) transfer suggestions scored by the "
-        "app's formula vs. by plain form vs. never transferring...\n"
+        "app's formula vs. by plain form vs. never transferring"
+        f"{' (no hits)' if args.no_hits else ''}...\n"
     )
-
-    fixtures_by_event = load_fixtures()
-    merged_gw = load_merged_gw()
-    teams_by_name = load_teams()
-    global _teams_cache
-    _teams_cache = teams_by_name
-    snapshots = load_status_snapshots()
-    kickoffs = first_kickoff_by_gw()
-
-    max_gw = max(merged_gw.keys())
-    gw1_rows = merged_gw[1]
-    gw1_players = [
-        {
-            "id": el,
-            "element_type": row["position"],
-            "team": teams_by_name.get(row["team_name"]),
-            "price": row["value"],
-        }
-        for el, row in gw1_rows.items()
-        if row["position"] and teams_by_name.get(row["team_name"])
-    ]
-
+    _init_world(*world_args)  # also downloads and caches the archive for the workers
+    gw1_players = _world["gw1_players"]
     print(f"Loaded {len(gw1_players)} draftable players at GW1 prices.\n")
 
-    results = []
-    drafted = 0
-    for seed in SEEDS:
-        squad = None
+    squads = {}
+    for seed in range(args.first_seed, args.first_seed + args.squads):
         for attempt_seed in range(seed * 1000, seed * 1000 + 20):
             squad = draft_squad(gw1_players, attempt_seed)
             if squad:
+                squads[seed] = squad
                 break
-        if not squad:
+        else:
             print(f"Seed {seed}: could not draft a legal squad, skipping.")
-            continue
-        drafted += 1
 
-        def fresh_state():
-            return (
-                defaultdict(int),  # cum_minutes
-                defaultdict(float),  # cum_ict
-                defaultdict(list),  # recent_points
-                {p["id"]: p["element_type"] for p in gw1_players},  # latest_position
-                {p["id"]: p["team"] for p in gw1_players},  # latest_team_id
-                {p["id"]: p["price"] for p in gw1_players},  # latest_value
-            )
+    arms = list(ARMS)
+    if args.projections:
+        arms += (
+            [] if args.only_model else [a for a in MODEL_ARMS if a != "model_solver"]
+        )
+        arms += ["model_solver"] if args.solver else []
+    tasks = [(seed, squad, arm) for seed, squad in squads.items() for arm in arms]
+    by_seed: Dict[int, dict] = defaultdict(dict)
+    with multiprocessing.Pool(
+        args.workers, initializer=_init_world, initargs=world_args
+    ) as pool:
+        for i, (seed, arm, res) in enumerate(pool.imap_unordered(_simulate, tasks)):
+            by_seed[seed][arm] = res
+            print(f"\r  {i + 1}/{len(tasks)} runs", end="", flush=True)
+    print("\n")
 
-        def simulate(scorer: Optional[Scorer], proj=None, window: int = 1) -> dict:
-            cm, ci, rp, lp, lt, lv = fresh_state()
-            return run_transfer_policy(
-                dict(squad),
-                max_gw,
-                merged_gw,
-                fixtures_by_event,
-                lp,
-                lt,
-                lv,
-                cm,
-                ci,
-                rp,
-                snapshots,
-                kickoffs,
-                scorer=scorer,
-                projections=proj,
-                window=window,
-            )
-
-        app = simulate(score_player)
-        form = simulate(form_scorer)
-        none = simulate(None)
-        results.append({"seed": seed, "app": app, "form": form, "none": none})
-        if projections is not None:
-            results[-1]["model"] = simulate(score_player, projections)
-            results[-1]["model_raw"] = simulate(raw_ep_scorer, projections)
-            for w in MODEL_WINDOWS:
-                results[-1][f"model_raw_{w}"] = simulate(raw_ep_scorer, projections, w)
+    results = []
+    for n, seed in enumerate(sorted(by_seed), 1):
+        r = {"seed": seed, **by_seed[seed]}
+        results.append(r)
+        app, form, none = r["app"], r["form"], r["none"]
         print(
-            f"Squad {drafted} (seed {seed}): app={app['total_points']}  "
+            f"Squad {n} (seed {seed}): app={app['total_points']}  "
             f"form={form['total_points']}  "
             f"app-form={app['total_points'] - form['total_points']:+d}  "
             f"(never-transfer={none['total_points']})  "
             f"transfers app/form={app['transfers_made']}/{form['transfers_made']}  "
             f"hits app/form={app['total_hits']}/{form['total_hits']}"
         )
-        if projections is not None:
+        if args.projections:
             print(
                 "    "
                 + "  ".join(
-                    f"{label}={results[-1][arm]['total_points']} "
-                    f"(transfers {results[-1][arm]['transfers_made']}, "
-                    f"hits {results[-1][arm]['total_hits']})"
+                    f"{label}={r[arm]['total_points']} "
+                    f"(transfers {r[arm]['transfers_made']}, "
+                    f"hits {r[arm]['total_hits']})"
                     for arm, label in model_arms()
+                    if arm in r
                 )
             )
 
@@ -589,12 +809,15 @@ def main() -> None:
         f"(hits {mean_of('app', 'total_hits'):.1f}), form "
         f"{mean_of('form', 'transfers_made'):.1f} (hits {mean_of('form', 'total_hits'):.1f})"
     )
-    if projections is not None:
+    if args.projections:
         print("MODEL — the same engine and formula fed the points model's")
         print("walk-forward projections as ep_next ('formula'), or ranking on the")
         print("projection alone ('raw'), over the next GW or the next N GWs ('Ngw');")
-        print("an Ngw hit needs N-GW projected gain over the 4-point cost:")
+        print("an Ngw hit needs N-GW projected gain over the 4-point cost. 'solver'")
+        print("re-plans the next GWs with tools/analysis/solver.py's MILP each GW:")
         for arm, label in model_arms():
+            if arm not in results[0]:
+                continue
             vs_form = [
                 r[arm]["total_points"] - r["form"]["total_points"] for r in results
             ]
