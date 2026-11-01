@@ -42,15 +42,21 @@ fed the points model's walk-forward projections: as ep_next through the app's
 formula, on their own, and summed over the next 3 or 5 GWs; `--solver` adds
 tools/analysis/solver.py's MILP re-planning 5 GWs each GW (run with
 tools/analysis/.venv's Python, which has scipy). `--squads N` (default 5),
-`--no-hits` (no arm takes hits) and `--workers` (arms run in a process pool).
-2026-10-30, 20 squads, vs the app arm (2024-25 / 2025-26), pts/season:
-  normal hits: formula -40/-70, raw -35/-86, 3gw +64/-9, 5gw +13/-49,
-               solver +67/+65 (beat app in 14/20 and 15/20 squads)
-  no hits:     formula -71/+7, raw -82/-9, 3gw +9/-29, 5gw -9/-10,
-               solver +149/-66
-Only the solver beat the app in both seasons, and not with hits disabled, so
-the app wasn't switched. Caveat: the archive's fixture list carries postponed
-games' final GWs, so a multi-GW arm sees later-arranged doubles early.
+`--no-hits` (no arm takes hits), `--lineup` (how every arm picks its XI and
+captain), `--first-seed` and `--workers` (arms run in a process pool; use 4 on
+a 16 GB laptop — 8 ran it out of memory).
+Results, 20 squads, solver arm vs the app arm, pts/season (2024-25 / 2025-26),
+with model projections scaled by chance of playing (2026-11-01):
+  --lineup model, hits:            +218 / +147  (beat app in 20/20, 19/20)
+  --lineup model, no hits:         +181 / +66   (19/20, 15/20)
+  --lineup model, no hits, seeds 21-40: +204 / +80 (20/20, 17/20)
+  --lineup xp-avail, no hits:      +130 / -54   (it only wins with model XIs)
+Picking every arm's XI and captain on the model instead of last-GW xP adds
++110 / +220 to every arm on its own (app 1918 -> 2029, 1624 -> 1847, no
+hits). The greedy model arms never beat the app consistently. Earlier runs
+without chance of playing, on the xp lineup, read as no clear win — both were
+handicapping the model arms. Caveat: the archive's fixture list carries
+postponed games' final GWs, so a multi-GW arm sees later-arranged doubles early.
 Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
 app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
 +77 and -173), so read any single season's number as noise until it agrees
