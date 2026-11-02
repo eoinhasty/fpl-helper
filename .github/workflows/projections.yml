@@ -1,17 +1,13 @@
 # Retrain the points model (tools/analysis/points_model.py) once each gameweek's
 # data is final, and publish its projections as an asset on the `projections`
-# pre-release. The backend reads them from there; Render's free tier can't fit
+# pre-release. The backend reads them from there (FPLService.projections); Render's free tier can't fit
 # scikit-learn or a minute of training, and a release asset (unlike a commit)
 # doesn't redeploy anything. Most runs stop after the cheap --check step.
-#
-# Manual-only for now: the app doesn't read the projections yet — they didn't
-# beat its current scoring in backend/scripts/backtest_transfers.py (see its
-# docstring). To publish after every GW again, restore the schedule:
-#   schedule:
-#     - cron: "17 */3 * * *"
 name: Projections
 
 on:
+  schedule:
+    - cron: "17 */3 * * *"
   workflow_dispatch:
     inputs:
       force:
