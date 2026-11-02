@@ -246,7 +246,11 @@ async def squad(
 
     # shape for UI
     enriched, team_value, team_bank = svc.enrich_picks(
-        picks_data, boot, fixtures_data, live_data
+        picks_data,
+        boot,
+        fixtures_data,
+        live_data,
+        await svc.projections(events, fixture_gw),
     )
     used_event = next((e for e in events if e["id"] == used_gw), None)
     if used_event is None:
@@ -325,6 +329,7 @@ async def live(
         boot,
         fixtures_data,
         event_live,
+        await svc.projections(events, used_gw),
     )
 
     summary = await _entry_summary(svc, entry_id, boot)

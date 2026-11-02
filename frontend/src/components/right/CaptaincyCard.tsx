@@ -13,8 +13,20 @@ function norm(v: number, { mn, mx }: { mn: number; mx: number }) {
 
 const posMult = (pos?: number) => pos === 4 ? 1.0 : pos === 3 ? 0.92 : 0.72;
 
-function score(players: Player[]) {
+type Scored = { p: Player; score: number; pts: number };
+
+function score(players: Player[]): { rows: Scored[]; projected: boolean } {
   const xi = players.filter((p) => isStarting(p) && p.position !== 1);
+
+  // The points model's projection is ranked as-is: it already prices fixtures,
+  // home advantage and position, and backtested better without the formula's
+  // terms on top (backend/scripts/backtest_transfers.py --captaincy).
+  if (xi.some((p) => p.projected_pts != null)) {
+    const rows = xi
+      .map((p) => ({ p, score: p.projected_pts ?? 0, pts: p.projected_pts ?? 0 }))
+      .sort((a, b) => b.score - a.score);
+    return { rows, projected: true };
+  }
 
   const raw = xi.map((p) => {
     const fxs = p.fixtures ?? (p.fixture ? [p.fixture] : []);
@@ -40,7 +52,7 @@ function score(players: Player[]) {
   const epRange = range(raw.map((r) => r.ep));
   const hasEp = raw.some((r) => r.ep > 0);
 
-  return raw
+  const rows = raw
     .map((r) => {
       const base = hasEp ? norm(r.ep, epRange) : norm(r.form, formRange) * 0.5 + norm(r.ict, ictRange) * 0.5;
       const homeBoost = 1 + r.home * 0.08;
@@ -48,9 +60,10 @@ function score(players: Player[]) {
       const dgwBoost = r.dgw && !hasEp ? 1.8 : 1.0;
       const bgwPenalty = r.bgw ? 0.1 : 1.0;
       const s = base * fdrFactor(r.fdr) * homeBoost * dgwBoost * bgwPenalty * r.sp * posMult(r.p.position);
-      return { p: r.p, score: s, epDisplay: r.ep };
+      return { p: r.p, score: s, pts: r.ep };
     })
     .sort((a, b) => b.score - a.score);
+  return { rows, projected: false };
 }
 
 const DIFF_THRESHOLD = 15;
@@ -59,12 +72,14 @@ const RANK_ICON = ["⭐", "🥈", "🥉"];
 
 function PlayerRow({
   p,
-  epDisplay,
+  pts,
+  projected,
   rank,
   onPlayerClick,
 }: {
   p: import("../../lib/types").Player;
-  epDisplay: number;
+  pts: number;
+  projected: boolean;
   rank?: number;
   onPlayerClick?: (p: import("../../lib/types").Player) => void;
 }) {
@@ -99,9 +114,11 @@ function PlayerRow({
           <div>{Number(p.selected_by_percent).toFixed(1)}% own</div>
         )}
         <div className="font-semibold text-foreground">
-          {epDisplay > 0
-            ? `${epDisplay.toFixed(1)} xPts`
-            : `${parseFloat(p.form ?? "0").toFixed(1)} form`}
+          {projected
+            ? `${pts.toFixed(1)} proj pts`
+            : pts > 0
+              ? `${pts.toFixed(1)} xPts`
+              : `${parseFloat(p.form ?? "0").toFixed(1)} form`}
         </div>
       </div>
     </li>
@@ -176,7 +193,7 @@ export default function CaptaincyCard({
     );
   }
 
-  const all = players ? score(players) : [];
+  const { rows: all, projected } = players ? score(players) : { rows: [], projected: false };
   const picks = all.slice(0, 3);
   const topIds = new Set(picks.map((r) => r.p.element));
   const differential = all.find(
@@ -194,8 +211,8 @@ export default function CaptaincyCard({
       ) : (
         <>
           <ul className="space-y-2">
-            {picks.map(({ p, epDisplay }, i) => (
-              <PlayerRow key={p.element} p={p} epDisplay={epDisplay} rank={i} onPlayerClick={onPlayerClick} />
+            {picks.map(({ p, pts }, i) => (
+              <PlayerRow key={p.element} p={p} pts={pts} projected={projected} rank={i} onPlayerClick={onPlayerClick} />
             ))}
           </ul>
 
@@ -204,7 +221,7 @@ export default function CaptaincyCard({
               <div className="mt-3 mb-2 border-t border-border" />
               <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Differential</div>
               <ul>
-                <PlayerRow p={differential.p} epDisplay={differential.epDisplay} onPlayerClick={onPlayerClick} />
+                <PlayerRow p={differential.p} pts={differential.pts} projected={projected} onPlayerClick={onPlayerClick} />
               </ul>
             </>
           )}
