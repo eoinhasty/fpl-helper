@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import logging
 from collections import defaultdict
-from typing import Any, Dict, Optional, Tuple, List
+from typing import Any, Dict, Iterable, Optional, Tuple, List
 import httpx
 from fastapi import HTTPException
 from datetime import datetime, timezone
@@ -955,7 +955,14 @@ class FPLService:
         )
 
     async def transfer_plan(
-        self, entry_id: int, *, token: Optional[str] = None
+        self,
+        entry_id: int,
+        *,
+        token: Optional[str] = None,
+        no_hits: bool = False,
+        wildcard: Optional[int] = None,
+        keep: Iterable[int] = (),
+        exclude: Iterable[int] = (),
     ) -> Tuple[dict, List[Tuple[str, float]], int]:
         """The multi-GW transfer planner's model for this entry (planner.py),
         as LP text for the browser to solve, plus what it needs to show the
@@ -964,7 +971,12 @@ class FPLService:
         per position by projected points, the first GW scaled by chance of
         playing. Without usable projections or a squad, returns
         {"available": False, "reason": ...} — the card falls back to
-        transfer suggestions."""
+        transfer suggestions.
+
+        The card's options, as planner.build's: no_hits; wildcard, a GW to
+        play it in (ignored unless a wildcard window is open then); keep,
+        squad players held for the whole horizon; exclude, players never
+        bought. What was applied is echoed back as "options"."""
         boot, boot_status, boot_age = await self.bootstrap()
         events = boot["events"]
         current, nxt = current_and_next(events)
@@ -1054,6 +1066,28 @@ class FPLService:
         if len(squad) != 15:
             return unavailable("no_squad", [reading])
 
+        # GWs a wildcard could be played in: one per window in bootstrap's
+        # chips (GW2–19, GW20–38), unless the GW history shows it played
+        # there. Not offered while transfers are already unlimited.
+        wildcard_gws: List[int] = []
+        if not unlimited:
+            history, _, _ = await self.entry_history(entry_id)
+            played = [
+                c.get("event", 0)
+                for c in history.get("chips", [])
+                if c.get("name") == "wildcard"
+            ]
+            for chip in boot.get("chips", []):
+                if chip.get("name") != "wildcard":
+                    continue
+                lo, hi = chip.get("start_event", 0), chip.get("stop_event", 0)
+                if not any(lo <= e <= hi for e in played):
+                    wildcard_gws += [g for g in gws if lo <= g <= hi]
+        if wildcard not in wildcard_gws:
+            wildcard = gws[0] if unlimited else None
+        keep = sorted(set(keep) & set(squad))
+        exclude = sorted(set(exclude) - set(squad))
+
         def window(el: dict) -> List[float]:
             row = (horizon.get(el["id"], []) + [0.0] * len(gws))[: len(gws)]
             chance = el.get("chance_of_playing_next_round")
@@ -1069,6 +1103,8 @@ class FPLService:
             and (e.get("minutes") or 0) > 0
             # "u" = left the club; can't be bought (player_pool drops them too)
             and e.get("status") != "u"
+            # before the top-N cut, so the next best takes the slot
+            and e["id"] not in exclude
         ]
         pts_by_el = {el: window(els[el]) for el in squad}
         for pos in SQUAD_QUOTA:
@@ -1091,7 +1127,9 @@ class FPLService:
             squad,
             min(ft, MAX_FT),
             gws,
-            wildcard=gws[0] if unlimited else None,
+            wildcard=wildcard,
+            no_hits=no_hits,
+            keep=keep,
         )
 
         teams = {t["id"]: t for t in boot["teams"]}
@@ -1116,6 +1154,19 @@ class FPLService:
             "bank": bank,
             "free_transfers": ft,
             "unlimited_transfers": unlimited,
+            "wildcard_gws": wildcard_gws,
+            # The wildcard chosen from wildcard_gws (the model also plans
+            # gws[0] as one when transfers are unlimited)
+            "options": {
+                "no_hits": no_hits,
+                "wildcard": None if unlimited else wildcard,
+                "keep": keep,
+                "exclude": [
+                    {"id": el, "name": els[el].get("web_name")}
+                    for el in exclude
+                    if el in els
+                ],
+            },
             "squad": squad,
             "players": players,
             "hit_cost": HIT_COST,

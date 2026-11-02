@@ -15,6 +15,29 @@ export type PlanPlayer = {
   pts: number[];
 };
 
+/** The card's options, as planner.build's (see FPLService.transfer_plan) */
+export type PlanOptions = {
+  no_hits: boolean;
+  /** GW to play a wildcard in, from wildcard_gws */
+  wildcard: number | null;
+  /** Squad players held for the whole horizon */
+  keep: number[];
+  /** Never bought; names kept since they drop out of the response's players */
+  exclude: { id: number; name: string }[];
+};
+
+export const DEFAULT_PLAN_OPTIONS: PlanOptions = { no_hits: false, wildcard: null, keep: [], exclude: [] };
+
+export function planQuery(o: PlanOptions): string {
+  const q = new URLSearchParams();
+  if (o.no_hits) q.set("no_hits", "true");
+  if (o.wildcard != null) q.set("wildcard", String(o.wildcard));
+  for (const id of [...o.keep].sort((a, b) => a - b)) q.append("keep", String(id));
+  for (const id of o.exclude.map((p) => p.id).sort((a, b) => a - b)) q.append("exclude", String(id));
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
 export type TransferPlanResponse =
   | { entry_id: number; available: false; reason: "season_over" | "no_projections" | "no_squad" | "free_hit" }
   | {
@@ -27,6 +50,10 @@ export type TransferPlanResponse =
       free_transfers: number;
       /** Unlimited free transfers this GW (pre-season, or a wildcard): planned as a wildcard */
       unlimited_transfers: boolean;
+      /** GWs in the horizon a wildcard could be played in (none while transfers are unlimited) */
+      wildcard_gws: number[];
+      /** The options as applied: invalid ones (a sold player kept, a closed wildcard week) are dropped */
+      options: PlanOptions;
       squad: number[];
       players: Record<string, PlanPlayer>;
       hit_cost: number;
@@ -57,6 +84,11 @@ export type Plan = {
 
 type Available = Extract<TransferPlanResponse, { available: true }>;
 
+/** The GW the model plans as a wildcard: the chosen one, or this GW while transfers are unlimited */
+export function planWildcard(resp: Available): number | null {
+  return resp.unlimited_transfers ? resp.gws[0] : resp.options.wildcard;
+}
+
 export function decodePlan(values: Record<string, number>, resp: Available, status: string): Plan {
   const pool = Object.keys(resp.players).map(Number);
   const pos = (p: number) => resp.players[p].position;
@@ -72,7 +104,7 @@ export function decodePlan(values: Record<string, number>, resp: Available, stat
       throw new Error(`Incomplete plan for GW${gw}`);
     }
     const pts = (p: number) => resp.players[p].pts[g] ?? 0;
-    const hits = resp.unlimited_transfers && g === 0 ? 0 : Math.round(values[`h_${g}`] ?? 0);
+    const hits = gw === planWildcard(resp) ? 0 : Math.round(values[`h_${g}`] ?? 0);
     const week: PlanWeek = {
       gw,
       squad,
@@ -157,8 +189,13 @@ function storePlan(hash: string | null, plan: Plan) {
   }
 }
 
+// The model asked for last: a queued solve for an older one (the card's
+// options changed again meanwhile) is skipped rather than holding up this one
+let latest: string | null = null;
+
 /** Solves the plan, or rejects (the caller falls back to transfer suggestions). */
 export function solvePlan(resp: Available): Promise<Plan> {
+  latest = resp.model;
   const cached = solved.get(resp.model);
   if (cached) return cached;
   const options = { mip_rel_gap: resp.mip_rel_gap, time_limit: SOLVE_TIME_LIMIT, output_flag: false };
@@ -166,7 +203,11 @@ export function solvePlan(resp: Available): Promise<Plan> {
     const stored = readStoredPlan(hash);
     if (stored) return stored;
     // Serialise: the worker handles one model at a time
-    const run = queue.then(() => runSolve({ model: resp.model, options }));
+    const run = queue.then(() =>
+      latest === resp.model
+        ? runSolve({ model: resp.model, options })
+        : ({ ok: false, error: "Superseded" } satisfies SolveResponse),
+    );
     queue = run.catch(() => {});
     const res = await run;
     if (!res.ok) throw new Error(res.error);
