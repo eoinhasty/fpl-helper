@@ -16,6 +16,8 @@ import { GwSelect } from "../components/controls/GwSelect";
 import { money } from "../lib/format";
 
 import type { Player } from "../lib/types";
+import { previewLineup, suggestLineup } from "../lib/lineup";
+import BestXiBanner from "../components/squad/BestXiBanner";
 import PlayerDetailModal from "../components/squad/PlayerDetailModal";
 import LiveAuthGate from "../components/squad/LiveAuthGate";
 import PreSeasonNotice from "../components/squad/PreSeasonNotice";
@@ -108,6 +110,39 @@ export default function SquadDashboard() {
 
   const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
   const isPreSeason = data?.season_status === "pre_season" && (data?.players?.length ?? 0) === 0;
+
+  // Best XI: previewing is tied to the players it was asked for, so a refetch,
+  // GW change or mode switch drops back to the real lineup on its own.
+  const lineup = useMemo(
+    () => (data?.players && !isHistorical ? suggestLineup(data.players) : null),
+    [data?.players, isHistorical]
+  );
+  const [previewFor, setPreviewFor] = useState<Player[] | null>(null);
+  const previewing = !!lineup && !!data?.players && previewFor === data.players;
+  const shownPlayers = useMemo(
+    () => (previewing && data?.players && lineup ? previewLineup(data.players, lineup) : data?.players),
+    [previewing, data?.players, lineup]
+  );
+  const squadView = (viewError: string | null) => (
+    <>
+      <BestXiBanner
+        suggestion={lineup}
+        previewing={previewing}
+        onTogglePreview={() => setPreviewFor(previewing ? null : (data?.players ?? null))}
+      />
+      {prefs.squadLayout === "pitch" ? (
+        <PitchView players={shownPlayers} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={viewError} />
+      ) : (
+        <XIList
+          players={shownPlayers}
+          loading={loading}
+          error={viewError}
+          entryMissing={entry === ""}
+          onPlayerClick={openPlayer}
+        />
+      )}
+    </>
+  );
 
   const left = (
     <>
@@ -293,32 +328,14 @@ export default function SquadDashboard() {
           <LiveAuthGate key={error === "AUTH_EXPIRED" ? "expired" : "authed"} onAuthenticated={loadLive}>
             {isPreSeason ? (
               <PreSeasonNotice deadlineISO={data?.deadline} />
-            ) : prefs.squadLayout === "pitch" ? (
-              <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error === "AUTH_EXPIRED" ? null : error} />
             ) : (
-              <XIList
-                players={data?.players}
-                loading={loading}
-                error={error === "AUTH_EXPIRED" ? null : error}
-                entryMissing={entry === ""}
-                onPlayerClick={openPlayer}
-              />
+              squadView(error === "AUTH_EXPIRED" ? null : error)
             )}
           </LiveAuthGate>
         ) : isPreSeason ? (
           <PreSeasonNotice deadlineISO={data?.deadline} />
         ) : (
-          prefs.squadLayout === "pitch" ? (
-            <PitchView players={data?.players} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={error} />
-          ) : (
-            <XIList
-              players={data?.players}
-              loading={loading}
-              error={error}
-              entryMissing={entry === ""}
-              onPlayerClick={openPlayer}
-            />
-          )
+          squadView(error)
         )}
       </DashboardLayout>
 

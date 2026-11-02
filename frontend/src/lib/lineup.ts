@@ -27,6 +27,8 @@ export type LineupSuggestion = {
   projected: boolean;
   /** Projected points of the suggested XI minus the current XI's (captain not doubled) */
   gain: number;
+  /** Suggested XI (the current one when it's already best) */
+  xi: Player[];
   /** Bench players who should start, and the starters they displace */
   bringIn: Player[];
   drop: Player[];
@@ -81,6 +83,7 @@ export function suggestLineup(players: Player[]): LineupSuggestion | null {
 
   return {
     projected: players.some((p) => p.projected_pts != null),
+    xi,
     gain: xi === best ? gain : 0,
     bringIn: xi.filter((p) => !wasIn.has(p.element)),
     drop: current.filter((p) => !inXi.has(p.element)),
@@ -89,4 +92,25 @@ export function suggestLineup(players: Player[]): LineupSuggestion | null {
     bench,
     benchChanged: bench.some((p, i) => currentBench[i]?.element !== p.element),
   };
+}
+
+/** The squad re-slotted into the suggested lineup (XI 1-11 by position, bench
+ * 12-15 in sub order), for PitchView/XIList to render as a preview. */
+export function previewLineup(players: Player[], s: LineupSuggestion): Player[] {
+  const wasIn = new Set(players.filter(isStarting).map((p) => p.element));
+  const xi = [...s.xi].sort((a, b) => a.position - b.position);
+  return [
+    ...xi.map((p, i) => ({
+      ...p,
+      slot: i + 1,
+      multiplier: p.is_captain ? Math.max(p.multiplier ?? 2, 2) : 1,
+      lineup_change: wasIn.has(p.element) ? undefined : ("start" as const),
+    })),
+    ...s.bench.map((p, i) => ({
+      ...p,
+      slot: 12 + i,
+      multiplier: 0,
+      lineup_change: wasIn.has(p.element) ? ("bench" as const) : undefined,
+    })),
+  ];
 }

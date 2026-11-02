@@ -29,6 +29,16 @@ export default function PlayerCard({
     </span>
   ) : null;
 
+  const change = p.lineup_change ? (
+    <span
+      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border text-foreground ${
+        p.lineup_change === "start" ? "bg-success/8 border-success" : "bg-warning/8 border-warning"
+      }`}
+    >
+      {p.lineup_change === "start" ? "Start" : "Bench"}
+    </span>
+  ) : null;
+
   return (
     <div
       role="button"
@@ -67,6 +77,7 @@ export default function PlayerCard({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          {change}
           {cap}
           <FixturePill f={p.fixture ?? undefined} />
         </div>

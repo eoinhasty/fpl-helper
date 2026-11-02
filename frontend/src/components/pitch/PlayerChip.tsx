@@ -81,6 +81,21 @@ function Points({
 }
 
 
+/** Best XI preview: who the suggestion moves in or out of the XI. */
+// Top-left, since the GW points sit top-right; stepped down below a C/V badge.
+function LineupChangeBadge({ change, belowCaptain }: { change?: "start" | "bench"; belowCaptain?: boolean }) {
+  if (!change) return null;
+  return (
+    <div
+      className={`absolute ${belowCaptain ? "top-4" : "-top-2"} -left-2 z-10 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none
+                  bg-card text-foreground shadow ring-2 ${change === "start" ? "ring-success" : "ring-warning"}`}
+      title={change === "start" ? "Suggested to start" : "Suggested to bench"}
+    >
+      {change === "start" ? "IN" : "OUT"}
+    </div>
+  );
+}
+
 function BenchOrderBadge({ label }: { label: string }) {
   return (
     <div
@@ -146,6 +161,7 @@ export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { 
             />
             <CaptainBadge c={p.is_captain} v={p.is_vice_captain} />
             <StatusTriangle status={p.status} />
+            <LineupChangeBadge change={p.lineup_change} belowCaptain={p.is_captain || p.is_vice_captain} />
 
             {isBench && benchLabel && <BenchOrderBadge label={benchLabel} />}
 
