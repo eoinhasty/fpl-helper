@@ -59,7 +59,18 @@ function MoveRow({ out, into, resp, gwIndex }: { out: number; into: number; resp
   );
 }
 
-function WeekBlock({ week, g, resp }: { week: PlanWeek; g: number; resp: Available }) {
+/** Bank after each planned GW's moves. Costs are selling prices for the
+ * current squad and buying prices otherwise, as the solver's budget sees them
+ * (a player bought and sold within the plan is assumed to hold his price). */
+function runningBank(weeks: PlanWeek[], resp: Available): number[] {
+  let bank = resp.bank;
+  return weeks.map((w) => {
+    bank += w.out.reduce((s, p) => s + resp.players[p].cost, 0) - w.into.reduce((s, p) => s + resp.players[p].cost, 0);
+    return bank;
+  });
+}
+
+function WeekBlock({ week, g, resp, bank }: { week: PlanWeek; g: number; resp: Available; bank: number }) {
   const wildcard = resp.unlimited_transfers && g === 0;
   const captain = resp.players[week.captain];
   return (
@@ -74,6 +85,7 @@ function WeekBlock({ week, g, resp }: { week: PlanWeek; g: number; resp: Availab
           {week.hits > 0 && (
             <span className={TONE_CLASS.destructive.text}>−{week.hits * resp.hit_cost} hit · </span>
           )}
+          {week.into.length > 0 && <>bank {fmtPrice(bank)} · </>}
           <span className="font-semibold text-foreground">{week.points.toFixed(1)} pts</span>
         </div>
       </div>
@@ -188,9 +200,10 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
               : `${resp.free_transfers} free transfer${resp.free_transfers === 1 ? "" : "s"}`}{" "}
             · bank {fmtPrice(resp.bank)}
           </div>
-          {plan.weeks.map((w, g) => (
-            <WeekBlock key={w.gw} week={w} g={g} resp={resp} />
-          ))}
+          {(() => {
+            const banks = runningBank(plan.weeks, resp);
+            return plan.weeks.map((w, g) => <WeekBlock key={w.gw} week={w} g={g} resp={resp} bank={banks[g]} />);
+          })()}
           <div className="text-[11px] text-muted-foreground">
             Plans every week on the points model's projections; later weeks are re-planned as projections update.
             {resp.source === "picks" && " Log in on the Live tab for exact selling prices and free transfers."}
