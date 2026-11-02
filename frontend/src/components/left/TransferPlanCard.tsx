@@ -2,8 +2,20 @@ import * as React from "react";
 import DataCard from "../ui/DataCard";
 import { Skeleton } from "../ui/Skeleton";
 import TransferSuggestionsCard from "./TransferSuggestionsCard";
+import { Toggle } from "../ui/Toggle";
+import { SelectMenu } from "../controls/SelectMenu";
 import { useFetch } from "../../hooks/useFetch";
-import { solvePlan, type Plan, type PlanWeek, type TransferPlanResponse } from "../../lib/transferPlan";
+import { usePlanOptions } from "../../hooks/usePlanOptions";
+import {
+  DEFAULT_PLAN_OPTIONS,
+  planQuery,
+  planWildcard,
+  solvePlan,
+  type Plan,
+  type PlanOptions,
+  type PlanWeek,
+  type TransferPlanResponse,
+} from "../../lib/transferPlan";
 import { fmtPrice } from "../../lib/format";
 import { TONE_CLASS } from "../../lib/utils";
 
@@ -13,6 +25,10 @@ type Available = Extract<TransferPlanResponse, { available: true }>;
 const SLOW_SOLVE_MS = 6000;
 
 // 44px touch target without changing the line height (as PlayerTable's "Clear filters")
+// Per-move actions: quieter than LINK_BUTTON, since every row has them
+const ROW_ACTION =
+  "-my-3.5 py-3.5 text-muted-foreground cursor-pointer hover:text-primary-strong hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 const LINK_BUTTON =
   "-my-3.5 py-3.5 text-primary-strong font-medium cursor-pointer hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -25,7 +41,22 @@ function fmtBank(delta: number) {
   return delta === 0 ? "bank ±£0.0" : `bank ${delta > 0 ? "+" : "−"}£${Math.abs(delta / 10).toFixed(1)}`;
 }
 
-function MoveRow({ out, into, resp, gwIndex }: { out: number; into: number; resp: Available; gwIndex: number }) {
+/** Adds a keep / don't-buy option from a move; null while re-planning */
+type Constrain = { keep: (id: number) => void; exclude: (id: number) => void } | null;
+
+function MoveRow({
+  out,
+  into,
+  resp,
+  gwIndex,
+  constrain,
+}: {
+  out: number;
+  into: number;
+  resp: Available;
+  gwIndex: number;
+  constrain: Constrain;
+}) {
   const o = resp.players[out];
   const i = resp.players[into];
   // The planner buys for the rest of the horizon, not just this GW
@@ -34,27 +65,43 @@ function MoveRow({ out, into, resp, gwIndex }: { out: number; into: number; resp
   const lastGw = resp.gws[resp.gws.length - 1];
   const bank = o.cost - i.cost;
   const shirt = shirtUrl(i.team_code, i.position);
+  // Only the current squad can be kept (planner.build holds it from the first GW)
+  const canKeep = resp.squad.includes(out);
   return (
-    <li className="flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5 gap-2">
-      <div className="flex items-center gap-2 min-w-0">
-        {shirt && <img src={shirt} alt="" className="w-6 h-6 object-contain shrink-0" />}
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-foreground truncate">{i.name}</div>
-          <div className="text-[11px] text-muted-foreground truncate" title={`Sell ${o.name} (${fmtPrice(o.cost)})`}>
-            {i.team} · for {o.name}
-          </div>
-          {gain > 0 && (
-            <div className={`text-[11px] ${TONE_CLASS.success.text}`}>
-              +{gain.toFixed(1)} pts {resp.gws[gwIndex] === lastGw ? "this GW" : `by GW${lastGw}`}
+    <li className="rounded-lg border border-border bg-card px-2 py-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {shirt && <img src={shirt} alt="" className="w-6 h-6 object-contain shrink-0" />}
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-foreground truncate">{i.name}</div>
+            <div className="text-[11px] text-muted-foreground truncate" title={`Sell ${o.name} (${fmtPrice(o.cost)})`}>
+              {i.team} · for {o.name}
             </div>
-          )}
+            {gain > 0 && (
+              <div className={`text-[11px] ${TONE_CLASS.success.text}`}>
+                +{gain.toFixed(1)} pts {resp.gws[gwIndex] === lastGw ? "this GW" : `by GW${lastGw}`}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-right shrink-0 text-xs text-muted-foreground space-y-0.5">
+          <div className="font-semibold text-foreground">{i.pts[gwIndex].toFixed(1)} pts</div>
+          <div>{fmtPrice(i.cost)}</div>
+          <div className={bank > 0 ? TONE_CLASS.success.text : undefined}>{fmtBank(bank)}</div>
         </div>
       </div>
-      <div className="text-right shrink-0 text-xs text-muted-foreground space-y-0.5">
-        <div className="font-semibold text-foreground">{i.pts[gwIndex].toFixed(1)} pts</div>
-        <div>{fmtPrice(i.cost)}</div>
-        <div className={bank > 0 ? TONE_CLASS.success.text : undefined}>{fmtBank(bank)}</div>
-      </div>
+      {constrain && (
+        <div className="flex flex-wrap gap-x-4 text-[11px] mt-1">
+          {canKeep && (
+            <button type="button" onClick={() => constrain.keep(out)} className={ROW_ACTION}>
+              Keep {o.name}
+            </button>
+          )}
+          <button type="button" onClick={() => constrain.exclude(into)} className={ROW_ACTION}>
+            Don't buy {i.name}
+          </button>
+        </div>
+      )}
     </li>
   );
 }
@@ -70,8 +117,20 @@ function runningBank(weeks: PlanWeek[], resp: Available): number[] {
   });
 }
 
-function WeekBlock({ week, g, resp, bank }: { week: PlanWeek; g: number; resp: Available; bank: number }) {
-  const wildcard = resp.unlimited_transfers && g === 0;
+function WeekBlock({
+  week,
+  g,
+  resp,
+  bank,
+  constrain,
+}: {
+  week: PlanWeek;
+  g: number;
+  resp: Available;
+  bank: number;
+  constrain: Constrain;
+}) {
+  const wildcard = week.gw === planWildcard(resp);
   const captain = resp.players[week.captain];
   return (
     <div>
@@ -92,7 +151,7 @@ function WeekBlock({ week, g, resp, bank }: { week: PlanWeek; g: number; resp: A
       {week.into.length > 0 ? (
         <ul className="space-y-1.5">
           {week.into.map((p, k) => (
-            <MoveRow key={p} out={week.out[k]} into={p} resp={resp} gwIndex={g} />
+            <MoveRow key={p} out={week.out[k]} into={p} resp={resp} gwIndex={g} constrain={constrain} />
           ))}
         </ul>
       ) : (
@@ -103,11 +162,98 @@ function WeekBlock({ week, g, resp, bank }: { week: PlanWeek; g: number; resp: A
   );
 }
 
+function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-border bg-muted/60 pl-2.5 text-xs text-foreground">
+      {label}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove: ${label}`}
+        className="-my-2 h-11 w-8 rounded-full text-muted-foreground cursor-pointer hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        ×
+      </button>
+    </span>
+  );
+}
+
+function PlanControls({
+  options,
+  setOptions,
+  resp,
+}: {
+  options: PlanOptions;
+  setOptions: (o: PlanOptions) => void;
+  resp: Available;
+}) {
+  const wildcardGws = resp.wildcard_gws;
+  return (
+    <div className="border-y border-border">
+      <Toggle
+        label="Avoid hits"
+        checked={options.no_hits}
+        onChange={(no_hits) => setOptions({ ...options, no_hits })}
+      />
+      {wildcardGws.length > 0 && (
+        <div className="flex items-center justify-between gap-3 pb-2">
+          <span className="text-sm font-medium text-foreground">Wildcard</span>
+          <SelectMenu<number | null>
+            ariaLabel="Plan a wildcard"
+            value={options.wildcard}
+            options={[{ label: "Not planned", value: null }, ...wildcardGws.map((gw) => ({ label: `GW${gw}`, value: gw }))]}
+            onChange={(wildcard) => setOptions({ ...options, wildcard })}
+            anchor="bottom end"
+            className="w-36"
+          />
+        </div>
+      )}
+      {(options.keep.length > 0 || options.exclude.length > 0) && (
+        <div className="flex flex-wrap gap-1.5 pb-2">
+          {options.keep.map((id) => (
+            <Chip
+              key={`k${id}`}
+              label={`Keep ${resp.players[id]?.name ?? "player"}`}
+                onRemove={() => setOptions({ ...options, keep: options.keep.filter((k) => k !== id) })}
+            />
+          ))}
+          {options.exclude.map((p) => (
+            <Chip
+              key={`x${p.id}`}
+              label={`Don't buy ${p.name}`}
+                onRemove={() => setOptions({ ...options, exclude: options.exclude.filter((x) => x.id !== p.id) })}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => setOptions({ ...options, keep: [], exclude: [] })}
+            className={`${LINK_BUTTON} text-xs ml-1`}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TransferPlanCard({ entry }: { entry: number | "" }) {
-  const url = entry ? `/api/transfer-plan/${entry}` : null;
+  const [options, setOptions] = usePlanOptions(entry);
+  const url = entry ? `/api/transfer-plan/${entry}${planQuery(options)}` : null;
   // Token when present: exact selling prices and free transfers from my_team
   const { data, loading, error } = useFetch<TransferPlanResponse>(url, { auth: true });
   const resp = data?.available ? data : null;
+
+  // Options that no longer apply (a kept player sold, a wildcard week
+  // passed) are dropped by the backend; forget them here too
+  React.useEffect(() => {
+    if (resp && planQuery(resp.options) !== planQuery(options)) setOptions(resp.options);
+  }, [resp, options, setOptions]);
+
+  // The last plan shown: after an option change it stays on screen, dimmed,
+  // until the new one is solved, instead of dropping back to a skeleton
+  const [shown, setShown] = React.useState<{ entry: number; resp: Available; plan: Plan } | null>(null);
+  const previous = shown?.entry === entry ? shown : null;
 
   const [view, setView] = React.useState<{ model: string; mode: "plan" | "suggestions" } | null>(null);
   const [solved, setSolved] = React.useState<{ model: string; plan: Plan | null } | null>(null);
@@ -118,6 +264,7 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
       (plan) => {
         if (!live) return;
         setSolved({ model: resp.model, plan });
+        setShown({ entry: resp.entry_id, resp, plan });
         // Solved before SLOW_SOLVE_MS (or from storage): claim the view so the timer doesn't switch to suggestions
         setView((v) => (v?.model === resp.model ? v : { model: resp.model, mode: "plan" }));
       },
@@ -134,21 +281,26 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
 
   // A mid-range phone takes ~20 s to solve. Past SLOW_SOLVE_MS, show this
   // GW's suggestions instead of a skeleton; once the plan is ready the user
-  // opens it themselves rather than having the card swap under them.
+  // opens it themselves rather than having the card swap under them. Not
+  // after an option change, where the user is already working with a plan.
+  const hasShown = previous !== null;
   React.useEffect(() => {
-    if (!resp) return;
+    if (!resp || hasShown) return;
     const t = setTimeout(
       () => setView((v) => (v?.model === resp.model ? v : { model: resp.model, mode: "suggestions" })),
       SLOW_SOLVE_MS,
     );
     return () => clearTimeout(t);
-  }, [resp]);
+  }, [resp, hasShown]);
   const mode = resp && view?.model === resp.model ? view.mode : null;
   const showMode = (m: "plan" | "suggestions") => resp && setView({ model: resp.model, mode: m });
 
+  const custom = planQuery(options) !== "";
+  const failed = Boolean(error) || plan === null;
   // No plan to show (no projections, no squad, or the solve failed): the
-  // one-GW suggestions still work from FPL's own data
-  if (!entry || error || (data && !resp) || plan === null) return <TransferSuggestionsCard entry={entry} />;
+  // one-GW suggestions still work from FPL's own data. With options set, the
+  // card stays and offers a reset instead.
+  if (!entry || (data && !resp) || (failed && !custom)) return <TransferSuggestionsCard entry={entry} />;
 
   if (mode === "suggestions") {
     const gws = resp?.gws.length;
@@ -174,14 +326,34 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
   }
 
   const solving = !loading && plan === undefined;
-  const span = resp ? `GW${resp.gws[0]}–${resp.gws[resp.gws.length - 1]}` : null;
+  const current = resp && plan ? { resp, plan } : null;
+  const replanning = !current && !failed && previous !== null;
+  const display = current ?? previous;
+  const spanResp = display?.resp ?? resp;
+  const span = spanResp ? `GW${spanResp.gws[0]}–${spanResp.gws[spanResp.gws.length - 1]}` : null;
+  const constrain: Constrain =
+    replanning || failed || !display
+      ? null
+      : {
+          keep: (id) => setOptions({ ...options, keep: [...options.keep, id] }),
+          exclude: (id) =>
+            setOptions({ ...options, exclude: [...options.exclude, { id, name: display.resp.players[id].name }] }),
+        };
   return (
     <DataCard
       title="Transfer Plan"
-      loading={loading}
+      loading={loading && !display}
       right={span && <span className="text-xs text-muted-foreground">{span}</span>}
     >
-      {solving && (
+      {failed && (
+        <div className="text-xs text-muted-foreground mb-2" role="status">
+          Couldn't plan with these options ·{" "}
+          <button type="button" onClick={() => setOptions(DEFAULT_PLAN_OPTIONS)} className={LINK_BUTTON}>
+            Reset
+          </button>
+        </div>
+      )}
+      {solving && !display && (
         // ~3 s on a desktop, longer on a phone — say what's happening
         <div className="space-y-2 mt-1">
           <div className="text-xs text-muted-foreground">Planning transfers for the next {resp?.gws.length} GWs…</div>
@@ -190,31 +362,69 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
           <Skeleton className="h-3 w-5/6" />
         </div>
       )}
-      {resp && plan && (
-        <div className="space-y-3">
-          <div className="text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">{plan.total.toFixed(1)} pts</span> projected over{" "}
-            {resp.gws.length} GWs, after hits ·{" "}
-            {resp.unlimited_transfers
-              ? "unlimited transfers"
-              : `${resp.free_transfers} free transfer${resp.free_transfers === 1 ? "" : "s"}`}{" "}
-            · bank {fmtPrice(resp.bank)}
-          </div>
-          {(() => {
-            const banks = runningBank(plan.weeks, resp);
-            return plan.weeks.map((w, g) => <WeekBlock key={w.gw} week={w} g={g} resp={resp} bank={banks[g]} />);
-          })()}
-          <div className="text-[11px] text-muted-foreground">
-            Plans every week on the points model's projections; later weeks are re-planned as projections update.
-            {resp.source === "picks" && " Log in on the Live tab for exact selling prices and free transfers."}
-          </div>
-          <div className="text-xs">
-            <button type="button" onClick={() => showMode("suggestions")} className={LINK_BUTTON}>
-              Other options this week
-            </button>
-          </div>
-        </div>
+      {display && (
+        <PlanBody
+          resp={display.resp}
+          plan={display.plan}
+          options={options}
+          setOptions={setOptions}
+          replanning={replanning}
+          constrain={constrain}
+          onSuggestions={() => showMode("suggestions")}
+        />
       )}
     </DataCard>
+  );
+}
+
+function PlanBody({
+  resp,
+  plan,
+  options,
+  setOptions,
+  replanning,
+  constrain,
+  onSuggestions,
+}: {
+  resp: Available;
+  plan: Plan;
+  options: PlanOptions;
+  setOptions: (o: PlanOptions) => void;
+  replanning: boolean;
+  constrain: Constrain;
+  onSuggestions: () => void;
+}) {
+  const banks = runningBank(plan.weeks, resp);
+  return (
+    <div className="space-y-3">
+      <div className="text-xs text-muted-foreground">
+        <span className="font-semibold text-foreground">{plan.total.toFixed(1)} pts</span> projected over{" "}
+        {resp.gws.length} GWs, after hits ·{" "}
+        {resp.unlimited_transfers
+          ? "unlimited transfers"
+          : `${resp.free_transfers} free transfer${resp.free_transfers === 1 ? "" : "s"}`}{" "}
+        · bank {fmtPrice(resp.bank)}
+      </div>
+      <PlanControls options={options} setOptions={setOptions} resp={resp} />
+      {replanning && (
+        <div className="text-xs text-muted-foreground" role="status">
+          Re-planning with your changes…
+        </div>
+      )}
+      <div className={`space-y-3 transition-opacity ${replanning ? "opacity-50" : ""}`} aria-busy={replanning}>
+        {plan.weeks.map((w, g) => (
+          <WeekBlock key={w.gw} week={w} g={g} resp={resp} bank={banks[g]} constrain={constrain} />
+        ))}
+      </div>
+      <div className="text-[11px] text-muted-foreground">
+        Plans every week on the points model's projections; later weeks are re-planned as projections update.
+        {resp.source === "picks" && " Log in on the Live tab for exact selling prices and free transfers."}
+      </div>
+      <div className="text-xs">
+        <button type="button" onClick={onSuggestions} className={LINK_BUTTON}>
+          Other options this week
+        </button>
+      </div>
+    </div>
   );
 }
