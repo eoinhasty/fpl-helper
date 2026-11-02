@@ -28,7 +28,7 @@ python evaluate.py                    # optional: re-test the model (~5 min)
 | `team_model.py` | *Legacy model.* Team attack/defence ratings from match xG (shrunk toward average), projected score and clean-sheet odds for next GW's fixtures. |
 | `projections.py` | *Legacy model* (`solver.py --legacy`). Expected points per player per GW, by scoring route. `python projections.py` shows your squad; `python projections.py Wissa Gonzalo --gws 10` compares players. |
 | `backtest.py` | *Legacy model.* Rebuilds the model as of each past GW, predicts the next one, compares with a points-per-game baseline, and fits the calibration. |
-| `solver.py` | Plans squad, XI and captain over several GWs as a mixed-integer program under FPL's rules (budget with real selling prices, 2/5/5/3, 3 per club, free-transfer rollover, 4-point hits, optional wildcard). |
+| `solver.py` | Plans squad, XI and captain over several GWs as a mixed-integer program under FPL's rules (budget with real selling prices, 2/5/5/3, 3 per club, free-transfer rollover, 4-point hits, optional wildcard). The formulation lives in `backend/app/services/planner.py`, shared with the app's transfer planner; this script solves it with scipy. |
 
 ### Solver examples
 

@@ -564,6 +564,19 @@ async def transfer_suggestions(
     return data
 
 
+@router.get("/transfer-plan/{entry_id}")
+@limiter.limit("10/minute")
+async def transfer_plan(request: Request, response: Response, entry_id: int):
+    svc: FPLService = request.app.state.svc
+    # Same per-request token as /transfer-suggestions (exact selling prices
+    # and free transfers when logged in)
+    token = request.headers.get("x-fpl-token")
+    data, readings, ttl = await svc.transfer_plan(entry_id, token=token)
+    combined_status, combined_age = combine_cache(*readings)
+    set_cache_headers(response, combined_status, combined_age, ttl)
+    return data
+
+
 @router.get("/players")
 @limiter.limit("30/minute")
 async def players(request: Request, response: Response):

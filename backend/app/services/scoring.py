@@ -253,16 +253,27 @@ def gw_projections(proj: dict, events: list, gw: int) -> Optional[Dict[int, floa
     format version or season, not covering `gw`, or built more than one
     finished GW before it (the workflow waits for FPL's data_checked, so the
     file can lag a day behind a GW finishing)."""
+    horizon = horizon_projections(proj, events, gw, 1)
+    return None if horizon is None else {el: pts[0] for el, pts in horizon.items()}
+
+
+def horizon_projections(
+    proj: dict, events: list, first_gw: int, n: int
+) -> Optional[Dict[int, List[float]]]:
+    """{element: [points for first_gw, first_gw + 1, ...]} for the first `n`
+    GWs from `first_gw` that the file covers (fewer near the season's end),
+    under gw_projections' trust rules — freshness is judged against
+    `first_gw`. Players the file leaves out (all-zero rows) are absent."""
     if not proj or proj.get("version") != PROJECTIONS_VERSION or not events:
         return None
     if proj.get("season") != int(events[0]["deadline_time"][:4]):
         return None
     gws = proj.get("gws") or []
-    if gw not in gws or (proj.get("last_finished_gw") or 0) < gw - 2:
+    if first_gw not in gws or (proj.get("last_finished_gw") or 0) < first_gw - 2:
         return None
-    i = gws.index(gw)
+    i = gws.index(first_gw)
     return {
-        int(el): pts[i]
+        int(el): pts[i : i + n]
         for el, pts in (proj.get("players") or {}).items()
         if i < len(pts)
     }

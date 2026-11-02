@@ -1,0 +1,142 @@
+// lib/transferPlan.ts — the multi-GW transfer planner, solved in the browser.
+// /api/transfer-plan ships the model as LP text (backend/app/services/planner.py);
+// a Web Worker solves it with highs-js and decodePlan reads the solution back
+// by variable name, mirroring planner.py's read_plan.
+import type { SolveRequest, SolveResponse } from "../workers/planSolver";
+
+export type PlanPlayer = {
+  name: string;
+  team: string | null;
+  team_code: number | null;
+  position: 1 | 2 | 3 | 4;
+  /** Selling price for squad players, buying price otherwise */
+  cost: number;
+  /** Projected points per planned GW, the first × chance of playing */
+  pts: number[];
+};
+
+export type TransferPlanResponse =
+  | { entry_id: number; available: false; reason: "season_over" | "no_projections" | "no_squad" | "free_hit" }
+  | {
+      entry_id: number;
+      available: true;
+      gws: number[];
+      deadline: string | null;
+      source: "my_team" | "picks";
+      bank: number;
+      free_transfers: number;
+      /** Unlimited free transfers this GW (pre-season, or a wildcard): planned as a wildcard */
+      unlimited_transfers: boolean;
+      squad: number[];
+      players: Record<string, PlanPlayer>;
+      hit_cost: number;
+      mip_rel_gap: number;
+      model: string;
+    };
+
+export type PlanWeek = {
+  gw: number;
+  squad: number[];
+  xi: number[];
+  captain: number;
+  hits: number;
+  /** Sold and bought vs the previous GW's squad, by position */
+  out: number[];
+  into: number[];
+  /** XI + captain, before hits */
+  points: number;
+};
+
+export type Plan = {
+  weeks: PlanWeek[];
+  /** Points over the horizon, net of hits */
+  total: number;
+  /** HiGHS's status: "Optimal" (within mip_rel_gap) or "Time limit reached" (best plan found in time) */
+  status: string;
+};
+
+type Available = Extract<TransferPlanResponse, { available: true }>;
+
+export function decodePlan(values: Record<string, number>, resp: Available, status: string): Plan {
+  const pool = Object.keys(resp.players).map(Number);
+  const pos = (p: number) => resp.players[p].position;
+  const byPos = (a: number, b: number) => pos(a) - pos(b);
+  const on = (block: string, p: number, g: number) => (values[`${block}_${p}_${g}`] ?? 0) > 0.5;
+
+  let prev = resp.squad;
+  const weeks = resp.gws.map((gw, g) => {
+    const squad = pool.filter((p) => on("x", p, g));
+    const xi = pool.filter((p) => on("y", p, g));
+    const captain = pool.find((p) => on("c", p, g));
+    if (squad.length !== 15 || xi.length !== 11 || captain == null) {
+      throw new Error(`Incomplete plan for GW${gw}`);
+    }
+    const pts = (p: number) => resp.players[p].pts[g] ?? 0;
+    const hits = resp.unlimited_transfers && g === 0 ? 0 : Math.round(values[`h_${g}`] ?? 0);
+    const week: PlanWeek = {
+      gw,
+      squad,
+      xi,
+      captain,
+      hits,
+      out: prev.filter((p) => !squad.includes(p)).sort(byPos),
+      into: squad.filter((p) => !prev.includes(p)).sort(byPos),
+      points: xi.reduce((s, p) => s + pts(p), 0) + pts(captain),
+    };
+    prev = squad;
+    return week;
+  });
+  const total = weeks.reduce((s, w) => s + w.points - w.hits * resp.hit_cost, 0);
+  return { weeks, total, status };
+}
+
+// One worker, reused across solves; a failed WASM instance isn't reusable, so
+// any failure terminates it and the next solve spawns a fresh one.
+let worker: Worker | null = null;
+let queue: Promise<unknown> = Promise.resolve();
+
+function runSolve(req: SolveRequest): Promise<SolveResponse> {
+  return new Promise((resolve) => {
+    worker ??= new Worker(new URL("../workers/planSolver.ts", import.meta.url), { type: "module" });
+    const w = worker;
+    const done = (res: SolveResponse) => {
+      w.onmessage = null;
+      w.onerror = null;
+      if (!res.ok) {
+        w.terminate();
+        if (worker === w) worker = null;
+      }
+      resolve(res);
+    };
+    w.onmessage = (e: MessageEvent<SolveResponse>) => done(e.data);
+    w.onerror = (e) => {
+      e.preventDefault();
+      done({ ok: false, error: e.message || "Solver crashed" });
+    };
+    w.postMessage(req);
+  });
+}
+
+/** Seconds; a desktop solves in ~3, a slow phone may hit this and use the best plan found so far. */
+const SOLVE_TIME_LIMIT = 30;
+
+/** Solves are cached by model text, so revisiting the dashboard doesn't re-solve an unchanged model. */
+const solved = new Map<string, Promise<Plan>>();
+const MAX_CACHED = 3;
+
+/** Solves the plan, or rejects (the caller falls back to transfer suggestions). */
+export function solvePlan(resp: Available): Promise<Plan> {
+  const cached = solved.get(resp.model);
+  if (cached) return cached;
+  const options = { mip_rel_gap: resp.mip_rel_gap, time_limit: SOLVE_TIME_LIMIT, output_flag: false };
+  // Serialise: the worker handles one model at a time
+  const result = queue.then(() => runSolve({ model: resp.model, options })).then((res) => {
+    if (!res.ok) throw new Error(res.error);
+    return decodePlan(res.values, resp, res.status);
+  });
+  queue = result.catch(() => {});
+  solved.set(resp.model, result);
+  result.catch(() => solved.delete(resp.model));
+  if (solved.size > MAX_CACHED) solved.delete(solved.keys().next().value!);
+  return result;
+}
