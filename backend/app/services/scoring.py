@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from math import log, prod
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 # Fixture multiplier by FDR, interpolated for a DGW's fractional average.
 # Deliberately gentle: ep_next already carries FPL's own fixture adjustment
@@ -241,3 +241,41 @@ def xgi_signal(player: dict) -> dict | None:
     if abs(gap) < XGI_MIN_GAP or abs(gap) < XGI_MIN_SHARE * xgi:
         return None
     return {"gap": round(gap, 2), "direction": "over" if gap > 0 else "under"}
+
+
+# tools/analysis/publish_projections.py's FORMAT_VERSION
+PROJECTIONS_VERSION = 1
+
+
+def gw_projections(proj: dict, events: list, gw: int) -> Optional[Dict[int, float]]:
+    """The points model's {element: points} for `gw` from the published
+    projections file, or None when it can't be trusted: missing, another
+    format version or season, not covering `gw`, or built more than one
+    finished GW before it (the workflow waits for FPL's data_checked, so the
+    file can lag a day behind a GW finishing)."""
+    if not proj or proj.get("version") != PROJECTIONS_VERSION or not events:
+        return None
+    if proj.get("season") != int(events[0]["deadline_time"][:4]):
+        return None
+    gws = proj.get("gws") or []
+    if gw not in gws or (proj.get("last_finished_gw") or 0) < gw - 2:
+        return None
+    i = gws.index(gw)
+    return {
+        int(el): pts[i]
+        for el, pts in (proj.get("players") or {}).items()
+        if i < len(pts)
+    }
+
+
+def projected_points(
+    player: dict, projections: Optional[Dict[int, float]]
+) -> Optional[float]:
+    """A player's model projection for the GW, scaled by FPL's chance of
+    playing (the model assumes availability). 0 for players the file leaves
+    out (it drops all-zero rows); None without usable projections."""
+    if projections is None:
+        return None
+    chance = player.get("chance_of_playing_next_round")
+    pts = projections.get(player.get("id"), 0.0)
+    return round(pts * (100 if chance is None else chance) / 100, 2)

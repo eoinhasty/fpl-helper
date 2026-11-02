@@ -20,7 +20,9 @@ from app.services.gameweeks import (
 )
 from app.services.scoring import (
     gain_driver,
+    gw_projections,
     position_ranks,
+    projected_points,
     score_factors,
     start_prob_from,
     transfer_ranks,
@@ -30,6 +32,8 @@ from app.services.scoring import (
 logger = logging.getLogger("uvicorn.error")
 
 FPL_BASE = "https://fantasy.premierleague.com/api"
+# Published by .github/workflows/projections.yml after each finished GW
+PROJECTIONS_URL = "https://github.com/eoinhasty/fpl-helper/releases/download/projections/projections.json"
 
 # ---- TTL policy  ----
 TTL_BOOTSTRAP = 6 * 60 * 60  # 6h fresh
@@ -56,6 +60,8 @@ TTL_PLAYERS = 30 * 60  # 30m fresh
 SWR_PLAYERS = 6 * 60 * 60  # +6h stale
 TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
+TTL_PROJECTIONS = 60 * 60  # 1h fresh (republished at most once per GW)
+SWR_PROJECTIONS = 12 * 60 * 60  # +12h stale
 
 MAX_PER_CLUB = 3  # FPL squad rule
 
@@ -361,6 +367,27 @@ class FPLService:
 
         return await self.cache.get_or_set(key, _fetch, TTL_PLAYERS, SWR_PLAYERS)
 
+    async def projections(self, events: list, gw: int) -> Optional[Dict[int, float]]:
+        """The points model's projections for `gw` (gw_projections), or None
+        when none usable are published — callers fall back to ep_next."""
+
+        async def _fetch():
+            r = await self.public.get(PROJECTIONS_URL, follow_redirects=True)
+            if r.status_code == 404:
+                return {}  # nothing published yet; cached like any result
+            r.raise_for_status()
+            return r.json()
+
+        try:
+            proj, _, _ = await self.cache.get_or_set(
+                "projections", _fetch, TTL_PROJECTIONS, SWR_PROJECTIONS
+            )
+        except (httpx.HTTPError, ValueError):
+            # Optional data: never fail a squad request over it
+            logger.warning("projections fetch failed", exc_info=True)
+            return None
+        return gw_projections(proj, events, gw)
+
     async def player_summary(self, player_id: int) -> Tuple[dict, str, float]:
         key = f"elsum:{player_id}"
         fetch = lambda: self._get_json(f"/element-summary/{player_id}/")
@@ -581,7 +608,12 @@ class FPLService:
         return self._rank_cache
 
     def enrich_picks(
-        self, picks: dict, boot: dict, fixtures: list, live: dict
+        self,
+        picks: dict,
+        boot: dict,
+        fixtures: list,
+        live: dict,
+        projections: Optional[Dict[int, float]] = None,
     ) -> Tuple[List[dict], Optional[int], Optional[int]]:
 
         live_points = {
@@ -648,6 +680,7 @@ class FPLService:
                     "ict_index": p.get("ict_index"),
                     "minutes": p.get("minutes"),
                     "ep_next": p.get("ep_next"),
+                    "projected_pts": projected_points(p, projections),
                     "points_per_game": p.get("points_per_game"),
                     "goals_scored": p.get("goals_scored"),
                     "assists": p.get("assists"),

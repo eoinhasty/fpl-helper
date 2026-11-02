@@ -57,6 +57,16 @@ hits). The greedy model arms never beat the app consistently. Earlier runs
 without chance of playing, on the xp lineup, read as no clear win — both were
 handicapping the model arms. Caveat: the archive's fixture list carries
 postponed games' final GWs, so a multi-GW arm sees later-arranged doubles early.
+`--captaincy` instead scores captain rules (CAPTAIN_RULES) on the app arm's
+XIs. Armband pts/season vs CaptaincyCard's formula on last-GW xP, 20 squads,
+(2024-25 / 2025-26), XIs on --lineup xp-avail; --lineup model in brackets:
+  card formula on the model:        +12 / +19   (+18 / +2, won 9/20)
+  same, no FDR/home terms:          +30 / +26   (+33 / +0)
+  model x chance of playing alone:  +34 / +31   (+37 / +14)  won 19/20 every
+                                    run but 2025-26 model XIs (16/20)
+The bare projection wins every run; the card's FDR/home/position/start-prob
+terms only dilute it (the model already prices fixtures). Gains are small
+next to the lineup effect above, which is mostly XI choice, not the captain.
 Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
 app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
 +77 and -173), so read any single season's number as noise until it agrees
@@ -76,7 +86,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app.services.scoring import score_player  # noqa: E402
+from app.services.scoring import fdr_factor, score_player, start_prob_from  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _fpl_archive  # noqa: E402
@@ -234,6 +244,59 @@ def pick_best_xi(
     return xi, captain
 
 
+CARD_POS_MULT = {2: 0.72, 3: 0.92, 4: 1.0}  # CaptaincyCard's posMult
+
+
+def card_captain(
+    cands: List[dict], fixture_terms: bool = True, pos_term: bool = True
+) -> Optional[int]:
+    """CaptaincyCard.tsx's score() over XI outfield players: {id, pos, ep,
+    form, ict, fixtures, sp}. fixture_terms/pos_term switch off the FDR + home
+    and position multipliers, for an ep that already prices them."""
+    if not cands:
+        return None
+
+    def norm(vals: List[float], v: float) -> float:
+        mn, mx = min(vals), max(vals)
+        return 0.5 if mx == mn else (v - mn) / (mx - mn)
+
+    eps = [c["ep"] for c in cands]
+    forms = [c["form"] for c in cands]
+    icts = [c["ict"] for c in cands]
+    has_ep = any(v > 0 for v in eps)
+
+    def score(c: dict) -> float:
+        fxs = c["fixtures"]
+        base = (
+            norm(eps, c["ep"])
+            if has_ep
+            else norm(forms, c["form"]) * 0.5 + norm(icts, c["ict"]) * 0.5
+        )
+        avg_fdr = sum(f["difficulty"] for f in fxs) / len(fxs) if fxs else 3
+        home = sum(1 for f in fxs if f["home"]) / len(fxs) if fxs else 0
+        s = base * c["sp"]
+        if fixture_terms:
+            s *= fdr_factor(avg_fdr) * (1 + home * 0.08)
+        if pos_term:
+            s *= CARD_POS_MULT[c["pos"]]
+        s *= 1.8 if len(fxs) > 1 and not has_ep else 1.0
+        return s * (0.1 if not fxs else 1.0)
+
+    return max(cands, key=score)["id"]
+
+
+# --captaincy: captain rules compared on the same XIs. Each gets the captain's
+# actual points (the armband's extra copy) added up over the season.
+CAPTAIN_RULES = {
+    "card_xp": "card formula on last-GW xP (ships today)",
+    "card_model": "card formula on the model",
+    "card_model_nofix": "card formula on the model, no FDR/home terms",
+    "card_model_bare": "card formula on the model, no FDR/home/position terms",
+    "model_avail": "model x chance of playing (the sim's model lineup rule)",
+    "oracle": "best outfield XI player in hindsight",
+}
+
+
 def gw_points(xi: List[int], captain: Optional[int], gw: int, merged_gw: dict) -> int:
     gw_rows = merged_gw.get(gw, {})
     total = 0
@@ -341,6 +404,7 @@ def run_transfer_policy(
     total_points = 0
     total_hits = 0
     transfers_made = 0
+    captain_pts: Dict[str, int] = defaultdict(int)
 
     for gw in range(1, max_gw + 1):
         fdr = fdr_by_team_for_gw(fixtures_by_event, gw)
@@ -541,6 +605,63 @@ def run_transfer_policy(
             list(owned.keys()), {el: owned[el]["element_type"] for el in owned}, ep
         )
         total_points += gw_points(xi, captain, gw, merged_gw)
+        if _captaincy and gw >= 2:
+            gw_rows = merged_gw.get(gw, {})
+            outfield = [el for el in xi if owned[el]["element_type"] != 1]
+
+            def cand(el: int, ep_val: float) -> dict:
+                s = snap.get(el, {})
+                player = {
+                    "status": s.get("status", "a"),
+                    "news": s.get("news", ""),
+                    "chance_of_playing_next_round": s.get(
+                        "chance_of_playing_next_round"
+                    ),
+                    "minutes": cum_minutes.get(el, 0),
+                }
+                return {
+                    "id": el,
+                    "pos": owned[el]["element_type"],
+                    "ep": ep_val,
+                    "form": form_of(el, recent_points),
+                    "ict": cum_ict.get(el, 0.0),
+                    "fixtures": fdr.get(owned[el]["team"], []),
+                    "sp": start_prob_from(player, gw - 1),
+                }
+
+            def model_next(el: int) -> float:
+                pts = lineup_projections.get(gw, {}).get(el, [])
+                return pts[0] if pts else 0.0
+
+            xp = [
+                cand(el, predicted_ep(el, gw, merged_gw, recent_points))
+                for el in outfield
+            ]
+            mdl = [cand(el, model_next(el)) for el in outfield]
+            picks = {
+                "card_xp": card_captain(xp),
+                "card_model": card_captain(mdl),
+                "card_model_nofix": card_captain(mdl, fixture_terms=False),
+                "card_model_bare": card_captain(
+                    mdl, fixture_terms=False, pos_term=False
+                ),
+                "model_avail": max(
+                    outfield,
+                    key=lambda el: (
+                        model_next(el)
+                        * (snap.get(el, {}).get("chance_of_playing_next_round") or 100)
+                        / 100
+                    ),
+                    default=None,
+                ),
+                "oracle": max(
+                    outfield,
+                    key=lambda el: gw_rows.get(el, {}).get("total_points", 0),
+                    default=None,
+                ),
+            }
+            for rule, el in picks.items():
+                captain_pts[rule] += gw_rows.get(el, {}).get("total_points", 0)
 
         # ---- advance cumulative state + squad market values with GW's real results ----
         gw_rows = merged_gw.get(gw, {})
@@ -562,6 +683,7 @@ def run_transfer_policy(
         "total_points": total_points,
         "total_hits": total_hits,
         "transfers_made": transfers_made,
+        "captain_pts": dict(captain_pts),
     }
 
 
@@ -584,6 +706,7 @@ _allow_hits = True
 #   own      model arms on the model, the rest on xp (favours the model arms)
 LINEUPS = ("xp", "xp-avail", "model", "own")
 _lineup = "xp"
+_captaincy = False
 
 # Every arm, by name: (scorer, fed the model's projections?, GW window).
 # Each (squad, arm) run is independent, so main() farms them out to a pool.
@@ -609,9 +732,11 @@ def _init_world(
     projections_path: Optional[str],
     allow_hits: bool,
     lineup: str = "xp",
+    captaincy: bool = False,
 ) -> None:
-    global _teams_cache, _allow_hits, _lineup
+    global _teams_cache, _allow_hits, _lineup, _captaincy
     _lineup = lineup
+    _captaincy = captaincy
     _fpl_archive.SEASON, _fpl_archive.REFRESH = season, refresh
     _allow_hits = allow_hits
     merged_gw = load_merged_gw()
@@ -668,6 +793,27 @@ def _simulate(task: tuple) -> tuple:
     return seed, arm, result
 
 
+def report_captaincy(per_squad: List[Dict[str, int]]) -> None:
+    print("=" * 72)
+    print(
+        f"CAPTAINCY — armband points/season over GW2+, the app arm's XIs, "
+        f"--lineup {_lineup}"
+    )
+    print("=" * 72)
+    base = "card_xp"
+    for rule, label in CAPTAIN_RULES.items():
+        vals = [s.get(rule, 0) for s in per_squad]
+        line = f"  {rule:<17} {statistics.mean(vals):6.1f}"
+        if rule != base:
+            d = [s.get(rule, 0) - s.get(base, 0) for s in per_squad]
+            sd = statistics.stdev(d) if len(d) > 1 else 0.0
+            line += (
+                f"   vs {base} {statistics.mean(d):+6.1f} (stdev {sd:.1f}, "
+                f"won {sum(1 for x in d if x > 0)}/{len(d)})"
+            )
+        print(f"{line}   {label}")
+
+
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -708,6 +854,12 @@ def main() -> None:
             help="draft seeds run from here (e.g. 21 for a fresh set of squads)",
         )
         p.add_argument("--workers", type=int, default=os.cpu_count())
+        p.add_argument(
+            "--captaincy",
+            action="store_true",
+            help="compare captain rules (CAPTAIN_RULES) on the app arm's XIs "
+            "instead of transfer arms; needs --projections",
+        )
 
     args = _fpl_archive.configure(
         "Simulate a season of following transfer suggestions.", add_args
@@ -718,6 +870,7 @@ def main() -> None:
         args.projections,
         not args.no_hits,
         args.lineup,
+        args.captaincy,
     )
     print(
         f"Simulating {_fpl_archive.SEASON}: (fixed) transfer suggestions scored by the "
@@ -739,7 +892,9 @@ def main() -> None:
             print(f"Seed {seed}: could not draft a legal squad, skipping.")
 
     arms = list(ARMS)
-    if args.projections:
+    if args.captaincy:
+        arms = ["app"]
+    elif args.projections:
         arms += (
             [] if args.only_model else [a for a in MODEL_ARMS if a != "model_solver"]
         )
@@ -753,6 +908,10 @@ def main() -> None:
             by_seed[seed][arm] = res
             print(f"\r  {i + 1}/{len(tasks)} runs", end="", flush=True)
     print("\n")
+
+    if args.captaincy:
+        report_captaincy([by_seed[s]["app"]["captain_pts"] for s in sorted(by_seed)])
+        return
 
     results = []
     for n, seed in enumerate(sorted(by_seed), 1):
