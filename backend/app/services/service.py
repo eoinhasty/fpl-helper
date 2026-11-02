@@ -1005,10 +1005,21 @@ class FPLService:
                     for p in picks_list
                     if p.get("selling_price")
                 }
-                # No limit = unlimited free transfers (pre-season, or a
-                # wildcard/free hit this GW): plan the first GW as a wildcard
+                # A free hit squad reverts after the GW, so neither planning
+                # it as a wildcard nor from the squad it replaces is right
+                # (the card falls back to suggestions). "active" = played for
+                # the next deadline, as FPL's own web app reads it.
+                if any(
+                    c.get("name") == "freehit" and c.get("status_for_entry") == "active"
+                    for c in my_team_data.get("chips") or []
+                ):
+                    return unavailable("free_hit", [(mt_status, mt_age)])
+                # e.g. {"limit": 2, "made": 0, "bank": 23, "status": "cost"}.
+                # FPL's web app charges no hits when limit is null or status
+                # is "unlimited" (pre-season, or a wildcard this GW): plan the
+                # first GW as a wildcard
                 limit = transfers.get("limit")
-                unlimited = limit is None
+                unlimited = limit is None or transfers.get("status") == "unlimited"
                 ft = 0 if unlimited else max(0, limit - (transfers.get("made") or 0))
                 reading = (mt_status, mt_age)
             except httpx.HTTPStatusError as e:
