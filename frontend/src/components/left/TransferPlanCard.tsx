@@ -197,7 +197,7 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
           </div>
           <div className="text-xs">
             <button type="button" onClick={() => showMode("suggestions")} className={LINK_BUTTON}>
-              This week's suggestions
+              Other options this week
             </button>
           </div>
         </div>
