@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, KeyboardEvent } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import LeaguesCard from "../components/left/LeaguesCard";
-import TransferSuggestionsCard from "../components/left/TransferSuggestionsCard";
+import TransferPlanCard from "../components/left/TransferPlanCard";
 import XIList from "../components/squad/XIList";
 import PitchView from "../components/pitch/PitchView";
 import SquadStatusBar from "../components/squad/SquadStatusBar";
@@ -147,7 +147,7 @@ export default function SquadDashboard() {
   const left = (
     <>
       <LeaguesCard entry={entry} preSeason={seasonStatus === "pre_season"} />
-      <TransferSuggestionsCard entry={entry} />
+      <TransferPlanCard entry={entry} />
     </>
   );
 
