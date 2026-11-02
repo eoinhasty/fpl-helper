@@ -3,7 +3,7 @@ import Card from "./Card";
 import { Skeleton } from "./Skeleton";
 
 export default function DataCard({
-  title, loading, error, empty, emptyMessage, children, right
+  title, loading, error, empty, emptyMessage, children, right, notice
 }: {
   title: string;
   loading?: boolean;
@@ -11,6 +11,8 @@ export default function DataCard({
   empty?: boolean;
   emptyMessage?: React.ReactNode;
   right?: React.ReactNode;
+  /** Shown under the title in every state, unlike children */
+  notice?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   return (
@@ -19,6 +21,7 @@ export default function DataCard({
         <div className="text-sm font-semibold text-foreground">{title}</div>
         {right}
       </div>
+      {notice}
       {error && <div className="text-sm text-destructive">{error}</div>}
       {loading && !error && (
         <div className="space-y-2 mt-1">

@@ -9,6 +9,13 @@ import { TONE_CLASS } from "../../lib/utils";
 
 type Available = Extract<TransferPlanResponse, { available: true }>;
 
+/** Fast devices solve within this and never see the suggestions step (this laptop: ~4 s from the plan response, 2026-11-02) */
+const SLOW_SOLVE_MS = 6000;
+
+// 44px touch target without changing the line height (as PlayerTable's "Clear filters")
+const LINK_BUTTON =
+  "-my-3.5 py-3.5 text-primary-strong font-medium cursor-pointer hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 const shirtUrl = (teamCode: number | null, position: number) =>
   teamCode == null
     ? null
@@ -90,12 +97,18 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
   const { data, loading, error } = useFetch<TransferPlanResponse>(url, { auth: true });
   const resp = data?.available ? data : null;
 
+  const [view, setView] = React.useState<{ model: string; mode: "plan" | "suggestions" } | null>(null);
   const [solved, setSolved] = React.useState<{ model: string; plan: Plan | null } | null>(null);
   React.useEffect(() => {
     if (!resp) return;
     let live = true;
     solvePlan(resp).then(
-      (plan) => live && setSolved({ model: resp.model, plan }),
+      (plan) => {
+        if (!live) return;
+        setSolved({ model: resp.model, plan });
+        // Solved before SLOW_SOLVE_MS (or from storage): claim the view so the timer doesn't switch to suggestions
+        setView((v) => (v?.model === resp.model ? v : { model: resp.model, mode: "plan" }));
+      },
       (e: unknown) => {
         console.warn("Transfer plan solve failed; showing suggestions instead", e);
         if (live) setSolved({ model: resp.model, plan: null });
@@ -107,9 +120,46 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
   }, [resp]);
   const plan = resp && solved?.model === resp.model ? solved.plan : undefined;
 
+  // A mid-range phone takes ~20 s to solve. Past SLOW_SOLVE_MS, show this
+  // GW's suggestions instead of a skeleton; once the plan is ready the user
+  // opens it themselves rather than having the card swap under them.
+  React.useEffect(() => {
+    if (!resp) return;
+    const t = setTimeout(
+      () => setView((v) => (v?.model === resp.model ? v : { model: resp.model, mode: "suggestions" })),
+      SLOW_SOLVE_MS,
+    );
+    return () => clearTimeout(t);
+  }, [resp]);
+  const mode = resp && view?.model === resp.model ? view.mode : null;
+  const showMode = (m: "plan" | "suggestions") => resp && setView({ model: resp.model, mode: m });
+
   // No plan to show (no projections, no squad, or the solve failed): the
   // one-GW suggestions still work from FPL's own data
   if (!entry || error || (data && !resp) || plan === null) return <TransferSuggestionsCard entry={entry} />;
+
+  if (mode === "suggestions") {
+    const gws = resp?.gws.length;
+    return (
+      <TransferSuggestionsCard
+        entry={entry}
+        notice={
+          <div className="text-xs text-muted-foreground mb-2">
+            {plan ? (
+              <>
+                Your {gws}-GW plan is ready ·{" "}
+                <button type="button" onClick={() => showMode("plan")} className={LINK_BUTTON}>
+                  View
+                </button>
+              </>
+            ) : (
+              `Planning your next ${gws} GWs…`
+            )}
+          </div>
+        }
+      />
+    );
+  }
 
   const solving = !loading && plan === undefined;
   const span = resp ? `GW${resp.gws[0]}–${resp.gws[resp.gws.length - 1]}` : null;
@@ -144,6 +194,11 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
           <div className="text-[11px] text-muted-foreground">
             Plans every week on the points model's projections; later weeks are re-planned as projections update.
             {resp.source === "picks" && " Log in on the Live tab for exact selling prices and free transfers."}
+          </div>
+          <div className="text-xs">
+            <button type="button" onClick={() => showMode("suggestions")} className={LINK_BUTTON}>
+              This week's suggestions
+            </button>
           </div>
         </div>
       )}
