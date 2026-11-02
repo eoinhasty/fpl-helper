@@ -32,6 +32,8 @@ export type Player = {
     ep_next?: string | null;
     /** Points model projection for the GW × chance of playing; null without usable projections */
     projected_pts?: number | null;
+    /** Client-side only: set by previewLineup() on players the Best XI suggestion moves */
+    lineup_change?: "start" | "bench";
     points_per_game?: string;
     goals_scored?: number;
     assists?: number;
