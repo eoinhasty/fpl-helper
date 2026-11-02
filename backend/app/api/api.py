@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Optional, List
 import httpx
-from fastapi import APIRouter, Response, Request, Depends, HTTPException
+from fastapi import APIRouter, Response, Request, Depends, HTTPException, Query
 from app.deps import limiter, verify_api_key, nocache_guard
 from app.services.service import (
     FPLService,
@@ -565,13 +565,29 @@ async def transfer_suggestions(
 
 
 @router.get("/transfer-plan/{entry_id}")
-@limiter.limit("10/minute")
-async def transfer_plan(request: Request, response: Response, entry_id: int):
+# Each change to the card's options is a fetch
+@limiter.limit("30/minute")
+async def transfer_plan(
+    request: Request,
+    response: Response,
+    entry_id: int,
+    no_hits: bool = False,
+    wildcard: Optional[int] = None,
+    keep: List[int] = Query([], max_length=15),
+    exclude: List[int] = Query([], max_length=50),
+):
     svc: FPLService = request.app.state.svc
     # Same per-request token as /transfer-suggestions (exact selling prices
     # and free transfers when logged in)
     token = request.headers.get("x-fpl-token")
-    data, readings, ttl = await svc.transfer_plan(entry_id, token=token)
+    data, readings, ttl = await svc.transfer_plan(
+        entry_id,
+        token=token,
+        no_hits=no_hits,
+        wildcard=wildcard,
+        keep=keep,
+        exclude=exclude,
+    )
     combined_status, combined_age = combine_cache(*readings)
     set_cache_headers(response, combined_status, combined_age, ttl)
     return data
