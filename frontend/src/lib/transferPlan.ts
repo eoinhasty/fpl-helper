@@ -124,17 +124,56 @@ const SOLVE_TIME_LIMIT = 30;
 const solved = new Map<string, Promise<Plan>>();
 const MAX_CACHED = 3;
 
+// The last solved plan also persists across reloads, keyed by a hash of the
+// model: a mid-range phone takes ~20 s to solve (4× CPU throttle, 2026-11-02),
+// and the model only changes with prices, projections or the squad.
+const STORAGE_KEY = "fpl-plan-v1";
+
+async function modelHash(model: string): Promise<string | null> {
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(model));
+    return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null; // no crypto.subtle outside a secure context — just don't persist
+  }
+}
+
+function readStoredPlan(hash: string | null): Plan | null {
+  if (!hash) return null;
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as { hash: string; plan: Plan } | null;
+    return stored?.hash === hash ? stored.plan : null;
+  } catch {
+    return null;
+  }
+}
+
+function storePlan(hash: string | null, plan: Plan) {
+  if (!hash) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ hash, plan }));
+  } catch {
+    // storage full or blocked — the in-memory cache still covers this visit
+  }
+}
+
 /** Solves the plan, or rejects (the caller falls back to transfer suggestions). */
 export function solvePlan(resp: Available): Promise<Plan> {
   const cached = solved.get(resp.model);
   if (cached) return cached;
   const options = { mip_rel_gap: resp.mip_rel_gap, time_limit: SOLVE_TIME_LIMIT, output_flag: false };
-  // Serialise: the worker handles one model at a time
-  const result = queue.then(() => runSolve({ model: resp.model, options })).then((res) => {
+  const result = modelHash(resp.model).then(async (hash) => {
+    const stored = readStoredPlan(hash);
+    if (stored) return stored;
+    // Serialise: the worker handles one model at a time
+    const run = queue.then(() => runSolve({ model: resp.model, options }));
+    queue = run.catch(() => {});
+    const res = await run;
     if (!res.ok) throw new Error(res.error);
-    return decodePlan(res.values, resp, res.status);
+    const plan = decodePlan(res.values, resp, res.status);
+    storePlan(hash, plan);
+    return plan;
   });
-  queue = result.catch(() => {});
   solved.set(resp.model, result);
   result.catch(() => solved.delete(resp.model));
   if (solved.size > MAX_CACHED) solved.delete(solved.keys().next().value!);
