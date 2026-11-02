@@ -95,7 +95,7 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
   );
 }
 
-export default function TransferSuggestionsCard({ entry }: { entry: number | "" }) {
+export default function TransferSuggestionsCard({ entry, notice }: { entry: number | ""; notice?: React.ReactNode }) {
   const url = entry ? `/api/transfer-suggestions/${entry}` : null;
   // Send the auth token when present so the backend can source suggestions
   // from my_team (works pre-season and stays fresh after a Live-mode
@@ -109,6 +109,7 @@ export default function TransferSuggestionsCard({ entry }: { entry: number | "" 
       error={error}
       empty={!entry || !data}
       emptyMessage={!entry ? "Set your entry id to see suggestions." : undefined}
+      notice={notice}
     >
       {data && data.season_status === "pre_season" && (
         <div className="text-sm text-muted-foreground">
