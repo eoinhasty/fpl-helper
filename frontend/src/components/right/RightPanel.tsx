@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Segmented } from "../controls/Segmented";
+import BestXiCard from "./BestXiCard";
 import CaptaincyCard from "./CaptaincyCard";
 import FootballFixturesCard from "./FootballFixturesCard";
 import HealthCard from "./HealthCard";
@@ -44,6 +45,7 @@ export default function RightPanel({
       {tab === "squad" && (
         <>
           <CaptaincyCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
+          <BestXiCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
           <HealthCard entry={entry} players={players} loading={loading} error={error} />
           <InternationalDutyCard players={players} />
           <HotNewsCard />
