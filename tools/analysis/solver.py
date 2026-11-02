@@ -12,6 +12,8 @@ transfer per GW with rollover (max 5), 4-point hits, optional wildcard.
 """
 import argparse
 import json
+import sys
+from pathlib import Path
 
 import numpy as np
 from scipy.optimize import Bounds, LinearConstraint, milp
@@ -19,13 +21,11 @@ from scipy.sparse import coo_matrix
 
 import points_model
 import projections
-from common import MAX_FT, POS, Data
+from common import POS, Data
 
-SQUAD_QUOTA = {1: 2, 2: 5, 3: 5, 4: 3}
-XI_RANGE = {1: (1, 1), 2: (3, 5), 3: (2, 5), 4: (1, 3)}
-HIT_COST = 4
-CHURN_PENALTY = 0.05  # stops no-op buy+sell pairs in the same GW
-ROLL_PENALTY = 0.01  # use free transfers before paying hits, as FPL does
+sys.path.append(str(Path(__file__).resolve().parents[2] / "backend"))
+from app.services import planner
+from app.services.planner import HIT_COST
 
 
 def build_points(d, proj, pool, gws, scenario):
@@ -67,126 +67,26 @@ def optimise(pool, pts, cost, budget, team, pos, squad, free_transfers, gws, *, 
              no_hits=False, force_out=(), keep=(), bench_weight=0.1, time_limit=120):
     """The MILP itself, on plain inputs (so backend/scripts/backtest_transfers.py can drive it from the archive).
 
-    pool: candidate ids, including the current squad. pts[(id, gw)]: expected points. cost[id]: selling price
-    for squad players, buying price otherwise. team/pos: id -> club/element_type. Returns the plan, one dict
-    per GW: squad, xi, captain, hits, out, into, points.
+    The formulation lives in backend/app/services/planner.py, shared with the app (which solves it in the
+    browser); this solves it with scipy. pool: candidate ids, including the current squad. pts[(id, gw)]:
+    expected points. cost[id]: selling price for squad players, buying price otherwise. team/pos: id -> club/
+    element_type. Returns the plan, one dict per GW: squad, xi, captain, hits, out, into, points.
     """
-    initial = list(squad)
-    squad = set(squad)
-    P, G = len(pool), len(gws)
-    idx = {p: i for i, p in enumerate(pool)}
-    nb = P * G
-    X, Y, C, IN, OUT = range(5)
-
-    def v(block, i, g):
-        return block * nb + i * G + g
-
-    base = 5 * nb
-    T, F, H, FT = (lambda g, k=k: base + k * G + g for k in range(4))
-    n = base + 4 * G
-
-    c = np.zeros(n)
-    for p in pool:
-        i = idx[p]
-        for g, gw in enumerate(gws):
-            s = pts[(p, gw)]
-            c[v(Y, i, g)] -= s * (1 - bench_weight)
-            c[v(X, i, g)] -= s * bench_weight
-            c[v(C, i, g)] -= s
-            c[v(IN, i, g)] += CHURN_PENALTY
-            c[v(OUT, i, g)] += CHURN_PENALTY
-    for g in range(G):
-        c[H(g)] += HIT_COST
-        c[FT(g)] += ROLL_PENALTY
-        c[F(g)] -= ROLL_PENALTY
-
-    lb, ub = np.zeros(n), np.ones(n)
-    ub[base:] = 15
-    rows, cols, vals, lo, hi = [], [], [], [], []
-
-    def add(coefs, l, h):
-        r = len(lo)
-        for k, val in coefs.items():
-            rows.append(r)
-            cols.append(k)
-            vals.append(val)
-        lo.append(l)
-        hi.append(h)
-        return r
-
-    by_club, by_pos = {}, {}
-    for p in pool:
-        by_club.setdefault(team[p], []).append(p)
-        by_pos.setdefault(pos[p], []).append(p)
-
-    wg = gws.index(wildcard) if wildcard else None
-    for g in range(G):
-        add({v(X, idx[p], g): cost[p] for p in pool}, 0, budget)
-        for el_type, quota in SQUAD_QUOTA.items():
-            add({v(X, idx[p], g): 1 for p in by_pos[el_type]}, quota, quota)
-        for ps in by_club.values():
-            add({v(X, idx[p], g): 1 for p in ps}, 0, 3)
-        add({v(Y, idx[p], g): 1 for p in pool}, 11, 11)
-        for el_type, (l, h) in XI_RANGE.items():
-            add({v(Y, idx[p], g): 1 for p in by_pos[el_type]}, l, h)
-        add({v(C, idx[p], g): 1 for p in pool}, 1, 1)
-        for p in pool:
-            i = idx[p]
-            add({v(Y, i, g): 1, v(X, i, g): -1}, -np.inf, 0)
-            add({v(C, i, g): 1, v(Y, i, g): -1}, -np.inf, 0)
-            flow = {v(X, i, g): 1, v(IN, i, g): -1, v(OUT, i, g): 1}
-            if g:
-                flow[v(X, i, g - 1)] = -1
-                add(flow, 0, 0)
-            else:
-                init = 1 if p in squad else 0
-                add(flow, init, init)
-        add({**{v(IN, idx[p], g): 1 for p in pool}, T(g): -1}, 0, 0)
-        add({F(g): 1, FT(g): -1}, -np.inf, 0)
-        add({F(g): 1, T(g): -1}, -np.inf, 0)
-        add({H(g): 1, T(g): -1, F(g): 1}, -np.inf if g == wg else 0, np.inf)
-        if g == 0:
-            add({FT(0): 1}, free_transfers, free_transfers)
-        else:
-            add({FT(g): 1, FT(g - 1): -1, F(g - 1): 1}, -np.inf, 1)
-        ub[FT(g)] = MAX_FT
-
-    if wg is not None:
-        ub[H(wg)] = ub[F(wg)] = 0
-    if max_now is not None:
-        ub[T(0)] = max_now
-    if no_hits:
-        for g in range(G):
-            if g != wg:
-                ub[H(g)] = 0
-    for p in force_out:
-        if p in idx:
-            ub[v(X, idx[p], 0)] = 0
-    for p in keep:
-        for g in range(G):
-            lb[v(X, idx[p], g)] = 1
-
-    A = coo_matrix((vals, (rows, cols)), shape=(len(lo), n)).tocsr()
-    res = milp(c, constraints=LinearConstraint(A, np.array(lo), np.array(hi)), integrality=np.ones(n),
-               bounds=Bounds(lb, ub), options={"time_limit": time_limit, "mip_rel_gap": 0.002})
+    m = planner.build(pool, pts, cost, budget, team, pos, squad, free_transfers, gws, wildcard=wildcard,
+                      max_now=max_now, no_hits=no_hits, force_out=force_out, keep=keep, bench_weight=bench_weight)
+    rows, cols, vals = [], [], []
+    for r, (coefs, _, _) in enumerate(m.rows):
+        rows += [r] * len(coefs)
+        cols += coefs.keys()
+        vals += coefs.values()
+    A = coo_matrix((vals, (rows, cols)), shape=(len(m.rows), len(m.names))).tocsr()
+    lo, hi = zip(*((lo, hi) for _, lo, hi in m.rows))
+    res = milp(np.array(m.obj), constraints=LinearConstraint(A, np.array(lo), np.array(hi)),
+               integrality=np.ones(len(m.names)), bounds=Bounds(m.lb, m.ub),
+               options={"time_limit": time_limit, "mip_rel_gap": 0.002})
     if res.x is None:
         raise SystemExit(f"No feasible plan: {res.message}")
-    x = res.x
-
-    plan, prev = [], initial
-    for g, gw in enumerate(gws):
-        sq = [p for p in pool if x[v(X, idx[p], g)] > 0.5]
-        xi = [p for p in pool if x[v(Y, idx[p], g)] > 0.5]
-        cap = next(p for p in pool if x[v(C, idx[p], g)] > 0.5)
-        hits = 0 if g == wg else round(x[H(g)])
-        plan.append(dict(
-            gw=gw, squad=sq, xi=xi, captain=cap, hits=hits,
-            out=sorted((p for p in prev if p not in sq), key=lambda p: pos[p]),
-            into=sorted((p for p in sq if p not in prev), key=lambda p: pos[p]),
-            points=sum(pts[(p, gw)] for p in xi) + pts[(cap, gw)],
-        ))
-        prev = sq
-    return plan
+    return planner.read_plan(dict(zip(m.names, res.x)), pool, pts, pos, squad, gws, wildcard=wildcard)
 
 
 def print_plan(d, plan, pts, wildcard=None):
