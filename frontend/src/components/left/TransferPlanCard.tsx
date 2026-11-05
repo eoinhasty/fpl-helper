@@ -11,7 +11,9 @@ import {
   planQuery,
   planWildcard,
   solvePlan,
+  type ChipChoice,
   type Plan,
+  type PlanChip,
   type PlanOptions,
   type PlanWeek,
   type TransferPlanResponse,
@@ -131,6 +133,7 @@ function WeekBlock({
   constrain: Constrain;
 }) {
   const wildcard = week.gw === planWildcard(resp);
+  const chip = week.chip ? CHIP_LABEL[week.chip] : null;
   const captain = resp.players[week.captain];
   return (
     <div>
@@ -139,6 +142,7 @@ function WeekBlock({
           GW{week.gw}
           {g === 0 && " · this week"}
           {wildcard && " · wildcard"}
+          {chip && <span className="text-primary-strong font-semibold"> · {chip}</span>}
         </div>
         <div className="text-xs text-muted-foreground">
           {week.hits > 0 && (
@@ -157,9 +161,51 @@ function WeekBlock({
       ) : (
         <div className="text-sm text-muted-foreground">No transfer — roll it over</div>
       )}
-      <div className="text-[11px] text-muted-foreground mt-1">Captain {captain.name}</div>
+      <div className="text-[11px] text-muted-foreground mt-1">
+        Captain {captain.name}
+        {week.chip === "3xc" && " ×3"}
+        {week.chip === "bboost" && " · all 15 score"}
+      </div>
     </div>
   );
+}
+
+const CHIP_LABEL: Record<PlanChip, string> = { bboost: "bench boost", "3xc": "triple captain" };
+
+/** One option row: a label and a select at the right */
+function OptionSelect<T>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { label: string; value: T }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 pb-2">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <SelectMenu<T>
+        ariaLabel={`Plan a ${label.toLowerCase()}`}
+        value={value}
+        options={options}
+        onChange={onChange}
+        anchor="bottom end"
+        className="w-36"
+      />
+    </div>
+  );
+}
+
+/** Not planned / the solver's pick / a fixed week, for Bench Boost and Triple Captain */
+function chipChoices(gws: number[]): { label: string; value: ChipChoice }[] {
+  return [
+    { label: "Not planned", value: null },
+    { label: "Best week", value: "best" },
+    ...gws.map((gw) => ({ label: `GW${gw}`, value: gw })),
+  ];
 }
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
@@ -196,17 +242,28 @@ function PlanControls({
         onChange={(no_hits) => setOptions({ ...options, no_hits })}
       />
       {wildcardGws.length > 0 && (
-        <div className="flex items-center justify-between gap-3 pb-2">
-          <span className="text-sm font-medium text-foreground">Wildcard</span>
-          <SelectMenu<number | null>
-            ariaLabel="Plan a wildcard"
-            value={options.wildcard}
-            options={[{ label: "Not planned", value: null }, ...wildcardGws.map((gw) => ({ label: `GW${gw}`, value: gw }))]}
-            onChange={(wildcard) => setOptions({ ...options, wildcard })}
-            anchor="bottom end"
-            className="w-36"
-          />
-        </div>
+        <OptionSelect<number | null>
+          label="Wildcard"
+          value={options.wildcard}
+          options={[{ label: "Not planned", value: null }, ...wildcardGws.map((gw) => ({ label: `GW${gw}`, value: gw }))]}
+          onChange={(wildcard) => setOptions({ ...options, wildcard })}
+        />
+      )}
+      {resp.bench_boost_gws.length > 0 && (
+        <OptionSelect<ChipChoice>
+          label="Bench Boost"
+          value={options.bench_boost}
+          options={chipChoices(resp.bench_boost_gws)}
+          onChange={(bench_boost) => setOptions({ ...options, bench_boost })}
+        />
+      )}
+      {resp.triple_captain_gws.length > 0 && (
+        <OptionSelect<ChipChoice>
+          label="Triple Captain"
+          value={options.triple_captain}
+          options={chipChoices(resp.triple_captain_gws)}
+          onChange={(triple_captain) => setOptions({ ...options, triple_captain })}
+        />
       )}
       {(options.keep.length > 0 || options.exclude.length > 0) && (
         <div className="flex flex-wrap gap-1.5 pb-2">
