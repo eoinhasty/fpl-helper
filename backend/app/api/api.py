@@ -575,11 +575,18 @@ async def transfer_plan(
     wildcard: Optional[int] = None,
     keep: List[int] = Query([], max_length=15),
     exclude: List[int] = Query([], max_length=50),
+    # A GW, or "best" for the solver to pick the week
+    bench_boost: Optional[str] = Query(None, pattern=r"^(best|\d{1,2})$"),
+    triple_captain: Optional[str] = Query(None, pattern=r"^(best|\d{1,2})$"),
 ):
     svc: FPLService = request.app.state.svc
     # Same per-request token as /transfer-suggestions (exact selling prices
     # and free transfers when logged in)
     token = request.headers.get("x-fpl-token")
+
+    def chip(choice: Optional[str]):
+        return int(choice) if choice and choice.isdigit() else choice
+
     data, readings, ttl = await svc.transfer_plan(
         entry_id,
         token=token,
@@ -587,6 +594,8 @@ async def transfer_plan(
         wildcard=wildcard,
         keep=keep,
         exclude=exclude,
+        bench_boost=chip(bench_boost),
+        triple_captain=chip(triple_captain),
     )
     combined_status, combined_age = combine_cache(*readings)
     set_cache_headers(response, combined_status, combined_age, ttl)

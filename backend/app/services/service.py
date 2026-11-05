@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import logging
 from collections import defaultdict
-from typing import Any, Dict, Iterable, Optional, Tuple, List
+from typing import Any, Dict, Iterable, Optional, Tuple, List, Union
 import httpx
 from fastapi import HTTPException
 from datetime import datetime, timezone
@@ -24,6 +24,7 @@ from app.services.planner import (
     MAX_FT,
     MAX_PER_CLUB,
     SQUAD_QUOTA,
+    ChipPlay,
     free_transfers,
     sell_price,
     to_lp,
@@ -963,6 +964,8 @@ class FPLService:
         wildcard: Optional[int] = None,
         keep: Iterable[int] = (),
         exclude: Iterable[int] = (),
+        bench_boost: Union[int, str, None] = None,
+        triple_captain: Union[int, str, None] = None,
     ) -> Tuple[dict, List[Tuple[str, float]], int]:
         """The multi-GW transfer planner's model for this entry (planner.py),
         as LP text for the browser to solve, plus what it needs to show the
@@ -976,7 +979,11 @@ class FPLService:
         The card's options, as planner.build's: no_hits; wildcard, a GW to
         play it in (ignored unless a wildcard window is open then); keep,
         squad players held for the whole horizon; exclude, players never
-        bought. What was applied is echoed back as "options"."""
+        bought; bench_boost and triple_captain, a GW to play the chip in or
+        "best" for the solver to pick its week (at most once per open
+        window). A Bench Boost or Triple Captain already active for the next
+        GW is planned there regardless. What was applied is echoed back as
+        "options"."""
         boot, boot_status, boot_age = await self.bootstrap()
         events = boot["events"]
         current, nxt = current_and_next(events)
@@ -1003,6 +1010,8 @@ class FPLService:
         bank = 0
         ft = 1
         unlimited = False
+        # The chip played for the next deadline, known only from my_team
+        active_chip: Optional[str] = None
         reading: Optional[Tuple[str, float]] = None
         if token:
             try:
@@ -1021,10 +1030,15 @@ class FPLService:
                 # it as a wildcard nor from the squad it replaces is right
                 # (the card falls back to suggestions). "active" = played for
                 # the next deadline, as FPL's own web app reads it.
-                if any(
-                    c.get("name") == "freehit" and c.get("status_for_entry") == "active"
-                    for c in my_team_data.get("chips") or []
-                ):
+                active_chip = next(
+                    (
+                        c.get("name")
+                        for c in my_team_data.get("chips") or []
+                        if c.get("status_for_entry") == "active"
+                    ),
+                    None,
+                )
+                if active_chip == "freehit":
                     return unavailable("free_hit", [(mt_status, mt_age)])
                 # e.g. {"limit": 2, "made": 0, "bank": 23, "status": "cost"}.
                 # FPL's web app charges no hits when limit is null or status
@@ -1066,25 +1080,58 @@ class FPLService:
         if len(squad) != 15:
             return unavailable("no_squad", [reading])
 
-        # GWs a wildcard could be played in: one per window in bootstrap's
-        # chips (GW2–19, GW20–38), unless the GW history shows it played
-        # there. Not offered while transfers are already unlimited.
-        wildcard_gws: List[int] = []
-        if not unlimited:
-            history, _, _ = await self.entry_history(entry_id)
-            played = [
-                c.get("event", 0)
-                for c in history.get("chips", [])
-                if c.get("name") == "wildcard"
-            ]
+        # GWs of the horizon each chip could be played in, per window in
+        # bootstrap's chips (one of each per half: GW1/2–19, GW20–38) unless
+        # the GW history shows it played there. A chip already active for the
+        # next GW uses its window up, and holds that GW (one chip per GW).
+        history, _, _ = await self.entry_history(entry_id)
+        played = [(c.get("name"), c.get("event", 0)) for c in history.get("chips", [])]
+        if active_chip:
+            played.append((active_chip, gws[0]))
+
+        # The first GW is taken by the active chip, or by unlimited transfers
+        # (planned as a wildcard — pre-season too, which isn't one, but a
+        # GW1 Bench Boost is rare enough not to model)
+        active_gw = gws[0] if active_chip or unlimited else None
+
+        def chip_windows(name: str) -> List[List[int]]:
+            windows = []
             for chip in boot.get("chips", []):
-                if chip.get("name") != "wildcard":
+                if chip.get("name") != name:
                     continue
                 lo, hi = chip.get("start_event", 0), chip.get("stop_event", 0)
-                if not any(lo <= e <= hi for e in played):
-                    wildcard_gws += [g for g in gws if lo <= g <= hi]
+                if any(n == name and lo <= e <= hi for n, e in played):
+                    continue
+                window = [g for g in gws if lo <= g <= hi and g != active_gw]
+                if window:
+                    windows.append(window)
+            return windows
+
+        # Not offered while transfers are already unlimited
+        wildcard_gws = [] if unlimited else sum(chip_windows("wildcard"), [])
         if wildcard not in wildcard_gws:
             wildcard = gws[0] if unlimited else None
+
+        def chip_play(name: str, choice: Union[int, str, None]):
+            """The chip as planned (ChipPlay), its open GWs, and the choice
+            as applied."""
+            if active_chip == name:
+                return ChipPlay([[gws[0]]], required=True), [], None
+            # FPL allows one chip per GW: not in a chosen wildcard week
+            windows = [[g for g in w if g != wildcard] for w in chip_windows(name)]
+            windows = [w for w in windows if w]
+            open_gws = sum(windows, [])
+            if choice == "best" and open_gws:
+                return ChipPlay(windows), open_gws, "best"
+            if choice in open_gws:
+                return ChipPlay([[choice]], required=True), open_gws, choice
+            return None, open_gws, None
+
+        bb_play, bench_boost_gws, bench_boost = chip_play("bboost", bench_boost)
+        tc_play, triple_captain_gws, triple_captain = chip_play("3xc", triple_captain)
+        # Two chips can't share a fixed week; keep the Bench Boost
+        if isinstance(bench_boost, int) and triple_captain == bench_boost:
+            tc_play, triple_captain = None, None
         keep = sorted(set(keep) & set(squad))
         exclude = sorted(set(exclude) - set(squad))
 
@@ -1130,6 +1177,8 @@ class FPLService:
             wildcard=wildcard,
             no_hits=no_hits,
             keep=keep,
+            bench_boost=bb_play,
+            triple_captain=tc_play,
         )
 
         teams = {t["id"]: t for t in boot["teams"]}
@@ -1155,11 +1204,20 @@ class FPLService:
             "free_transfers": ft,
             "unlimited_transfers": unlimited,
             "wildcard_gws": wildcard_gws,
+            # GWs Bench Boost / Triple Captain could be played in (empty when
+            # used, or active this GW — see active_chip)
+            "bench_boost_gws": bench_boost_gws,
+            "triple_captain_gws": triple_captain_gws,
+            # "bboost" or "3xc" when played for the next GW (logged in only):
+            # the model plays it in gws[0]
+            "active_chip": active_chip if active_chip in ("bboost", "3xc") else None,
             # The wildcard chosen from wildcard_gws (the model also plans
             # gws[0] as one when transfers are unlimited)
             "options": {
                 "no_hits": no_hits,
                 "wildcard": None if unlimited else wildcard,
+                "bench_boost": bench_boost,
+                "triple_captain": triple_captain,
                 "keep": keep,
                 "exclude": [
                     {"id": el, "name": els[el].get("web_name")}
