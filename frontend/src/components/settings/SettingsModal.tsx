@@ -21,10 +21,28 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
     if (!open) setConfirmingReset(false);
   }, [open]);
 
+  // Typed into a draft and saved on Enter or leaving the field (closing the
+  // modal included): saving per keystroke would load the squad of every
+  // prefix on the way to the real ID
+  const [draft, setDraft] = React.useState(String(entry));
+  React.useEffect(() => {
+    if (open) setDraft(String(entry));
+  }, [open, entry]);
+  const parsed = draft.trim() === "" ? "" : Number(draft);
+  const invalid = parsed !== "" && (!Number.isInteger(parsed) || parsed <= 0);
+  const commit = () => {
+    if (!invalid && parsed !== entry) setEntry(parsed);
+  };
+  // Escape and the backdrop unmount the field without a blur, so save here too
+  const close = () => {
+    commit();
+    onClose();
+  };
+
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       labelledBy="settings-modal-title"
       widthClass="w-[min(56rem,94vw)]"
       initialFocusRef={closeBtnRef}
@@ -34,7 +52,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
         <h2 id="settings-modal-title" className="text-lg font-semibold">Settings</h2>
         <button
           ref={closeBtnRef}
-          onClick={onClose}
+          onClick={close}
           className="btn"
           aria-label="Close settings"
         >
@@ -48,22 +66,39 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
         <Card className="p-4">
           <div className="text-sm font-semibold mb-3">Account</div>
 
-          <label className="block text-sm mb-1">Your FPL Entry ID</label>
-          <div className="flex gap-2">
+          <label htmlFor="settings-entry-id" className="block text-sm mb-1">Your FPL Entry ID</label>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              commit();
+            }}
+          >
             <input
+              id="settings-entry-id"
               className="input"
               type="number"
+              inputMode="numeric"
               placeholder="1234567"
-              value={entry}
-              onChange={(e) => setEntry(e.target.value === "" ? "" : Number(e.target.value))}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              aria-invalid={invalid}
               autoComplete="off"
             />
-            <button onClick={() => setEntry("")} className="btn" type="button">
+            <button
+              onClick={() => {
+                setDraft("");
+                setEntry("");
+              }}
+              className="btn"
+              type="button"
+            >
               Clear
             </button>
-          </div>
-          {entry !== "" && (!Number.isInteger(entry) || entry <= 0) && (
-            <p className="text-xs text-destructive mt-1">Entry ID must be a positive whole number.</p>
+          </form>
+          {invalid && (
+            <p className="text-xs text-destructive mt-1">Entry ID must be a positive whole number — not saved.</p>
           )}
 
           <div className="text-sm font-semibold mt-5 mb-2">FPL Account</div>

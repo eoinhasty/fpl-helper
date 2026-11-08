@@ -20,6 +20,7 @@ import {
 } from "../../lib/transferPlan";
 import { fmtPrice } from "../../lib/format";
 import { TONE_CLASS } from "../../lib/utils";
+import PlayerOpen from "../squad/PlayerOpen";
 
 type Available = Extract<TransferPlanResponse, { available: true }>;
 
@@ -70,8 +71,8 @@ function MoveRow({
   // Only the current squad can be kept (planner.build holds it from the first GW)
   const canKeep = resp.squad.includes(out);
   return (
-    <li className="rounded-lg border border-border bg-card px-2 py-1.5">
-      <div className="flex items-center justify-between gap-2">
+    <li className="rounded-lg border border-border bg-card px-1 py-1">
+      <PlayerOpen id={into} className="w-full flex items-center justify-between gap-2 rounded-md px-1 py-0.5">
         <div className="flex items-center gap-2 min-w-0">
           {shirt && <img src={shirt} alt="" className="w-6 h-6 object-contain shrink-0" />}
           <div className="min-w-0">
@@ -91,9 +92,9 @@ function MoveRow({
           <div>{fmtPrice(i.cost)}</div>
           <div className={bank > 0 ? TONE_CLASS.success.text : undefined}>{fmtBank(bank)}</div>
         </div>
-      </div>
+      </PlayerOpen>
       {constrain && (
-        <div className="flex flex-wrap gap-x-4 text-[11px] mt-1">
+        <div className="flex flex-wrap gap-x-4 text-[11px] mt-1 px-1">
           {canKeep && (
             <button type="button" onClick={() => constrain.keep(out)} className={ROW_ACTION}>
               Keep {o.name}
@@ -162,7 +163,7 @@ function WeekBlock({
         <div className="text-sm text-muted-foreground">No transfer — roll it over</div>
       )}
       <div className="text-[11px] text-muted-foreground mt-1">
-        Captain {captain.name}
+        Captain <PlayerOpen id={week.captain} inline>{captain.name}</PlayerOpen>
         {week.chip === "3xc" && " ×3"}
         {week.chip === "bboost" && " · all 15 score"}
       </div>

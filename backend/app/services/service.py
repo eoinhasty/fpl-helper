@@ -439,6 +439,21 @@ class FPLService:
             return await self.cache.refresh(key, fetch, TTL_MYTEAM, SWR_MYTEAM)
         return await self.cache.get_or_set(key, fetch, TTL_MYTEAM, SWR_MYTEAM)
 
+    async def token_rejection(self, entry_id: int, token: str) -> Optional[str]:
+        """Why FPL rejects this token for this entry's my_team, or None if it
+        doesn't: "expired" (401) or "not_owner" (403 — a valid login viewing
+        someone else's team). Cached like my_team itself, so the caller's own
+        my_team read right after is free."""
+        try:
+            await self.my_team(entry_id, token=token)
+        except HTTPException as e:
+            if e.status_code == 401:
+                return "expired"
+            if e.status_code == 403:
+                return "not_owner"
+            raise
+        return None
+
     async def entry(self, entry_id: int) -> Tuple[dict, str, float]:
         key = f"entry:{entry_id}"
         fetch = lambda: self._get_json(f"/entry/{entry_id}/")
@@ -771,8 +786,9 @@ class FPLService:
                 picks_list = my_team_data.get("picks", [])
                 bank = (my_team_data.get("transfers") or {}).get("bank", 0)
                 reading_status, reading_age = mt_status, mt_age
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code not in (401, 403):
+            except HTTPException as e:
+                # _get_json_auth turns FPL's 401/403 into an HTTPException
+                if e.status_code not in (401, 403):
                     raise
                 token = None  # rejected token — fall through to picks below
 
@@ -1048,8 +1064,9 @@ class FPLService:
                 unlimited = limit is None or transfers.get("status") == "unlimited"
                 ft = 0 if unlimited else max(0, limit - (transfers.get("made") or 0))
                 reading = (mt_status, mt_age)
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code not in (401, 403):
+            except HTTPException as e:
+                # _get_json_auth turns FPL's 401/403 into an HTTPException
+                if e.status_code not in (401, 403):
                     raise
                 token = None  # rejected token — fall through to picks below
 

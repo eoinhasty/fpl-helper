@@ -17,14 +17,15 @@ export default function RightPanel({
   loading,
   error,
   isHistorical,
-  onPlayerClick,
+  lockedGw,
 }: {
   entry?: number | "";
   players?: Player[] | null;
   loading?: boolean;
   error?: string | null;
   isHistorical?: boolean;
-  onPlayerClick?: (p: Player) => void;
+  /** Set while the shown GW is past its deadline but unfinished */
+  lockedGw?: number;
 }) {
   const [tab, setTab] = React.useState<Tab>("squad");
 
@@ -43,8 +44,8 @@ export default function RightPanel({
 
       {tab === "squad" && (
         <>
-          <CaptaincyCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
-          <HealthCard entry={entry} players={players} loading={loading} error={error} />
+          <CaptaincyCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} lockedGw={lockedGw} />
+          <HealthCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} />
           <InternationalDutyCard players={players} />
           <HotNewsCard />
         </>

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os as _os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
+import httpx
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
 load_dotenv(dotenv_path=BASE_DIR / ".env")
@@ -53,6 +55,36 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+@app.exception_handler(httpx.HTTPStatusError)
+async def _upstream_status_handler(
+    request: Request, exc: httpx.HTTPStatusError
+) -> JSONResponse:
+    # An FPL (or other upstream) error no route handled. Unhandled, it was a
+    # bare 500 — and in production one without CORS headers, so the browser
+    # reported a network failure instead of anything readable.
+    code = exc.response.status_code
+    if code == 404:
+        return JSONResponse(status_code=404, content={"detail": "Not found on FPL."})
+    logging.getLogger(__name__).warning(
+        "Upstream %s for %s", code, exc.request.url, exc_info=exc
+    )
+    return JSONResponse(
+        status_code=502,
+        content={"detail": "FPL didn't respond properly — try again shortly."},
+    )
+
+
+@app.exception_handler(httpx.TransportError)
+async def _upstream_transport_handler(
+    request: Request, exc: httpx.TransportError
+) -> JSONResponse:
+    logging.getLogger(__name__).warning("Upstream unreachable: %r", exc)
+    return JSONResponse(
+        status_code=502,
+        content={"detail": "Couldn't reach FPL — try again shortly."},
+    )
+
+
 @app.exception_handler(RequestValidationError)
 async def _validation_error_handler(
     request: Request, exc: RequestValidationError
@@ -82,7 +114,7 @@ app.add_middleware(
     allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["x-cache-status", "x-cache-age"],
+    expose_headers=["x-cache-status", "x-cache-age", "x-fpl-token-rejected"],
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)

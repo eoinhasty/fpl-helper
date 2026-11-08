@@ -444,7 +444,14 @@ async def fixtures_grid(request: Request, response: Response, horizon: int = 6):
 @limiter.limit("30/minute")
 async def leagues(request: Request, response: Response, entry_id: int):
     svc: FPLService = request.app.state.svc
-    entry_json, status, age = await svc.entry(entry_id)
+    try:
+        entry_json, status, age = await svc.entry(entry_id)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(
+                404, detail=f"FPL entry {entry_id} not found. Check your team ID."
+            )
+        raise
 
     leagues = entry_json.get("leagues") or {}
     classic = leagues.get("classic") or []
@@ -543,6 +550,23 @@ async def news_hot(
     return data
 
 
+async def _accepted_token(
+    svc: FPLService, entry_id: int, request: Request, response: Response
+) -> Optional[str]:
+    """The request's FPL token, or None when FPL rejects it — these endpoints
+    then work from public picks instead of failing. The reason goes out as
+    x-fpl-token-rejected; on "expired" (the usual case, on the first load
+    after a while away) the frontend refreshes the token and refetches."""
+    token = request.headers.get("x-fpl-token")
+    if not token:
+        return None
+    reason = await svc.token_rejection(entry_id, token)
+    if reason:
+        response.headers["x-fpl-token-rejected"] = reason
+        return None
+    return token
+
+
 @router.get("/transfer-suggestions/{entry_id}")
 @limiter.limit("30/minute")
 async def transfer_suggestions(
@@ -555,7 +579,7 @@ async def transfer_suggestions(
     top_n = max(1, min(int(top_n), 5))
     # Same per-request token as /live, since my_team is auth-gated (see
     # transfer_suggestions for why my_team is preferred over picks).
-    token = request.headers.get("x-fpl-token")
+    token = await _accepted_token(svc, entry_id, request, response)
     data, readings, ttl = await svc.transfer_suggestions(
         entry_id, top_n=top_n, token=token
     )
@@ -582,7 +606,7 @@ async def transfer_plan(
     svc: FPLService = request.app.state.svc
     # Same per-request token as /transfer-suggestions (exact selling prices
     # and free transfers when logged in)
-    token = request.headers.get("x-fpl-token")
+    token = await _accepted_token(svc, entry_id, request, response)
 
     def chip(choice: Optional[str]):
         return int(choice) if choice and choice.isdigit() else choice

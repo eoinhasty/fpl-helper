@@ -3,6 +3,7 @@ import { fmtPrice } from "../../lib/format";
 import StartMeter from "./StartMeter";
 import FixturePill from "./FixturePill";
 import XgiBadge from "./XgiBadge";
+import { gwPointsDisplay } from "../../lib/utils";
 
 export default function PlayerCard({
   p,
@@ -39,6 +40,8 @@ export default function PlayerCard({
     </span>
   ) : null;
 
+  const gwPts = gwPointsDisplay(p);
+
   return (
     <div
       role="button"
@@ -65,8 +68,8 @@ export default function PlayerCard({
             <div className="font-semibold leading-tight truncate text-foreground">
               {p.name}
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {p.team} • {fmtPrice(p.price)}
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+              <span className="whitespace-nowrap">{p.team} • {fmtPrice(p.price)}</span>
               <XgiBadge
                 signal={p.xgi_signal}
                 ga={(p.goals_scored ?? 0) + (p.assists ?? 0)}
@@ -80,6 +83,18 @@ export default function PlayerCard({
           {change}
           {cap}
           <FixturePill f={p.fixture ?? undefined} />
+          {gwPts && (
+            // GW points, as the pitch chip shows them — the list once showed none,
+            // so a past GW in list view had no scores at all
+            <span
+              className={`min-w-6 sm:min-w-11 text-right text-sm font-bold tabular-nums ${gwPts.counted ? "text-foreground" : "text-muted-foreground"}`}
+              title={gwPts.tooltip}
+              aria-label={gwPts.tooltip}
+            >
+              {gwPts.points}
+              <span className="hidden sm:inline"> pts</span>
+            </span>
+          )}
         </div>
       </div>
 
