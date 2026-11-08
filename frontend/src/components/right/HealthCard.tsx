@@ -8,12 +8,25 @@ export default function HealthCard({
   players,
   loading,
   error,
+  isHistorical,
 }: {
   entry?: number | "";
   players?: Player[] | null;
   loading?: boolean;
   error?: string | null;
+  isHistorical?: boolean;
 }) {
+  // Statuses and news are today's, so against a past GW's squad they'd
+  // flag players who were fine then (as CaptaincyCard does)
+  if (isHistorical) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Team Health</div>
+        <div className="text-sm text-muted-foreground">Team health uses today's injury news — not available for past GWs.</div>
+      </Card>
+    );
+  }
+
   if (!entry) {
     return (
       <Card className="p-4">
