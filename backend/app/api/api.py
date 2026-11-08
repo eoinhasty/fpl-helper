@@ -444,7 +444,14 @@ async def fixtures_grid(request: Request, response: Response, horizon: int = 6):
 @limiter.limit("30/minute")
 async def leagues(request: Request, response: Response, entry_id: int):
     svc: FPLService = request.app.state.svc
-    entry_json, status, age = await svc.entry(entry_id)
+    try:
+        entry_json, status, age = await svc.entry(entry_id)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(
+                404, detail=f"FPL entry {entry_id} not found. Check your team ID."
+            )
+        raise
 
     leagues = entry_json.get("leagues") or {}
     classic = leagues.get("classic") or []
