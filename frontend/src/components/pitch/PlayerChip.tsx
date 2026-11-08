@@ -2,7 +2,7 @@
 import type { Player } from "../../lib/types";
 import { BENCH_LABEL, CHIP } from "../../lib/constants";
 import StartMeter from "../squad/StartMeter";
-import { TONE_CLASS, statusTone } from "../../lib/utils";
+import { TONE_CLASS, gwPointsDisplay, statusTone } from "../../lib/utils";
 
 function CaptainBadge({ c, v }: { c?: boolean; v?: boolean }) {
   if (!c && !v) return null;
@@ -114,21 +114,9 @@ export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { 
 
   const benchLabel = BENCH_LABEL[p.slot ?? 0];
 
-  const displayPoints =
-    p.gw_points == null
-      ? undefined
-      : isBench
-        ? p.gw_points
-        : p.gw_points * (p.multiplier ?? 1);
-
-  const tooltip =
-    p.gw_points == null
-      ? undefined
-      : isBench
-        ? `Bench: ${p.gw_points} points (not counted)`
-        : p.is_captain
-          ? `Captain: ${p.gw_points} × ${p.multiplier ?? 2} = ${displayPoints}`
-          : `GW points: ${displayPoints}`;
+  const gwPts = gwPointsDisplay(p);
+  const displayPoints = gwPts?.points;
+  const tooltip = gwPts?.tooltip;
 
   return (
     <div
@@ -155,7 +143,7 @@ export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { 
             <Shirt url={p.shirt_url} />
             <Points
               n={displayPoints}
-              variant={isBench ? "bench" : "xi"}
+              variant={gwPts?.counted ? "xi" : "bench"}
               isCaptain={!!p.is_captain}
               title={tooltip}
             />

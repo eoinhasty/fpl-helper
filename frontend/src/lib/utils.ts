@@ -72,3 +72,19 @@ export function statusToText(s: string | undefined) {
     default:  return "Unknown";
   }
 }
+
+/** A player's GW points as they count for the manager: × the pick multiplier
+ * (captain ×2, triple captain ×3), and not counted on the bench. The
+ * multiplier is FPL's own word on that — slots alone get a Bench Boost week
+ * wrong, where slots 12–15 count too. Null when there are no live points. */
+export function gwPointsDisplay(p: Player): { points: number; counted: boolean; tooltip: string } | null {
+  if (p.gw_points == null) return null;
+  const mult = p.multiplier ?? ((p.slot ?? 99) <= 11 ? 1 : 0);
+  if (mult === 0) return { points: p.gw_points, counted: false, tooltip: `Bench: ${p.gw_points} points (not counted)` };
+  const points = p.gw_points * mult;
+  return {
+    points,
+    counted: true,
+    tooltip: mult > 1 ? `Captain: ${p.gw_points} × ${mult} = ${points}` : `GW points: ${points}`,
+  };
+}
