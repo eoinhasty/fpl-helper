@@ -78,7 +78,20 @@ export async function fplLogin(email: string, password: string): Promise<void> {
   localStorage.setItem(TOKEN_KEY, `Bearer ${json.access_token}`);
 }
 
-async function tryRefresh(): Promise<boolean> {
+// One refresh at a time: several cards can find the token expired on the same
+// load, and a second refresh racing the first could present a refresh cookie
+// the first one already rotated — failing, and logging the user out.
+let refreshing: Promise<boolean> | null = null;
+
+/** Swap the refresh cookie for a new access token; false (and logged out) if it's expired too */
+export function tryRefresh(): Promise<boolean> {
+  refreshing ??= doRefresh().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+async function doRefresh(): Promise<boolean> {
   try {
     // Refresh token is an HttpOnly cookie — browser sends it automatically with credentials: "include"
     const { json } = await fetchJSON<{ access_token: string }>(

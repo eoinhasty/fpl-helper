@@ -1,6 +1,13 @@
 // hooks/useFetch.ts
 import * as React from "react";
-import { apiBase, baseHeaders, tokenHeaders } from "../lib/api";
+import { apiBase, baseHeaders, tokenHeaders, tryRefresh } from "../lib/api";
+
+/** What a card shows for a failed request: the status code alone means nothing to a user */
+function errorMessage(status: number): string {
+  if (status === 429) return "Too many requests — try again in a minute.";
+  if (status >= 500) return `FPL Helper's server couldn't load this — try again shortly (${status}).`;
+  return `Couldn't load this (${status}).`;
+}
 
 type Settled<T> = { key: string; data: T | null; error: string | null };
 
@@ -21,9 +28,12 @@ export function useFetch<T>(url?: string | null, opts?: { auth?: boolean }) {
     const ac = new AbortController();
     (async () => {
       try {
-        const headers = auth ? tokenHeaders() : baseHeaders();
-        const r = await fetch(prefixedUrl, { signal: ac.signal, headers });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const get = () => fetch(prefixedUrl, { signal: ac.signal, headers: auth ? tokenHeaders() : baseHeaders() });
+        let r = await get();
+        // The backend answered without the token (from public data) because
+        // it had expired: refresh it and fetch again for the logged-in data
+        if (auth && r.headers.get("x-fpl-token-rejected") === "expired" && (await tryRefresh())) r = await get();
+        if (!r.ok) throw new Error(errorMessage(r.status));
         const data = (await r.json()) as T;
         setSettled({ key, data, error: null });
       } catch (e: unknown) {
