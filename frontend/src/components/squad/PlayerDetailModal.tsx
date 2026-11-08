@@ -309,13 +309,14 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
       <div
         className="flex gap-6 px-4 border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: "none" }}
-        tabIndex={0}
       >
         {(["overview", "stats", "fixtures", "history"] as const).map((t) => (
           <button
             key={t}
+            type="button"
+            aria-pressed={tab === t}
             onClick={() => setTab(t)}
-            className={`py-3 text-sm font-medium capitalize relative transition-colors shrink-0 ${
+            className={`py-3 text-sm font-medium capitalize relative transition-colors shrink-0 cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -381,9 +382,9 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
                   right={
                     player.cost_change_event != null && player.cost_change_event !== 0
                       ? <span className={player.cost_change_event > 0 ? "text-success" : "text-destructive"}>
-                          {player.cost_change_event > 0 ? "↑" : "↓"} £{(Math.abs(player.cost_change_event) / 10).toFixed(1)} today
+                          {player.cost_change_event > 0 ? "↑" : "↓"} £{(Math.abs(player.cost_change_event) / 10).toFixed(1)} this GW
                         </span>
-                      : <span className="text-muted-foreground">No change today</span>
+                      : <span className="text-muted-foreground">No change this GW</span>
                   }
                 />
               </div>
