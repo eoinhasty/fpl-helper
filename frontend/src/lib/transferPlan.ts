@@ -3,6 +3,7 @@
 // a Web Worker solves it with highs-js and decodePlan reads the solution back
 // by variable name, mirroring planner.py's read_plan.
 import type { SolveRequest, SolveResponse } from "../workers/planSolver";
+import { FORMATIONS } from "./lineup";
 
 export type PlanPlayer = {
   name: string;
@@ -148,6 +149,25 @@ export function decodePlan(values: Record<string, number>, resp: Available, stat
   });
   const total = weeks.reduce((s, w) => s + w.points - w.hits * resp.hit_cost, 0);
   return { weeks, total, status };
+}
+
+/** Projected points the week's chip adds: the captain's third score under a
+ * Triple Captain; under a Bench Boost, all 15's total minus their best XI's */
+export function chipGain(week: PlanWeek, g: number, resp: Available): number {
+  const pts = (p: number) => resp.players[p].pts[g] ?? 0;
+  if (week.chip === "3xc") return pts(week.captain);
+  if (week.chip !== "bboost") return 0;
+  const sum = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
+  const [gks, defs, mids, fwds] = [1, 2, 3, 4].map((pos) =>
+    week.squad
+      .filter((p) => resp.players[p].position === pos)
+      .map(pts)
+      .sort((a, b) => b - a),
+  );
+  const bestXi = Math.max(
+    ...FORMATIONS.map(([d, m, f]) => gks[0] + sum(defs.slice(0, d)) + sum(mids.slice(0, m)) + sum(fwds.slice(0, f))),
+  );
+  return sum(week.squad.map(pts)) - bestXi;
 }
 
 // One worker, reused across solves; a failed WASM instance isn't reusable, so

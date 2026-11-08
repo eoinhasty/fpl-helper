@@ -8,6 +8,7 @@ import { useFetch } from "../../hooks/useFetch";
 import { usePlanOptions } from "../../hooks/usePlanOptions";
 import {
   DEFAULT_PLAN_OPTIONS,
+  chipGain,
   planQuery,
   planWildcard,
   solvePlan,
@@ -166,6 +167,12 @@ function WeekBlock({
         Captain <PlayerOpen id={week.captain} inline>{captain.name}</PlayerOpen>
         {week.chip === "3xc" && " ×3"}
         {week.chip === "bboost" && " · all 15 score"}
+        {week.chip && (
+          <span className={TONE_CLASS.success.text}>
+            {" "}
+            · +{chipGain(week, g, resp).toFixed(1)} pts from the {chip}
+          </span>
+        )}
       </div>
     </div>
   );
