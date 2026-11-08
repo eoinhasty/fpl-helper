@@ -4,6 +4,7 @@ import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import { fmtRelTime } from "../../lib/format";
 import type { Player } from "../../lib/types";
+import PlayerOpen from "../squad/PlayerOpen";
 import {
   CheckCircleIcon,
   ArrowUpCircleIcon,
@@ -68,7 +69,7 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                  <span className="truncate">{player.name}</span>
+                  <PlayerOpen id={player.element} inline className="truncate">{player.name}</PlayerOpen>
                   {info!.country && <span className="text-xs text-muted-foreground shrink-0">({info!.country})</span>}
                   {badge && (
                     <span className={`flex items-center gap-0.5 text-[11px] font-normal shrink-0 ${badge.color}`} title={match!.opponent ? `vs ${match!.opponent}` : undefined}>

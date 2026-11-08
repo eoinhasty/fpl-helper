@@ -18,7 +18,7 @@ import { money } from "../lib/format";
 import type { Player } from "../lib/types";
 import { previewLineup, suggestLineup } from "../lib/lineup";
 import BestXiBanner from "../components/squad/BestXiBanner";
-import PlayerDetailModal from "../components/squad/PlayerDetailModal";
+import { PlayerDetailContext, usePlayerDetailHost } from "../hooks/usePlayerDetail";
 import LiveAuthGate from "../components/squad/LiveAuthGate";
 import PreSeasonNotice from "../components/squad/PreSeasonNotice";
 
@@ -53,9 +53,8 @@ export default function SquadDashboard() {
   const loading = mode === "live" ? liveLoading : squadLoading;
   const error = mode === "live" ? liveError : squadError;
 
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const openPlayer = (p: Player) => setSelectedPlayer(p);
-  const closePlayer = () => setSelectedPlayer(null);
+  const playerDetail = usePlayerDetailHost({ squad: data?.players, season: data?.season });
+  const openPlayer = (p: Player) => playerDetail.open(p.element);
 
   // The sidebars stick just below the sticky content header, so their offset
   // is that header's measured height — it changes with wrapping, the chip
@@ -158,7 +157,6 @@ export default function SquadDashboard() {
       loading={loading}
       error={error === "AUTH_EXPIRED" ? null : error}
       isHistorical={isHistorical}
-      onPlayerClick={openPlayer}
     />
   );
 
@@ -317,7 +315,7 @@ export default function SquadDashboard() {
   );
 
   return (
-    <>
+    <PlayerDetailContext.Provider value={playerDetail.open}>
       {contentHeader}
       <DashboardLayout
         left={left}
@@ -339,9 +337,7 @@ export default function SquadDashboard() {
         )}
       </DashboardLayout>
 
-      {selectedPlayer && (
-        <PlayerDetailModal key={selectedPlayer.element} open={true} onClose={closePlayer} player={selectedPlayer} season={data?.season} />
-      )}
-    </>
+      {playerDetail.modal}
+    </PlayerDetailContext.Provider>
   );
 }

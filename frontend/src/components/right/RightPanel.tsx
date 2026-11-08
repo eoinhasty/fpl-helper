@@ -17,14 +17,12 @@ export default function RightPanel({
   loading,
   error,
   isHistorical,
-  onPlayerClick,
 }: {
   entry?: number | "";
   players?: Player[] | null;
   loading?: boolean;
   error?: string | null;
   isHistorical?: boolean;
-  onPlayerClick?: (p: Player) => void;
 }) {
   const [tab, setTab] = React.useState<Tab>("squad");
 
@@ -43,7 +41,7 @@ export default function RightPanel({
 
       {tab === "squad" && (
         <>
-          <CaptaincyCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} onPlayerClick={onPlayerClick} />
+          <CaptaincyCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} />
           <HealthCard entry={entry} players={players} loading={loading} error={error} />
           <InternationalDutyCard players={players} />
           <HotNewsCard />

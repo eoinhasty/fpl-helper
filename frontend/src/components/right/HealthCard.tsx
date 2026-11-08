@@ -1,6 +1,7 @@
 import Card from "../ui/Card";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
+import PlayerOpen from "../squad/PlayerOpen";
 
 export default function HealthCard({
   entry,
@@ -76,10 +77,11 @@ export default function HealthCard({
       {lowStart.length > 0 && (
         <ul className="space-y-1">
           {lowStart.map((p) => (
-            <li
-              key={p.element}
-              className="text-sm flex items-center justify-between rounded-md border border-border bg-card px-2 py-1"
-            >
+            <li key={p.element}>
+              <PlayerOpen
+                id={p.element}
+                className="w-full text-sm flex items-center justify-between rounded-md border border-border bg-card px-2 py-1"
+              >
               <span className="truncate text-foreground">
                 {p.name}{" "}
                 <span className="text-xs text-muted-foreground">({p.team})</span>
@@ -87,6 +89,7 @@ export default function HealthCard({
               <span className="text-xs text-destructive font-medium">
                 {Math.round((p.start_probability ?? 0) * 100)}%
               </span>
+              </PlayerOpen>
             </li>
           ))}
         </ul>
