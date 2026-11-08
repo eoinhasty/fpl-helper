@@ -981,7 +981,7 @@ class FPLService:
         squad players held for the whole horizon; exclude, players never
         bought; bench_boost and triple_captain, a GW to play the chip in or
         "best" for the solver to pick its week (at most once per open
-        window). A Bench Boost or Triple Captain already active for the next
+        window; a Triple Captain only in a double GW, see chip_play). A Bench Boost or Triple Captain already active for the next
         GW is planned there regardless. What was applied is echoed back as
         "options"."""
         boot, boot_status, boot_age = await self.bootstrap()
@@ -1094,7 +1094,18 @@ class FPLService:
         # GW1 Bench Boost is rare enough not to model)
         active_gw = gws[0] if active_chip or unlimited else None
 
-        def chip_windows(name: str) -> List[List[int]]:
+        # GWs where some club plays twice, for Triple Captain's "best"
+        fixtures, _, _ = await self.fixtures(None)
+        club_gws = defaultdict(int)
+        for fx in fixtures:
+            if fx.get("event"):
+                club_gws[(fx["event"], fx["team_h"])] += 1
+                club_gws[(fx["event"], fx["team_a"])] += 1
+        double_gws = {gw for (gw, _), n in club_gws.items() if n > 1}
+
+        def chip_windows(name: str, doubles: bool = False) -> List[List[int]]:
+            """doubles: only a window's double GWs, or its last GW once none
+            are left in it."""
             windows = []
             for chip in boot.get("chips", []):
                 if chip.get("name") != name:
@@ -1102,7 +1113,11 @@ class FPLService:
                 lo, hi = chip.get("start_event", 0), chip.get("stop_event", 0)
                 if any(n == name and lo <= e <= hi for n, e in played):
                     continue
-                window = [g for g in gws if lo <= g <= hi and g != active_gw]
+                allowed = range(lo, hi + 1)
+                if doubles:
+                    left = [g for g in double_gws if max(lo, gws[0]) <= g <= hi]
+                    allowed = left or [hi]
+                window = [g for g in gws if g in allowed and g != active_gw]
                 if window:
                     windows.append(window)
             return windows
@@ -1117,12 +1132,23 @@ class FPLService:
             as applied."""
             if active_chip == name:
                 return ChipPlay([[gws[0]]], required=True), [], None
-            # FPL allows one chip per GW: not in a chosen wildcard week
-            windows = [[g for g in w if g != wildcard] for w in chip_windows(name)]
-            windows = [w for w in windows if w]
+
+            def free(windows: List[List[int]]) -> List[List[int]]:
+                # FPL allows one chip per GW: not in a chosen wildcard week
+                windows = [[g for g in w if g != wildcard] for w in windows]
+                return [w for w in windows if w]
+
+            windows = free(chip_windows(name))
             open_gws = sum(windows, [])
             if choice == "best" and open_gws:
-                return ChipPlay(windows), open_gws, "best"
+                # A Triple Captain waits for a double GW: picked from any week
+                # it was spent at once (GW2 / GW21) and lost to the first
+                # double in 9 of 10 backtested squads, 13 vs 17 pts/season
+                # (backtest_transfers.py --chips tc). Held while none is in
+                # sight, so "best" is kept but may plan nothing.
+                if name == "3xc":
+                    windows = free(chip_windows(name, doubles=True))
+                return (ChipPlay(windows) if windows else None), open_gws, "best"
             if choice in open_gws:
                 return ChipPlay([[choice]], required=True), open_gws, choice
             return None, open_gws, None

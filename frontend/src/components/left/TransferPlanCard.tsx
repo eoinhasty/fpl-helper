@@ -200,10 +200,10 @@ function OptionSelect<T>({
 }
 
 /** Not planned / the solver's pick / a fixed week, for Bench Boost and Triple Captain */
-function chipChoices(gws: number[]): { label: string; value: ChipChoice }[] {
+function chipChoices(gws: number[], best = "Best week"): { label: string; value: ChipChoice }[] {
   return [
     { label: "Not planned", value: null },
-    { label: "Best week", value: "best" },
+    { label: best, value: "best" },
     ...gws.map((gw) => ({ label: `GW${gw}`, value: gw })),
   ];
 }
@@ -228,11 +228,16 @@ function PlanControls({
   options,
   setOptions,
   resp,
+  plan,
 }: {
   options: PlanOptions;
   setOptions: (o: PlanOptions) => void;
   resp: Available;
+  plan: Plan;
 }) {
+  // The backend only lets "best" play a Triple Captain in a double GW (or a
+  // window's last GW), so with none in sight the plan holds it
+  const tcHeld = options.triple_captain === "best" && !plan.weeks.some((w) => w.chip === "3xc");
   const wildcardGws = resp.wildcard_gws;
   return (
     <div className="border-y border-border">
@@ -261,9 +266,14 @@ function PlanControls({
         <OptionSelect<ChipChoice>
           label="Triple Captain"
           value={options.triple_captain}
-          options={chipChoices(resp.triple_captain_gws)}
+          options={chipChoices(resp.triple_captain_gws, "Best double GW")}
           onChange={(triple_captain) => setOptions({ ...options, triple_captain })}
         />
+      )}
+      {resp.triple_captain_gws.length > 0 && tcHeld && (
+        <div className="-mt-1 pb-2 text-[11px] text-muted-foreground">
+          No double gameweek in the next {resp.gws.length} — Triple Captain is held for one.
+        </div>
       )}
       {(options.keep.length > 0 || options.exclude.length > 0) && (
         <div className="flex flex-wrap gap-1.5 pb-2">
@@ -462,7 +472,7 @@ function PlanBody({
           : `${resp.free_transfers} free transfer${resp.free_transfers === 1 ? "" : "s"}`}{" "}
         · bank {fmtPrice(resp.bank)}
       </div>
-      <PlanControls options={options} setOptions={setOptions} resp={resp} />
+      <PlanControls options={options} setOptions={setOptions} resp={resp} plan={plan} />
       {replanning && (
         <div className="text-xs text-muted-foreground" role="status">
           Re-planning with your changes…
