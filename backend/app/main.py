@@ -82,7 +82,7 @@ app.add_middleware(
     allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["x-cache-status", "x-cache-age"],
+    expose_headers=["x-cache-status", "x-cache-age", "x-fpl-token-rejected"],
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
