@@ -146,13 +146,27 @@ export default function CaptaincyCard({
   loading,
   error,
   isHistorical,
+  lockedGw,
 }: {
   entry?: number | "";
   players?: Player[] | null;
   loading?: boolean;
   error?: string | null;
   isHistorical?: boolean;
+  /** The shown GW is past its deadline: its captain can't be changed */
+  lockedGw?: number;
 }) {
+  if (lockedGw != null) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
+        <div className="text-sm text-muted-foreground">
+          GW{lockedGw}'s captain is locked — picks for the next GW appear once it finishes.
+        </div>
+      </Card>
+    );
+  }
+
   if (isHistorical) {
     return (
       <Card className="p-4">

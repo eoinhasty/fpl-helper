@@ -110,11 +110,20 @@ export default function SquadDashboard() {
   const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
   const isPreSeason = data?.season_status === "pre_season" && (data?.players?.length ?? 0) === 0;
 
+  // The shown GW's deadline has passed but it hasn't finished (once it has,
+  // fixture_gw moves on to the next GW and its deadline is ahead again): the
+  // lineup and captain are locked, so advice on them can't be acted on.
+  const deadlinePassed = useMemo(
+    () => !!data?.deadline && new Date(data.deadline).getTime() <= Date.now(),
+    [data?.deadline]
+  );
+  const lockedGw = !isHistorical && deadlinePassed ? (data?.fixture_gw ?? data?.used_gw) : undefined;
+
   // Best XI: previewing is tied to the players it was asked for, so a refetch,
   // GW change or mode switch drops back to the real lineup on its own.
   const lineup = useMemo(
-    () => (data?.players && !isHistorical ? suggestLineup(data.players) : null),
-    [data?.players, isHistorical]
+    () => (data?.players && !isHistorical && lockedGw == null ? suggestLineup(data.players) : null),
+    [data?.players, isHistorical, lockedGw]
   );
   const [previewFor, setPreviewFor] = useState<Player[] | null>(null);
   const previewing = !!lineup && !!data?.players && previewFor === data.players;
@@ -157,6 +166,7 @@ export default function SquadDashboard() {
       loading={loading}
       error={error === "AUTH_EXPIRED" ? null : error}
       isHistorical={isHistorical}
+      lockedGw={lockedGw}
     />
   );
 
@@ -269,14 +279,17 @@ export default function SquadDashboard() {
     </div>
   );
 
+  const loggedOutLive = mode === "live" && error === "AUTH_EXPIRED";
   const statusBarProps = {
     gw: data?.fixture_gw ?? data?.used_gw,
     deadlineISO: data?.deadline,
     teamValue: data?.team_value,
     teamBank: data?.team_bank,
     activeChip: data?.active_chip ?? null,
-    cache: cache ?? { status: null, ageSeconds: null },
-    isLive: mode === "live",
+    // Logged out on Live there's no live data: the cache age and LIVE badge
+    // would be left over from Squad mode
+    cache: loggedOutLive ? { status: null, ageSeconds: null } : (cache ?? { status: null, ageSeconds: null }),
+    isLive: mode === "live" && !loggedOutLive,
     isSwitching,
   };
 
