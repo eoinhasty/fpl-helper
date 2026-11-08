@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Outlet } from "@tanstack/react-router";
 import App from "./app/App";
+import NotFoundPage from "./pages/NotFoundPage";
 
 // The dashboard is the landing page and stays in the main bundle; the other
 // pages load on demand so a dashboard visitor doesn't download the planner's
@@ -32,4 +33,4 @@ const plannerRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([indexRoute, privacyRoute, fixturesRoute, plannerRoute]);
-export const router = createRouter({ routeTree, defaultPreload: "intent" });
+export const router = createRouter({ routeTree, defaultPreload: "intent", defaultNotFoundComponent: NotFoundPage });
