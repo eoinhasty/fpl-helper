@@ -67,6 +67,17 @@ XIs. Armband pts/season vs CaptaincyCard's formula on last-GW xP, 20 squads,
 The bare projection wins every run; the card's FDR/home/position/start-prob
 terms only dilute it (the model already prices fixtures). Gains are small
 next to the lineup effect above, which is mostly XI choice, not the captain.
+`--chips bb|tc` instead times one chip on the solver arm (CHIP_RULES; `--rules`
+picks some). Chip pts/season (the chip's own actual points, both halves),
+2025-26, 10 squads, --lineup model (2026-11-08):
+  Bench Boost:    best 24.6 · peak 23.3 · dgw 22.5 · last 18.5 (ceiling 43.3)
+  Triple Captain: best 13.0 · peak 13.6 · dgw 17.0 · last 15.0 (ceiling 30.0);
+                  best_dgw 17.0, same weeks as dgw
+Bench Boost totals vs no chip are noisy (stdev 36-68: the arms' transfers
+diverge), so read the chip pts. A Triple Captain on "best" was spent as soon
+as a window opened (GW2 / GW21) — within 5 GWs the top captain projects about
+the same every week — and lost to the first double in 9/10 squads, so the
+app's Triple Captain "best" is chips_best_dgw. Not yet run on 2024-25.
 Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
 app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
 +77 and -173), so read any single season's number as noise until it agrees
@@ -143,6 +154,8 @@ ANALYSIS_DIR = Path(__file__).resolve().parents[2] / "tools" / "analysis"
 CHIP_HALF = 19
 CHIP_RULES = {
     "chips_best": "solver's pick in its 5-GW horizon (the card's Best week)",
+    "chips_best_dgw": "solver's pick of the double GWs in sight, else the window's "
+    "last GW (the card's Triple Captain Best week)",
     "chips_dgw": "first double gameweek in the window, else its last GW",
     "chips_last": "the window's last GW",
     "chips_peak": "this GW, once its projected value tops every later GW in sight",
@@ -418,20 +431,19 @@ def run_transfer_policy(
         window = [g for g in chip_windows[w] if g >= gw]
         if not window:
             return []
+        doubles = [
+            g
+            for g in window
+            if any(
+                len(fx) > 1 for fx in fdr_by_team_for_gw(fixtures_by_event, g).values()
+            )
+        ]
         if chip_rule == "chips_best":
             return [g for g in window if g in gws]
+        if chip_rule == "chips_best_dgw":  # mirrors FPLService.transfer_plan
+            return [g for g in doubles or window[-1:] if g in gws]
         if chip_rule == "chips_dgw":
-            target = next(
-                (
-                    g
-                    for g in window
-                    if any(
-                        len(fx) > 1
-                        for fx in fdr_by_team_for_gw(fixtures_by_event, g).values()
-                    )
-                ),
-                window[-1],
-            )
+            target = (doubles or window[-1:])[0]
         elif chip_rule == "chips_last":
             target = window[-1]
         else:  # chips_peak: decided week by week, so only ever this GW
@@ -515,7 +527,10 @@ def run_transfer_policy(
             pts = {(el, g): p for el in pool for g, p in zip(gws, window_pts(el))}
             allowed = [chip_gws_allowed(w, gw, gws) for w in sorted(chips_left)]
             play = (
-                ChipPlay([a for a in allowed if a], required=chip_rule != "chips_best")
+                ChipPlay(
+                    [a for a in allowed if a],
+                    required=chip_rule not in ("chips_best", "chips_best_dgw"),
+                )
                 if any(allowed)
                 else None
             )
@@ -917,7 +932,8 @@ def report_chips(results: List[dict], max_gw: int) -> None:
     print("=" * 72)
     base = [r["model_solver"]["total_points"] for r in results]
     print(f"  no chip      {statistics.mean(base):7.1f} pts/season")
-    for rule, label in CHIP_RULES.items():
+    rules = {rule: label for rule, label in CHIP_RULES.items() if rule in results[0]}
+    for rule, label in rules.items():
         d = [r[rule]["total_points"] - b for r, b in zip(results, base)]
         sd = statistics.stdev(d) if len(d) > 1 else 0.0
         played = [g for r in results for g in r[rule]["chip_gws"]]
@@ -929,10 +945,10 @@ def report_chips(results: List[dict], max_gw: int) -> None:
             f"{_median(first)} / {_median([g for g in played if g > CHIP_HALF])}"
             f"   {label}"
         )
-    for rule in CHIP_RULES:
+    for rule in rules if len(rules) > 1 else ():
         won = sum(
             r[rule]["total_points"]
-            > max(r[o]["total_points"] for o in CHIP_RULES if o != rule)
+            > max(r[o]["total_points"] for o in rules if o != rule)
             for r in results
         )
         print(f"  {rule:<12} best rule outright in {won}/{len(results)} squads")
@@ -1007,6 +1023,12 @@ def main() -> None:
             help="compare when to play Bench Boost or Triple Captain (CHIP_RULES) "
             "on the solver arm instead of the usual arms; needs --projections",
         )
+        p.add_argument(
+            "--rules",
+            nargs="+",
+            choices=CHIP_RULES,
+            help="with --chips, only these rules (default all)",
+        )
 
     args = _fpl_archive.configure(
         "Simulate a season of following transfer suggestions.", add_args
@@ -1043,7 +1065,7 @@ def main() -> None:
     if args.captaincy:
         arms = ["app"]
     elif args.chips:
-        arms = ["model_solver", *CHIP_RULES]
+        arms = ["model_solver", *(args.rules or CHIP_RULES)]
     elif args.projections:
         arms += (
             [] if args.only_model else [a for a in MODEL_ARMS if a != "model_solver"]
