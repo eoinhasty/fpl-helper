@@ -19,20 +19,42 @@ function cacheFrom(r: Response): CacheMeta {
   return { status, ageSeconds: age ? Number(age) : null };
 }
 
-// fetch JSON, throw on non-2xx with a readable message
+/** A failed API request: `status` for code that branches on it, `message` for display */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** The error a non-2xx response becomes. The backend's own `detail` is written
+ * for users ("FPL entry 123 not found. Check your team ID."), so it's shown
+ * as-is; rate limits and server errors get generic copy instead. */
+export async function apiError(r: Response): Promise<ApiError> {
+  let detail: string | null = null;
+  try {
+    const body = await r.json();
+    if (typeof body?.detail === "string") detail = body.detail;
+  } catch {
+    // not JSON (a proxy's error page, an empty body)
+  }
+  const s = r.status;
+  const message =
+    s === 429
+      ? "Too many requests — try again in a minute."
+      : s >= 500
+        ? (s === 502 && detail) || `FPL Helper's server couldn't load this — try again shortly (${s}).`
+        : detail ?? `Couldn't load this (${s}).`;
+  return new ApiError(s, message);
+}
+
+export const isUnauthorized = (e: unknown) => e instanceof ApiError && e.status === 401;
+
+// fetch JSON, throw an ApiError on non-2xx
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<{ json: T; resp: Response }> {
   const r = await fetch(url, init);
-  if (!r.ok) {
-    // use server error body if there is one, otherwise fall back to status text
-    let reason = r.statusText;
-    try {
-      const text = await r.text();
-      if (text) reason = text.slice(0, 180);
-    } catch {
-      // r.text() can fail on certain error responses — fall back to statusText
-    }
-    throw new Error(`${r.status} ${reason}`.trim());
-  }
+  if (!r.ok) throw await apiError(r);
   return { json: await r.json(), resp: r };
 }
 
@@ -78,7 +100,20 @@ export async function fplLogin(email: string, password: string): Promise<void> {
   localStorage.setItem(TOKEN_KEY, `Bearer ${json.access_token}`);
 }
 
-async function tryRefresh(): Promise<boolean> {
+// One refresh at a time: several cards can find the token expired on the same
+// load, and a second refresh racing the first could present a refresh cookie
+// the first one already rotated — failing, and logging the user out.
+let refreshing: Promise<boolean> | null = null;
+
+/** Swap the refresh cookie for a new access token; false (and logged out) if it's expired too */
+export function tryRefresh(): Promise<boolean> {
+  refreshing ??= doRefresh().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+async function doRefresh(): Promise<boolean> {
   try {
     // Refresh token is an HttpOnly cookie — browser sends it automatically with credentials: "include"
     const { json } = await fetchJSON<{ access_token: string }>(
@@ -106,19 +141,22 @@ export async function getLive(entry: number, opts?: { forceRefresh?: boolean }):
     const { json, resp } = await fetchJSON<SquadResponse>(u.toString(), { headers: tokenHeaders() });
     return { data: json, cache: cacheFrom(resp) };
   };
-  const is401 = (e: unknown) => (e as Error)?.message?.startsWith("401");
+
+  // Logged out: the request could only 401 (the access token and refresh
+  // cookie are set at login and cleared together), so go straight to the login form
+  if (!isAuthenticated()) throw new Error("AUTH_EXPIRED");
 
   try {
     return await attempt();
   } catch (e: unknown) {
-    if (!is401(e)) throw e;
+    if (!isUnauthorized(e)) throw e;
     if (await tryRefresh()) {
       try {
         return await attempt();
       } catch (retryErr: unknown) {
         // Refresh succeeded but FPL still rejects the new token — same outcome
         // as an expired session, so route it to the re-login flow too.
-        if (is401(retryErr)) throw new Error("AUTH_EXPIRED", { cause: retryErr });
+        if (isUnauthorized(retryErr)) throw new Error("AUTH_EXPIRED", { cause: retryErr });
         throw retryErr;
       }
     }

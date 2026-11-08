@@ -1,7 +1,7 @@
 // hooks/useSquad.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SquadResponse } from "../lib/types";
-import { getSquad, getLive, clearAuth, type CacheMeta } from "../lib/api";
+import { getSquad, getLive, clearAuth, isAuthenticated, type CacheMeta } from "../lib/api";
 
 type LoadSquadOpts = { gw?: number; forceRefresh?: boolean };
 type Fetcher = () => Promise<{ data: SquadResponse; cache: CacheMeta }>;
@@ -114,7 +114,8 @@ export function useSquad(entry: number | "") {
   const loadLive = useCallback((forceRefresh = false) => {
     if (!entry) return;
     return _load(liveReqId, () => getLive(Number(entry), { forceRefresh }), "Failed to load live squad", liveStaleTimer, setLiveLoading, setLiveError, (msg) => {
-      if (msg === "AUTH_EXPIRED") clearAuth();
+      // Logged out already (no token): nothing to clear, so no logout request
+      if (msg === "AUTH_EXPIRED" && isAuthenticated()) clearAuth();
     });
   }, [entry, _load]);
 

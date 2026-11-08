@@ -2,6 +2,7 @@ import Card from "../ui/Card";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
 import { fdrFactor, isStarting } from "../../lib/utils";
+import PlayerOpen from "../squad/PlayerOpen";
 
 function range(arr: number[]) {
   return { mn: Math.min(...arr), mx: Math.max(...arr) };
@@ -75,20 +76,16 @@ function PlayerRow({
   pts,
   projected,
   rank,
-  onPlayerClick,
 }: {
-  p: import("../../lib/types").Player;
+  p: Player;
   pts: number;
   projected: boolean;
   rank?: number;
-  onPlayerClick?: (p: import("../../lib/types").Player) => void;
 }) {
   const fxs = p.fixtures ?? (p.fixture ? [p.fixture] : []);
   return (
-    <li
-      onClick={() => onPlayerClick?.(p)}
-      className={`flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5${onPlayerClick ? " cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
-    >
+    <li>
+    <PlayerOpen id={p.element} className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5">
       <div className="flex items-center gap-2 min-w-0">
         <img
           src={p.shirt_url || ""}
@@ -121,6 +118,7 @@ function PlayerRow({
               : `${parseFloat(p.form ?? "0").toFixed(1)} form`}
         </div>
       </div>
+    </PlayerOpen>
     </li>
   );
 }
@@ -148,15 +146,27 @@ export default function CaptaincyCard({
   loading,
   error,
   isHistorical,
-  onPlayerClick,
+  lockedGw,
 }: {
   entry?: number | "";
   players?: Player[] | null;
   loading?: boolean;
   error?: string | null;
   isHistorical?: boolean;
-  onPlayerClick?: (p: Player) => void;
+  /** The shown GW is past its deadline: its captain can't be changed */
+  lockedGw?: number;
 }) {
+  if (lockedGw != null) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
+        <div className="text-sm text-muted-foreground">
+          GW{lockedGw}'s captain is locked — picks for the next GW appear once it finishes.
+        </div>
+      </Card>
+    );
+  }
+
   if (isHistorical) {
     return (
       <Card className="p-4">
@@ -212,7 +222,7 @@ export default function CaptaincyCard({
         <>
           <ul className="space-y-2">
             {picks.map(({ p, pts }, i) => (
-              <PlayerRow key={p.element} p={p} pts={pts} projected={projected} rank={i} onPlayerClick={onPlayerClick} />
+              <PlayerRow key={p.element} p={p} pts={pts} projected={projected} rank={i} />
             ))}
           </ul>
 
@@ -221,7 +231,7 @@ export default function CaptaincyCard({
               <div className="mt-3 mb-2 border-t border-border" />
               <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Differential</div>
               <ul>
-                <PlayerRow p={differential.p} pts={differential.pts} projected={projected} onPlayerClick={onPlayerClick} />
+                <PlayerRow p={differential.p} pts={differential.pts} projected={projected} />
               </ul>
             </>
           )}

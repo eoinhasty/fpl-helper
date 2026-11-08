@@ -3,17 +3,18 @@ import AppShell from "../components/layout/AppShell";
 import DataCard from "../components/ui/DataCard";
 import PlayerTable from "../components/planner/PlayerTable";
 import DraftPanel from "../components/planner/DraftPanel";
-import PlayerDetailModal from "../components/squad/PlayerDetailModal";
+import { usePlayerDetailHost } from "../hooks/usePlayerDetail";
 import PitchView from "../components/pitch/PitchView";
 import { useFetch } from "../hooks/useFetch";
 import { useDraft } from "../hooks/useDraft";
-import { poolPlayerToPlayer, poolToSquadPlayers } from "../lib/plannerAdapter";
+import { poolToSquadPlayers } from "../lib/plannerAdapter";
 import type { Player, PlayersResponse, PoolPlayer } from "../lib/types";
 
 export default function PlannerPage() {
   const { data, loading, error } = useFetch<PlayersResponse>("/api/players");
   const draft = useDraft(data?.players);
-  const [selected, setSelected] = React.useState<PoolPlayer | null>(null);
+  const playerDetail = usePlayerDetailHost({ pool: data?.players, season: data?.season });
+  const openPool = (p: PoolPlayer) => playerDetail.open(p.id);
   const [showPitch, setShowPitch] = React.useState(false);
   const [showBackToTop, setShowBackToTop] = React.useState(false);
 
@@ -24,12 +25,7 @@ export default function PlannerPage() {
   }, []);
 
   const squadPlayers = React.useMemo(() => poolToSquadPlayers(draft.picks), [draft.picks]);
-  const byId = React.useMemo(() => new Map(draft.picks.map((p) => [p.id, p])), [draft.picks]);
-
-  function handlePitchClick(sp: Player) {
-    const p = byId.get(sp.element);
-    if (p) setSelected(p);
-  }
+  const openPitch = (sp: Player) => playerDetail.open(sp.element);
 
   return (
     <AppShell>
@@ -54,7 +50,7 @@ export default function PlannerPage() {
                     Add players from the pool below to see your squad on the pitch.
                   </div>
                 ) : (
-                  <PitchView players={squadPlayers} brand="FPL Helper" onPlayerClick={handlePitchClick} hideStartMeter />
+                  <PitchView players={squadPlayers} brand="FPL Helper" onPlayerClick={openPitch} hideStartMeter />
                 )}
               </DataCard>
             </div>
@@ -67,7 +63,7 @@ export default function PlannerPage() {
                 teams={data.teams}
                 canAdd={draft.canAdd}
                 onAdd={draft.add}
-                onSelect={setSelected}
+                onSelect={openPool}
               />
             )}
           </DataCard>
@@ -85,7 +81,7 @@ export default function PlannerPage() {
               violations={draft.violations}
               warnings={draft.warnings}
               onRemove={draft.remove}
-              onSelect={setSelected}
+              onSelect={openPool}
               onClear={draft.clear}
             />
           </DataCard>
@@ -104,16 +100,7 @@ export default function PlannerPage() {
         </button>
       )}
 
-      {selected && (
-        <PlayerDetailModal
-          key={selected.id}
-          open={!!selected}
-          onClose={() => setSelected(null)}
-          player={poolPlayerToPlayer(selected, 1)}
-          hideStartProbability
-          season={data?.season}
-        />
-      )}
+      {playerDetail.modal}
     </AppShell>
   );
 }

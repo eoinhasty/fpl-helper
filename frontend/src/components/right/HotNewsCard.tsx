@@ -1,6 +1,7 @@
 // right/HotNewsCard.tsx
 
 import DataCard from "../ui/DataCard";
+import PlayerOpen from "../squad/PlayerOpen";
 import { useFetch } from "../../hooks/useFetch";
 import { fmtRelTime } from "../../lib/format";
 import { POSITION_LABEL } from "../../lib/constants";
@@ -17,9 +18,9 @@ export default function HotNewsCard() {
 
   return (
     <DataCard title="Hot News 🔥" loading={loading} error={error} empty={!data || data.items.length === 0}>
-      <div className="space-y-3">
+      <div className="space-y-1">
         {data?.items.map((t) => (
-          <div key={t.id} className="flex gap-3">
+          <PlayerOpen key={t.id} id={t.id} className="w-[calc(100%+0.75rem)] flex gap-3 rounded-lg -mx-1.5 px-1.5 py-1">
             <div className="w-12 h-12 rounded-lg bg-card border border-border grid place-content-center shrink-0">
               {t.badge_url
                 ? <img src={t.badge_url} alt={t.team || ""} className="w-8 h-8 object-contain" loading="lazy" />
@@ -43,7 +44,7 @@ export default function HotNewsCard() {
                 </span>
               </div>
             </div>
-          </div>
+          </PlayerOpen>
         ))}
       </div>
     </DataCard>

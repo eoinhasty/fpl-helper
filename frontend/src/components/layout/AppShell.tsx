@@ -1,5 +1,6 @@
 // components/layout/AppShell.tsx
 import type * as React from "react";
+import { Link } from "@tanstack/react-router";
 import TopNav from "./TopNav";
 import MobileTabBar from "./MobileTabBar";
 
@@ -23,7 +24,7 @@ export default function AppShell({ children }: Props) {
 
       <footer className="mt-auto pt-2 pb-2 lg:py-4 text-center text-[10px] lg:text-xs text-muted-foreground/70 lg:text-muted-foreground/60">
         Not affiliated with or endorsed by Fantasy Premier League or the Premier League.{" "}
-        <a href="/privacy" className="underline hover:text-muted-foreground">Privacy policy</a>
+        <Link to="/privacy" className="underline hover:text-muted-foreground">Privacy policy</Link>
       </footer>
 
       <MobileTabBar />

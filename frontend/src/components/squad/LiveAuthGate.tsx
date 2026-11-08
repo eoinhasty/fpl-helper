@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Card from "../ui/Card";
-import { fplLogin, isAuthenticated } from "../../lib/api";
+import { ApiError, fplLogin, isAuthenticated } from "../../lib/api";
 
 const CONSENT_KEY = "fpl_consent_v1";
 
@@ -37,9 +37,11 @@ export default function LiveAuthGate({ children, onAuthenticated }: Props) {
       setAuthed(true);
       onAuthenticated();
     } catch (err: unknown) {
-      const msg: string = (err as Error)?.message ?? "";
-      if (msg.startsWith("401")) {
+      const status = err instanceof ApiError ? err.status : null;
+      if (status === 401) {
         setError("Incorrect email or password.");
+      } else if (status === 429) {
+        setError("Too many sign-in attempts — wait a minute and try again.");
       } else {
         setError("Could not connect to FPL. Please try again.");
       }

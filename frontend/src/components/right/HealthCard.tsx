@@ -1,18 +1,32 @@
 import Card from "../ui/Card";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
+import PlayerOpen from "../squad/PlayerOpen";
 
 export default function HealthCard({
   entry,
   players,
   loading,
   error,
+  isHistorical,
 }: {
   entry?: number | "";
   players?: Player[] | null;
   loading?: boolean;
   error?: string | null;
+  isHistorical?: boolean;
 }) {
+  // Statuses and news are today's, so against a past GW's squad they'd
+  // flag players who were fine then (as CaptaincyCard does)
+  if (isHistorical) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-foreground mb-2">Team Health</div>
+        <div className="text-sm text-muted-foreground">Team health uses today's injury news — not available for past GWs.</div>
+      </Card>
+    );
+  }
+
   if (!entry) {
     return (
       <Card className="p-4">
@@ -76,10 +90,11 @@ export default function HealthCard({
       {lowStart.length > 0 && (
         <ul className="space-y-1">
           {lowStart.map((p) => (
-            <li
-              key={p.element}
-              className="text-sm flex items-center justify-between rounded-md border border-border bg-card px-2 py-1"
-            >
+            <li key={p.element}>
+              <PlayerOpen
+                id={p.element}
+                className="w-full text-sm flex items-center justify-between rounded-md border border-border bg-card px-2 py-1"
+              >
               <span className="truncate text-foreground">
                 {p.name}{" "}
                 <span className="text-xs text-muted-foreground">({p.team})</span>
@@ -87,6 +102,7 @@ export default function HealthCard({
               <span className="text-xs text-destructive font-medium">
                 {Math.round((p.start_probability ?? 0) * 100)}%
               </span>
+              </PlayerOpen>
             </li>
           ))}
         </ul>

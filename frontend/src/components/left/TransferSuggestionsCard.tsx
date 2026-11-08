@@ -4,6 +4,7 @@ import type { TransferSuggestion, TransferSuggestionsResponse } from "../../lib/
 import { fmtPrice, pct } from "../../lib/format";
 import { fdrDotClass, TONE_CLASS } from "../../lib/utils";
 import { isAuthenticated } from "../../lib/api";
+import PlayerOpen from "../squad/PlayerOpen";
 
 const POS_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
@@ -57,7 +58,8 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
       : `bank ${bankDelta > 0 ? "+" : "−"}£${Math.abs(bankDelta / 10).toFixed(1)}`;
 
   return (
-    <li className="flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5 gap-2">
+    <li>
+    <PlayerOpen id={p.element} className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5 gap-2">
       <div className="flex items-center gap-2 min-w-0">
         {p.shirt_url && (
           <img
@@ -91,6 +93,7 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
           <div className="text-[10px]">{pct(p.start_probability)} start</div>
         )}
       </div>
+    </PlayerOpen>
     </li>
   );
 }
