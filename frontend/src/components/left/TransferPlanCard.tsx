@@ -8,10 +8,14 @@ import { useFetch } from "../../hooks/useFetch";
 import { usePlanOptions } from "../../hooks/usePlanOptions";
 import {
   DEFAULT_PLAN_OPTIONS,
+  benchBoostGain,
+  chipGain,
   planQuery,
   planWildcard,
   solvePlan,
+  type ChipChoice,
   type Plan,
+  type PlanChip,
   type PlanOptions,
   type PlanWeek,
   type TransferPlanResponse,
@@ -132,6 +136,7 @@ function WeekBlock({
   constrain: Constrain;
 }) {
   const wildcard = week.gw === planWildcard(resp);
+  const chip = week.chip ? CHIP_LABEL[week.chip] : null;
   const captain = resp.players[week.captain];
   return (
     <div>
@@ -140,6 +145,7 @@ function WeekBlock({
           GW{week.gw}
           {g === 0 && " · this week"}
           {wildcard && " · wildcard"}
+          {chip && <span className="text-primary-strong font-semibold"> · {chip}</span>}
         </div>
         <div className="text-xs text-muted-foreground">
           {week.hits > 0 && (
@@ -160,9 +166,55 @@ function WeekBlock({
       )}
       <div className="text-[11px] text-muted-foreground mt-1">
         Captain <PlayerOpen id={week.captain} inline>{captain.name}</PlayerOpen>
+        {week.chip === "3xc" && " ×3"}
+        {week.chip === "bboost" && " · all 15 score"}
+        {week.chip && (
+          <span className={TONE_CLASS.success.text}>
+            {" "}
+            · +{chipGain(week, g, resp).toFixed(1)} pts from the {chip}
+          </span>
+        )}
       </div>
     </div>
   );
+}
+
+const CHIP_LABEL: Record<PlanChip, string> = { bboost: "bench boost", "3xc": "triple captain" };
+
+/** One option row: a label and a select at the right */
+function OptionSelect<T>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { label: string; value: T }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 pb-2">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <SelectMenu<T>
+        ariaLabel={`Plan a ${label.toLowerCase()}`}
+        value={value}
+        options={options}
+        onChange={onChange}
+        anchor="bottom end"
+        className="w-36"
+      />
+    </div>
+  );
+}
+
+/** Not planned / the solver's pick / a fixed week, for Bench Boost and Triple Captain */
+function chipChoices(gws: number[], best = "Best week"): { label: string; value: ChipChoice }[] {
+  return [
+    { label: "Not planned", value: null },
+    { label: best, value: "best" },
+    ...gws.map((gw) => ({ label: `GW${gw}`, value: gw })),
+  ];
 }
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
@@ -185,11 +237,24 @@ function PlanControls({
   options,
   setOptions,
   resp,
+  plan,
 }: {
   options: PlanOptions;
   setOptions: (o: PlanOptions) => void;
   resp: Available;
+  plan: Plan;
 }) {
+  // The backend only lets "best" play a Triple Captain in a double GW (or a
+  // window's last GW), so with none in sight the plan holds it
+  const tcHeld = options.triple_captain === "best" && !plan.weeks.some((w) => w.chip === "3xc");
+  // ...and a Bench Boost only this GW, once the current bench projects no
+  // more in any later week in sight; held, it names the week that does
+  const bbPeak =
+    options.bench_boost === "best" && !plan.weeks.some((w) => w.chip === "bboost")
+      ? resp.bench_boost_gws
+          .map((gw) => ({ gw, gain: benchBoostGain(resp.squad, resp.gws.indexOf(gw), resp) }))
+          .reduce<{ gw: number; gain: number } | null>((a, b) => (a && a.gain >= b.gain ? a : b), null)
+      : null;
   const wildcardGws = resp.wildcard_gws;
   return (
     <div className="border-y border-border">
@@ -199,16 +264,37 @@ function PlanControls({
         onChange={(no_hits) => setOptions({ ...options, no_hits })}
       />
       {wildcardGws.length > 0 && (
-        <div className="flex items-center justify-between gap-3 pb-2">
-          <span className="text-sm font-medium text-foreground">Wildcard</span>
-          <SelectMenu<number | null>
-            ariaLabel="Plan a wildcard"
-            value={options.wildcard}
-            options={[{ label: "Not planned", value: null }, ...wildcardGws.map((gw) => ({ label: `GW${gw}`, value: gw }))]}
-            onChange={(wildcard) => setOptions({ ...options, wildcard })}
-            anchor="bottom end"
-            className="w-36"
-          />
+        <OptionSelect<number | null>
+          label="Wildcard"
+          value={options.wildcard}
+          options={[{ label: "Not planned", value: null }, ...wildcardGws.map((gw) => ({ label: `GW${gw}`, value: gw }))]}
+          onChange={(wildcard) => setOptions({ ...options, wildcard })}
+        />
+      )}
+      {resp.bench_boost_gws.length > 0 && (
+        <OptionSelect<ChipChoice>
+          label="Bench Boost"
+          value={options.bench_boost}
+          options={chipChoices(resp.bench_boost_gws)}
+          onChange={(bench_boost) => setOptions({ ...options, bench_boost })}
+        />
+      )}
+      {resp.bench_boost_gws.length > 0 && bbPeak && (
+        <div className="-mt-1 pb-2 text-[11px] text-muted-foreground">
+          Held for now — your bench projects most in GW{bbPeak.gw} (+{bbPeak.gain.toFixed(1)} pts).
+        </div>
+      )}
+      {resp.triple_captain_gws.length > 0 && (
+        <OptionSelect<ChipChoice>
+          label="Triple Captain"
+          value={options.triple_captain}
+          options={chipChoices(resp.triple_captain_gws, "Best double GW")}
+          onChange={(triple_captain) => setOptions({ ...options, triple_captain })}
+        />
+      )}
+      {resp.triple_captain_gws.length > 0 && tcHeld && (
+        <div className="-mt-1 pb-2 text-[11px] text-muted-foreground">
+          No double gameweek in the next {resp.gws.length} — Triple Captain is held for one.
         </div>
       )}
       {(options.keep.length > 0 || options.exclude.length > 0) && (
@@ -408,7 +494,7 @@ function PlanBody({
           : `${resp.free_transfers} free transfer${resp.free_transfers === 1 ? "" : "s"}`}{" "}
         · bank {fmtPrice(resp.bank)}
       </div>
-      <PlanControls options={options} setOptions={setOptions} resp={resp} />
+      <PlanControls options={options} setOptions={setOptions} resp={resp} plan={plan} />
       {replanning && (
         <div className="text-xs text-muted-foreground" role="status">
           Re-planning with your changes…

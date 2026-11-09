@@ -64,16 +64,19 @@ def solve(d, proj, state, gws, *, scenario=None, wildcard=None, max_now=None, no
 
 
 def optimise(pool, pts, cost, budget, team, pos, squad, free_transfers, gws, *, wildcard=None, max_now=None,
-             no_hits=False, force_out=(), keep=(), bench_weight=0.1, time_limit=120):
+             no_hits=False, force_out=(), keep=(), bench_boost=None, triple_captain=None, bench_weight=0.1,
+             time_limit=120):
     """The MILP itself, on plain inputs (so backend/scripts/backtest_transfers.py can drive it from the archive).
 
     The formulation lives in backend/app/services/planner.py, shared with the app (which solves it in the
     browser); this solves it with scipy. pool: candidate ids, including the current squad. pts[(id, gw)]:
     expected points. cost[id]: selling price for squad players, buying price otherwise. team/pos: id -> club/
-    element_type. Returns the plan, one dict per GW: squad, xi, captain, hits, out, into, points.
+    element_type. bench_boost/triple_captain: planner.ChipPlay. Returns the plan, one dict per GW: squad, xi,
+    captain, hits, out, into, chip, points.
     """
     m = planner.build(pool, pts, cost, budget, team, pos, squad, free_transfers, gws, wildcard=wildcard,
-                      max_now=max_now, no_hits=no_hits, force_out=force_out, keep=keep, bench_weight=bench_weight)
+                      max_now=max_now, no_hits=no_hits, force_out=force_out, keep=keep, bench_boost=bench_boost,
+                      triple_captain=triple_captain, bench_weight=bench_weight)
     rows, cols, vals = [], [], []
     for r, (coefs, _, _) in enumerate(m.rows):
         rows += [r] * len(coefs)

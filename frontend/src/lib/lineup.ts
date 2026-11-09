@@ -7,7 +7,7 @@ import { isStarting } from "./utils";
 // +110 / +220 pts/season there (2026-11-01).
 
 /** Legal (DEF, MID, FWD) splits alongside one GK. */
-const FORMATIONS: [number, number, number][] = [];
+export const FORMATIONS: [number, number, number][] = [];
 for (let d = 3; d <= 5; d++)
   for (let f = 1; f <= 3; f++) {
     const m = 10 - d - f;

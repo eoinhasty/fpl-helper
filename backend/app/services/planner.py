@@ -3,7 +3,8 @@
 Picks the squad, starting XI and captain for each GW in the horizon to
 maximise expected points minus hits, under FPL's rules: budget (selling
 prices), 2/5/5/3 squad, max 3 per club, valid formations, one free transfer
-per GW with rollover (max 5), 4-point hits, optional wildcard.
+per GW with rollover (max 5), 4-point hits, optional wildcard, Bench Boost
+and Triple Captain.
 
 One formulation, two solvers: tools/analysis/solver.py (and through it
 backend/scripts/backtest_transfers.py) solves `build()`'s model with scipy,
@@ -29,9 +30,21 @@ ROLL_PENALTY = 0.01  # use free transfers before paying hits, as FPL does
 
 # Per-player blocks, then per-GW counters, in this variable order:
 # x squad, y starting XI, c captain, in bought, out sold;
-# t transfers made, f free transfers used, h hits, ft free transfers held
+# t transfers made, f free transfers used, h hits, ft free transfers held.
+# With a chip, per-GW flags follow: bb_ (Bench Boost) and tc_ (Triple
+# Captain), and for a Triple Captain a per-player block before the counters:
+# triple_, the XI player scoring again.
 PLAYER_BLOCKS = ("x", "y", "c", "in", "out")
 GW_BLOCKS = ("t", "f", "h", "ft")
+
+
+@dataclass(frozen=True)
+class ChipPlay:
+    """Where a chip may be played: at most once in each window (GWs of the
+    horizon), or exactly once when required (a chosen or already active week)."""
+
+    windows: Sequence[Sequence[int]]
+    required: bool = False
 
 
 @dataclass
@@ -64,36 +77,54 @@ def build(
     no_hits: bool = False,
     force_out: Iterable[int] = (),
     keep: Iterable[int] = (),
+    bench_boost: Optional[ChipPlay] = None,
+    triple_captain: Optional[ChipPlay] = None,
     bench_weight: float = 0.1,
 ) -> Model:
     """pool: candidate ids, including the current squad. pts[(id, gw)]:
     expected points. cost[id]: selling price for squad players, buying price
-    otherwise. team/pos: id -> club/element_type."""
+    otherwise. team/pos: id -> club/element_type. At most one of Bench Boost
+    and Triple Captain per GW; keeping either off a wildcard week (FPL's one
+    chip per GW) is the caller's job, since an unlimited first GW (pre-season)
+    is planned as a wildcard without being one."""
     squad = set(squad)
     P, G = len(pool), len(gws)
     idx = {p: i for i, p in enumerate(pool)}
     nb = P * G
+    has_bb = bool(bench_boost and any(bench_boost.windows))
+    has_tc = bool(triple_captain and any(triple_captain.windows))
+    player_blocks = PLAYER_BLOCKS + (("triple",) if has_tc else ())
+    gw_blocks = GW_BLOCKS + (("bb",) if has_bb else ()) + (("tc",) if has_tc else ())
 
     def v(block: int, i: int, g: int) -> int:
         return block * nb + i * G + g
 
     X, Y, C, IN, OUT = range(len(PLAYER_BLOCKS))
-    base = len(PLAYER_BLOCKS) * nb
+    base = len(player_blocks) * nb
+
+    def gw_var(block: int, g: int) -> int:
+        return base + block * G + g
 
     def T(g):
-        return base + g
+        return gw_var(0, g)
 
     def F(g):
-        return base + G + g
+        return gw_var(1, g)
 
     def H(g):
-        return base + 2 * G + g
+        return gw_var(2, g)
 
     def FT(g):
-        return base + 3 * G + g
+        return gw_var(3, g)
 
-    names = [f"{b}_{p}_{g}" for b in PLAYER_BLOCKS for p in pool for g in range(G)]
-    names += [f"{b}_{g}" for b in GW_BLOCKS for g in range(G)]
+    def BB(g):
+        return gw_var(gw_blocks.index("bb"), g)
+
+    def TC(g):
+        return gw_var(gw_blocks.index("tc"), g)
+
+    names = [f"{b}_{p}_{g}" for b in player_blocks for p in pool for g in range(G)]
+    names += [f"{b}_{g}" for b in gw_blocks for g in range(G)]
     n = len(names)
     m = Model(names, [0.0] * n, [0.0] * n, [1.0] * base + [15.0] * (n - base))
 
@@ -125,9 +156,17 @@ def build(
             m.add({v(X, idx[p], g): 1 for p in by_pos.get(el_type, [])}, quota, quota)
         for ps in by_club.values():
             m.add({v(X, idx[p], g): 1 for p in ps}, 0, MAX_PER_CLUB)
-        m.add({v(Y, idx[p], g): 1 for p in pool}, 11, 11)
+        # A Bench Boost week fields all 15: the XI grows by the 4 on the
+        # bench, both keepers included (the other XI maxima are the quotas)
+        xi = {v(Y, idx[p], g): 1 for p in pool}
+        if has_bb:
+            xi[BB(g)] = -4
+        m.add(xi, 11, 11)
         for el_type, (lo, hi) in XI_RANGE.items():
-            m.add({v(Y, idx[p], g): 1 for p in by_pos.get(el_type, [])}, lo, hi)
+            row = {v(Y, idx[p], g): 1 for p in by_pos.get(el_type, [])}
+            if has_bb and el_type == 1:
+                row[BB(g)] = -1
+            m.add(row, lo, hi)
         m.add({v(C, idx[p], g): 1 for p in pool}, 1, 1)
         for p in pool:
             i = idx[p]
@@ -158,6 +197,33 @@ def build(
         for g in range(G):
             if g != wg:
                 m.ub[H(g)] = 0
+    for flag, play, on in (
+        (has_bb, bench_boost, BB),
+        (has_tc, triple_captain, TC),
+    ):
+        if not flag:
+            continue
+        for g in range(G):
+            m.ub[on(g)] = 0
+        for window in play.windows:
+            gs = [gws.index(gw) for gw in window if gw in gws]
+            for g in gs:
+                m.ub[on(g)] = 1
+            if gs:
+                m.add({on(g): 1 for g in gs}, 1 if play.required else 0, 1)
+    if has_tc:
+        # One XI player scores again: the captain, at the optimum (tying it
+        # to c rather than y solved ~4x slower)
+        TRIPLE = len(PLAYER_BLOCKS)
+        for g, gw in enumerate(gws):
+            for p in pool:
+                i = idx[p]
+                m.add({v(TRIPLE, i, g): 1, v(Y, i, g): -1}, -INF, 0)
+                c[v(TRIPLE, i, g)] -= pts[(p, gw)]
+            m.add({**{v(TRIPLE, idx[p], g): 1 for p in pool}, TC(g): -1}, -INF, 0)
+    if has_bb and has_tc:
+        for g in range(G):
+            m.add({BB(g): 1, TC(g): 1}, 0, 1)
     for p in force_out:
         if p in idx:
             m.ub[v(X, idx[p], 0)] = 0
@@ -177,8 +243,10 @@ def read_plan(
     *,
     wildcard: Optional[int] = None,
 ) -> List[dict]:
-    """A solution ({variable name: value}) as one dict per GW: squad, xi,
-    captain, hits, out, into, points (XI + captain, before hits)."""
+    """A solution ({variable name: value}) as one dict per GW: squad, xi
+    (all 15 under a Bench Boost), captain, hits, out, into, chip
+    ("bboost"/"3xc"/None), points (XI + captain, the captain again under a
+    Triple Captain, before hits)."""
 
     def on(block: str, p: int, g: int) -> bool:
         return values.get(f"{block}_{p}_{g}", 0) > 0.5
@@ -189,6 +257,14 @@ def read_plan(
         xi = [p for p in pool if on("y", p, g)]
         cap = next(p for p in pool if on("c", p, g))
         hits = 0 if gw == wildcard else round(values.get(f"h_{g}", 0))
+        chip = (
+            "bboost"
+            if values.get(f"bb_{g}", 0) > 0.5
+            else "3xc"
+            if values.get(f"tc_{g}", 0) > 0.5
+            else None
+        )
+        captain_x = 2 if chip == "3xc" else 1
         plan.append(
             dict(
                 gw=gw,
@@ -198,7 +274,8 @@ def read_plan(
                 hits=hits,
                 out=sorted((p for p in prev if p not in sq), key=lambda p: pos[p]),
                 into=sorted((p for p in sq if p not in prev), key=lambda p: pos[p]),
-                points=sum(pts[(p, gw)] for p in xi) + pts[(cap, gw)],
+                chip=chip,
+                points=sum(pts[(p, gw)] for p in xi) + captain_x * pts[(cap, gw)],
             )
         )
         prev = sq
@@ -209,6 +286,24 @@ def sell_price(paid: int, now: int) -> int:
     """What selling returns: FPL keeps half of any rise (rounded down), and
     passes on all of a fall."""
     return now if now <= paid else paid + (now - paid) // 2
+
+
+def bench_boost_gain(pts: Dict[int, float], pos: Dict[int, int]) -> float:
+    """What a Bench Boost adds to a squad: all its points minus its best
+    legal XI's (pts, pos: id -> points, element_type)."""
+    ranked = {
+        t: sorted((pts[p] for p in pts if pos[p] == t), reverse=True) for t in XI_RANGE
+    }
+    best = max(
+        sum(ranked[1][:1])
+        + sum(ranked[2][:d])
+        + sum(ranked[3][:m])
+        + sum(ranked[4][: 10 - d - m])
+        for d in range(XI_RANGE[2][0], XI_RANGE[2][1] + 1)
+        for m in range(XI_RANGE[3][0], XI_RANGE[3][1] + 1)
+        if XI_RANGE[4][0] <= 10 - d - m <= XI_RANGE[4][1]
+    )
+    return sum(pts.values()) - best
 
 
 def free_transfers(history: List[dict], chips: List[dict]) -> int:

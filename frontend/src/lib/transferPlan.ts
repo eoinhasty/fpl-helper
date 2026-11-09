@@ -3,6 +3,7 @@
 // a Web Worker solves it with highs-js and decodePlan reads the solution back
 // by variable name, mirroring planner.py's read_plan.
 import type { SolveRequest, SolveResponse } from "../workers/planSolver";
+import { FORMATIONS } from "./lineup";
 
 export type PlanPlayer = {
   name: string;
@@ -15,23 +16,38 @@ export type PlanPlayer = {
   pts: number[];
 };
 
+/** A GW to play a chip in, or "best" for the solver to pick the week */
+export type ChipChoice = number | "best" | null;
+
 /** The card's options, as planner.build's (see FPLService.transfer_plan) */
 export type PlanOptions = {
   no_hits: boolean;
   /** GW to play a wildcard in, from wildcard_gws */
   wildcard: number | null;
+  /** From bench_boost_gws / triple_captain_gws */
+  bench_boost: ChipChoice;
+  triple_captain: ChipChoice;
   /** Squad players held for the whole horizon */
   keep: number[];
   /** Never bought; names kept since they drop out of the response's players */
   exclude: { id: number; name: string }[];
 };
 
-export const DEFAULT_PLAN_OPTIONS: PlanOptions = { no_hits: false, wildcard: null, keep: [], exclude: [] };
+export const DEFAULT_PLAN_OPTIONS: PlanOptions = {
+  no_hits: false,
+  wildcard: null,
+  bench_boost: null,
+  triple_captain: null,
+  keep: [],
+  exclude: [],
+};
 
 export function planQuery(o: PlanOptions): string {
   const q = new URLSearchParams();
   if (o.no_hits) q.set("no_hits", "true");
   if (o.wildcard != null) q.set("wildcard", String(o.wildcard));
+  if (o.bench_boost != null) q.set("bench_boost", String(o.bench_boost));
+  if (o.triple_captain != null) q.set("triple_captain", String(o.triple_captain));
   for (const id of [...o.keep].sort((a, b) => a - b)) q.append("keep", String(id));
   for (const id of o.exclude.map((p) => p.id).sort((a, b) => a - b)) q.append("exclude", String(id));
   const s = q.toString();
@@ -52,6 +68,11 @@ export type TransferPlanResponse =
       unlimited_transfers: boolean;
       /** GWs in the horizon a wildcard could be played in (none while transfers are unlimited) */
       wildcard_gws: number[];
+      /** GWs in the horizon each chip could be played in (none once used, or while active) */
+      bench_boost_gws: number[];
+      triple_captain_gws: number[];
+      /** A Bench Boost / Triple Captain played for the next GW (logged in only): planned in gws[0] */
+      active_chip: "bboost" | "3xc" | null;
       /** The options as applied: invalid ones (a sold player kept, a closed wildcard week) are dropped */
       options: PlanOptions;
       squad: number[];
@@ -61,16 +82,21 @@ export type TransferPlanResponse =
       model: string;
     };
 
+export type PlanChip = "bboost" | "3xc";
+
 export type PlanWeek = {
   gw: number;
   squad: number[];
+  /** All 15 under a Bench Boost */
   xi: number[];
   captain: number;
   hits: number;
+  /** Optional, as plans stored before chips have none */
+  chip?: PlanChip | null;
   /** Sold and bought vs the previous GW's squad, by position */
   out: number[];
   into: number[];
-  /** XI + captain, before hits */
+  /** XI + captain (twice under a Triple Captain), before hits */
   points: number;
 };
 
@@ -100,7 +126,9 @@ export function decodePlan(values: Record<string, number>, resp: Available, stat
     const squad = pool.filter((p) => on("x", p, g));
     const xi = pool.filter((p) => on("y", p, g));
     const captain = pool.find((p) => on("c", p, g));
-    if (squad.length !== 15 || xi.length !== 11 || captain == null) {
+    const chip: PlanChip | null =
+      (values[`bb_${g}`] ?? 0) > 0.5 ? "bboost" : (values[`tc_${g}`] ?? 0) > 0.5 ? "3xc" : null;
+    if (squad.length !== 15 || xi.length !== (chip === "bboost" ? 15 : 11) || captain == null) {
       throw new Error(`Incomplete plan for GW${gw}`);
     }
     const pts = (p: number) => resp.players[p].pts[g] ?? 0;
@@ -111,15 +139,40 @@ export function decodePlan(values: Record<string, number>, resp: Available, stat
       xi,
       captain,
       hits,
+      chip,
       out: prev.filter((p) => !squad.includes(p)).sort(byPos),
       into: squad.filter((p) => !prev.includes(p)).sort(byPos),
-      points: xi.reduce((s, p) => s + pts(p), 0) + pts(captain),
+      points: xi.reduce((s, p) => s + pts(p), 0) + (chip === "3xc" ? 2 : 1) * pts(captain),
     };
     prev = squad;
     return week;
   });
   const total = weeks.reduce((s, w) => s + w.points - w.hits * resp.hit_cost, 0);
   return { weeks, total, status };
+}
+
+/** A Bench Boost's projected gain for these 15 in the g-th planned GW: their
+ * total minus their best XI's (planner.bench_boost_gain) */
+export function benchBoostGain(squad: number[], g: number, resp: Available): number {
+  const pts = (p: number) => resp.players[p].pts[g] ?? 0;
+  const sum = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
+  const [gks, defs, mids, fwds] = [1, 2, 3, 4].map((pos) =>
+    squad
+      .filter((p) => resp.players[p].position === pos)
+      .map(pts)
+      .sort((a, b) => b - a),
+  );
+  const bestXi = Math.max(
+    ...FORMATIONS.map(([d, m, f]) => gks[0] + sum(defs.slice(0, d)) + sum(mids.slice(0, m)) + sum(fwds.slice(0, f))),
+  );
+  return sum(squad.map(pts)) - bestXi;
+}
+
+/** Projected points the week's chip adds: the captain's third score under a
+ * Triple Captain, the bench's under a Bench Boost */
+export function chipGain(week: PlanWeek, g: number, resp: Available): number {
+  if (week.chip === "3xc") return resp.players[week.captain].pts[g] ?? 0;
+  return week.chip === "bboost" ? benchBoostGain(week.squad, g, resp) : 0;
 }
 
 // One worker, reused across solves; a failed WASM instance isn't reusable, so
