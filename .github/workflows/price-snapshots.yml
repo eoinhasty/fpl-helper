@@ -1,0 +1,49 @@
+# Save FPL's price-change fields (tools/analysis/price_snapshots.py) every 2 hours as
+# assets on the `price-snapshots` pre-release, so its price-change projections can be
+# checked against the changes that followed before the app shows them. FPL keeps no
+# history of them and the laptop isn't reliably on; a release asset doesn't redeploy
+# anything. Every 2 hours so a late or dropped scheduled run still leaves a snapshot
+# on each side of the nightly update.
+name: Price snapshots
+
+on:
+  schedule:
+    - cron: "41 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release and upload its assets
+
+concurrency:
+  group: price-snapshots
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: price-snapshots
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/analysis
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+      - run: pip install "$(grep '^httpx==' requirements.txt)"
+
+      - name: Snapshot
+        run: python price_snapshots.py save --out snapshots
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --prerelease --target "$GITHUB_SHA" \
+              --title "FPL price snapshots" \
+              --notes "Machine-published by the Price snapshots workflow every 2 hours: FPL's price-change fields, to check its projections against real changes. Not a software release."
+          fi
+          gh release upload "$RELEASE_TAG" snapshots/*.json.gz
