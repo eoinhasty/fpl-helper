@@ -25,6 +25,7 @@ from app.services.planner import (
     MAX_PER_CLUB,
     SQUAD_QUOTA,
     ChipPlay,
+    bench_boost_gain,
     free_transfers,
     sell_price,
     to_lp,
@@ -1144,6 +1145,21 @@ class FPLService:
         if wildcard not in wildcard_gws:
             wildcard = gws[0] if unlimited else None
 
+        def window(el: dict) -> List[float]:
+            row = (horizon.get(el["id"], []) + [0.0] * len(gws))[: len(gws)]
+            chance = el.get("chance_of_playing_next_round")
+            if chance is not None:  # projections assume availability
+                row[0] *= chance / 100
+            return row
+
+        # The current squad's projected Bench Boost gain in each GW
+        squad_pts = {el: window(els[el]) for el in squad}
+        squad_pos = {el: els[el]["element_type"] for el in squad}
+        bb_gain = [
+            bench_boost_gain({el: row[g] for el, row in squad_pts.items()}, squad_pos)
+            for g in range(len(gws))
+        ]
+
         def chip_play(name: str, choice: Union[int, str, None]):
             """The chip as planned (ChipPlay), its open GWs, and the choice
             as applied."""
@@ -1165,6 +1181,24 @@ class FPLService:
                 # sight, so "best" is kept but may plan nothing.
                 if name == "3xc":
                     windows = free(chip_windows(name, doubles=True))
+                # A Bench Boost is played this GW once its projected gain tops
+                # every later GW of the window in sight, else held: the
+                # solver's own pick was the worst rule in 2024-25 (18.7 chip
+                # pts/season vs 26.0 for this), the best by a hair in 2025-26
+                # (24.6 vs 23.3) — backtest_transfers.py --chips bb, chips_peak
+                if name == "bboost":
+                    windows = [
+                        [gws[0]]
+                        for w in windows
+                        if w[0] == gws[0]
+                        and bb_gain[0] >= max(bb_gain[gws.index(g)] for g in w)
+                    ]
+                    if windows:
+                        return (
+                            ChipPlay(windows, required=True),
+                            open_gws,
+                            "best",
+                        )
                 return (ChipPlay(windows) if windows else None), open_gws, "best"
             if choice in open_gws:
                 return ChipPlay([[choice]], required=True), open_gws, choice
@@ -1177,13 +1211,6 @@ class FPLService:
             tc_play, triple_captain = None, None
         keep = sorted(set(keep) & set(squad))
         exclude = sorted(set(exclude) - set(squad))
-
-        def window(el: dict) -> List[float]:
-            row = (horizon.get(el["id"], []) + [0.0] * len(gws))[: len(gws)]
-            chance = el.get("chance_of_playing_next_round")
-            if chance is not None:  # projections assume availability
-                row[0] *= chance / 100
-            return row
 
         candidates = [
             e

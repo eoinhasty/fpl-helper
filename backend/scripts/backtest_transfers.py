@@ -69,15 +69,17 @@ terms only dilute it (the model already prices fixtures). Gains are small
 next to the lineup effect above, which is mostly XI choice, not the captain.
 `--chips bb|tc` instead times one chip on the solver arm (CHIP_RULES; `--rules`
 picks some). Chip pts/season (the chip's own actual points, both halves),
-2025-26, 10 squads, --lineup model (2026-11-08):
-  Bench Boost:    best 24.6 · peak 23.3 · dgw 22.5 · last 18.5 (ceiling 43.3)
+10 squads, --lineup model (2026-11-08), 2025-26 / 2024-25:
+  Bench Boost:    best 24.6 / 18.7 · peak 23.3 / 26.0 · dgw 22.5 / 20.0 ·
+                  last 18.5 / 21.0 (ceiling 43.3 / 44.9)
   Triple Captain: best 13.0 · peak 13.6 · dgw 17.0 · last 15.0 (ceiling 30.0);
                   best_dgw 17.0, same weeks as dgw
-Bench Boost totals vs no chip are noisy (stdev 36-68: the arms' transfers
-diverge), so read the chip pts. A Triple Captain on "best" was spent as soon
+Bench Boost totals vs no chip are noisy (stdev 34-68: the arms' transfers
+diverge), so read the chip pts. Only peak held up in both seasons, so it's
+the app's Bench Boost "best". A Triple Captain on "best" was spent as soon
 as a window opened (GW2 / GW21) — within 5 GWs the top captain projects about
 the same every week — and lost to the first double in 9/10 squads, so the
-app's Triple Captain "best" is chips_best_dgw. Not yet run on 2024-25.
+app's Triple Captain "best" is chips_best_dgw.
 Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
 app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
 +77 and -173), so read any single season's number as noise until it agrees
@@ -446,7 +448,7 @@ def run_transfer_policy(
             target = (doubles or window[-1:])[0]
         elif chip_rule == "chips_last":
             target = window[-1]
-        else:  # chips_peak: decided week by week, so only ever this GW
+        else:  # chips_peak (mirrors FPLService.transfer_plan's Bench Boost): only ever this GW
             if window[0] != gw:
                 return []
             value = {g: chip_projection(g, gw) for g in window if g in gws}

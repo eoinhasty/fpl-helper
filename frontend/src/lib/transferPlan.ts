@@ -151,15 +151,13 @@ export function decodePlan(values: Record<string, number>, resp: Available, stat
   return { weeks, total, status };
 }
 
-/** Projected points the week's chip adds: the captain's third score under a
- * Triple Captain; under a Bench Boost, all 15's total minus their best XI's */
-export function chipGain(week: PlanWeek, g: number, resp: Available): number {
+/** A Bench Boost's projected gain for these 15 in the g-th planned GW: their
+ * total minus their best XI's (planner.bench_boost_gain) */
+export function benchBoostGain(squad: number[], g: number, resp: Available): number {
   const pts = (p: number) => resp.players[p].pts[g] ?? 0;
-  if (week.chip === "3xc") return pts(week.captain);
-  if (week.chip !== "bboost") return 0;
   const sum = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
   const [gks, defs, mids, fwds] = [1, 2, 3, 4].map((pos) =>
-    week.squad
+    squad
       .filter((p) => resp.players[p].position === pos)
       .map(pts)
       .sort((a, b) => b - a),
@@ -167,7 +165,14 @@ export function chipGain(week: PlanWeek, g: number, resp: Available): number {
   const bestXi = Math.max(
     ...FORMATIONS.map(([d, m, f]) => gks[0] + sum(defs.slice(0, d)) + sum(mids.slice(0, m)) + sum(fwds.slice(0, f))),
   );
-  return sum(week.squad.map(pts)) - bestXi;
+  return sum(squad.map(pts)) - bestXi;
+}
+
+/** Projected points the week's chip adds: the captain's third score under a
+ * Triple Captain, the bench's under a Bench Boost */
+export function chipGain(week: PlanWeek, g: number, resp: Available): number {
+  if (week.chip === "3xc") return resp.players[week.captain].pts[g] ?? 0;
+  return week.chip === "bboost" ? benchBoostGain(week.squad, g, resp) : 0;
 }
 
 // One worker, reused across solves; a failed WASM instance isn't reusable, so

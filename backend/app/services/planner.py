@@ -288,6 +288,24 @@ def sell_price(paid: int, now: int) -> int:
     return now if now <= paid else paid + (now - paid) // 2
 
 
+def bench_boost_gain(pts: Dict[int, float], pos: Dict[int, int]) -> float:
+    """What a Bench Boost adds to a squad: all its points minus its best
+    legal XI's (pts, pos: id -> points, element_type)."""
+    ranked = {
+        t: sorted((pts[p] for p in pts if pos[p] == t), reverse=True) for t in XI_RANGE
+    }
+    best = max(
+        sum(ranked[1][:1])
+        + sum(ranked[2][:d])
+        + sum(ranked[3][:m])
+        + sum(ranked[4][: 10 - d - m])
+        for d in range(XI_RANGE[2][0], XI_RANGE[2][1] + 1)
+        for m in range(XI_RANGE[3][0], XI_RANGE[3][1] + 1)
+        if XI_RANGE[4][0] <= 10 - d - m <= XI_RANGE[4][1]
+    )
+    return sum(pts.values()) - best
+
+
 def free_transfers(history: List[dict], chips: List[dict]) -> int:
     """Free transfers banked for the next deadline, replayed from the entry's
     GW history: one per GW from GW2, max MAX_FT; a wildcard or free hit week

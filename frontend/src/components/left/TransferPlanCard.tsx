@@ -8,6 +8,7 @@ import { useFetch } from "../../hooks/useFetch";
 import { usePlanOptions } from "../../hooks/usePlanOptions";
 import {
   DEFAULT_PLAN_OPTIONS,
+  benchBoostGain,
   chipGain,
   planQuery,
   planWildcard,
@@ -246,6 +247,14 @@ function PlanControls({
   // The backend only lets "best" play a Triple Captain in a double GW (or a
   // window's last GW), so with none in sight the plan holds it
   const tcHeld = options.triple_captain === "best" && !plan.weeks.some((w) => w.chip === "3xc");
+  // ...and a Bench Boost only this GW, once the current bench projects no
+  // more in any later week in sight; held, it names the week that does
+  const bbPeak =
+    options.bench_boost === "best" && !plan.weeks.some((w) => w.chip === "bboost")
+      ? resp.bench_boost_gws
+          .map((gw) => ({ gw, gain: benchBoostGain(resp.squad, resp.gws.indexOf(gw), resp) }))
+          .reduce<{ gw: number; gain: number } | null>((a, b) => (a && a.gain >= b.gain ? a : b), null)
+      : null;
   const wildcardGws = resp.wildcard_gws;
   return (
     <div className="border-y border-border">
@@ -269,6 +278,11 @@ function PlanControls({
           options={chipChoices(resp.bench_boost_gws)}
           onChange={(bench_boost) => setOptions({ ...options, bench_boost })}
         />
+      )}
+      {resp.bench_boost_gws.length > 0 && bbPeak && (
+        <div className="-mt-1 pb-2 text-[11px] text-muted-foreground">
+          Held for now — your bench projects most in GW{bbPeak.gw} (+{bbPeak.gain.toFixed(1)} pts).
+        </div>
       )}
       {resp.triple_captain_gws.length > 0 && (
         <OptionSelect<ChipChoice>
