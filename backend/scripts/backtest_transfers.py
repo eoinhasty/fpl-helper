@@ -72,14 +72,18 @@ picks some). Chip pts/season (the chip's own actual points, both halves),
 10 squads, --lineup model (2026-11-08), 2025-26 / 2024-25:
   Bench Boost:    best 24.6 / 18.7 · peak 23.3 / 26.0 · dgw 22.5 / 20.0 ·
                   last 18.5 / 21.0 (ceiling 43.3 / 44.9)
-  Triple Captain: best 13.0 · peak 13.6 · dgw 17.0 · last 15.0 (ceiling 30.0);
-                  best_dgw 17.0, same weeks as dgw
-Bench Boost totals vs no chip are noisy (stdev 34-68: the arms' transfers
-diverge), so read the chip pts. Only peak held up in both seasons, so it's
-the app's Bench Boost "best". A Triple Captain on "best" was spent as soon
-as a window opened (GW2 / GW21) — within 5 GWs the top captain projects about
-the same every week — and lost to the first double in 9/10 squads, so the
-app's Triple Captain "best" is chips_best_dgw.
+  Triple Captain: best 13.0 / 38.0 · best_dgw 17.0 / 31.0 · dgw 17.0 / 31.0
+                  (2025-26 also peak 13.6, last 15.0; ceiling 30.0 / 48.8)
+Totals vs no chip are noisy (stdev 34-68: the arms' transfers diverge), so
+read the chip pts — and squads are far from independent: they captain (and
+bench) many of the same players, so "won 9/10 squads" is closer to one data
+point per window per season than ten. Only peak held up in both seasons, so
+it's the app's Bench Boost "best". A Triple Captain on "best" is spent as
+soon as a window opens (within 5 GWs the top captain projects about the same
+every week): it lost to the first double in 2025-26 (9/10 squads) and beat it
+in 2024-25 (7/10, a GW5 haul) — even overall, so the app keeps the
+conventional double-GW rule (chips_best_dgw), which also keeps the chip for a
+double past the horizon.
 Results swing by season: with the gentle FDR_FACTOR curve (2026-10-29)
 app-minus-form was +49 on 2024-25 and +94 on 2025-26 (the old linear curve:
 +77 and -173), so read any single season's number as noise until it agrees

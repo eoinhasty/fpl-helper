@@ -1174,11 +1174,15 @@ class FPLService:
             windows = free(chip_windows(name))
             open_gws = sum(windows, [])
             if choice == "best" and open_gws:
-                # A Triple Captain waits for a double GW: picked from any week
-                # it was spent at once (GW2 / GW21) and lost to the first
-                # double in 9 of 10 backtested squads, 13 vs 17 pts/season
-                # (backtest_transfers.py --chips tc). Held while none is in
-                # sight, so "best" is kept but may plan nothing.
+                # A Triple Captain waits for a double GW (else the window's
+                # last GW). Picked from any week, the solver spends it as soon
+                # as a window opens: within 5 GWs the top captain projects
+                # about the same every week. Backtested about even over two
+                # seasons (backtest_transfers.py --chips tc: 17 vs 13 chip
+                # pts in 2025-26, 31 vs 38 in 2024-25 — one captain haul
+                # decides a season), so this keeps the conventional rule and
+                # the option of a later double. Held while none is in sight,
+                # so "best" is kept but may plan nothing.
                 if name == "3xc":
                     windows = free(chip_windows(name, doubles=True))
                 # A Bench Boost is played this GW once its projected gain tops
