@@ -53,7 +53,11 @@ export default function SquadDashboard() {
   const loading = mode === "live" ? liveLoading : squadLoading;
   const error = mode === "live" ? liveError : squadError;
 
-  const playerDetail = usePlayerDetailHost({ squad: data?.players, season: data?.season });
+  const playerDetail = usePlayerDetailHost({
+    squad: data?.players,
+    squadGws: data ? { points: data.used_gw, fixtures: data.fixture_gw ?? data.used_gw } : undefined,
+    season: data?.season,
+  });
   const openPlayer = (p: Player) => playerDetail.open(p.element);
 
   // The sidebars stick just below the sticky content header, so their offset
