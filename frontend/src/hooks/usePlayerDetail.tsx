@@ -1,6 +1,6 @@
 // hooks/usePlayerDetail.tsx
 import * as React from "react";
-import PlayerDetailModal from "../components/squad/PlayerDetailModal";
+import PlayerDetailModal from "../components/squad/PlayerDetailModal/PlayerDetailModal";
 import PendingPlayerModal from "../components/squad/PendingPlayerModal";
 import { useFetch } from "./useFetch";
 import { poolPlayerToPlayer } from "../lib/plannerAdapter";
