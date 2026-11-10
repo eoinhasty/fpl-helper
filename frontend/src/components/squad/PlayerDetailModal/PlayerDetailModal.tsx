@@ -202,6 +202,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
             player={player}
             hideStartProbability={hideStartProbability}
             posLabel={posLabel}
+            pointsGw={pointsGw}
             history={history}
             next={next}
           />

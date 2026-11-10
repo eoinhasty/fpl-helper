@@ -4,6 +4,7 @@ import { statusToText, fdrClass, TONE_CLASS, statusTone } from "../../../lib/uti
 import { fmtPrice, pct, fmtCompact } from "../../../lib/format";
 import { SectionHeader, PositionTag, KickoffLabel, NextFixturesStatus } from "./parts";
 import type { NextFixtures, TeamFixture } from "./parts";
+import PointsBreakdown from "./PointsBreakdown";
 
 function StatusBanner({ player, hideStartProbability }: { player: Player; hideStartProbability?: boolean }) {
   const s = player.status;
@@ -82,8 +83,9 @@ function OverviewFixtureCard({ f }: { f: TeamFixture }) {
   );
 }
 
-export default function OverviewTab({ player, hideStartProbability, posLabel, history, next }: {
+export default function OverviewTab({ player, hideStartProbability, posLabel, pointsGw, history, next }: {
   player: Player;
+  pointsGw?: number;
   hideStartProbability?: boolean;
   posLabel: string | null;
   history: { data: PlayerSummaryResponse | null; loading: boolean; error: string | null };
@@ -107,6 +109,10 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, hi
   return (
     <div className="space-y-4">
       <StatusBanner player={player} hideStartProbability={hideStartProbability} />
+
+      {player.gw_breakdown && (
+        <PointsBreakdown breakdown={player.gw_breakdown} points={player.gw_points} gw={pointsGw} />
+      )}
 
       {/* Per-GW returns — what form, an average, hides */}
       {!history.error && (
