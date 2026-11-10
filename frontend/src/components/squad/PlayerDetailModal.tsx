@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { Player, PlayerRank, PlayerSummaryResponse } from "../../lib/types";
+import type { FixtureLite, Player, PlayerRank, PlayerSummaryResponse } from "../../lib/types";
 import { statusToText, fdrClass, TONE_CLASS, statusTone, XGI_COPY, XGI_MIN_MINUTES, xgiSummary } from "../../lib/utils";
 import { fmtKickoff, fmtPrice, pct, fmtCompact, fmtPriceDelta } from "../../lib/format";
 import { useFetch } from "../../hooks/useFetch";
@@ -27,6 +27,10 @@ type Props = {
    * so the current-season stats aren't confused with the History tab's past
    * seasons. Optional since older callers may not have it wired through yet. */
   season?: string | null;
+  /** GW that `gw_points` belongs to */
+  pointsGw?: number;
+  /** GW that `fixtures` and `projected_pts` belong to */
+  fixtureGw?: number;
 };
 
 function TopNum({ label, value, delta, accent }: { label: string; value: React.ReactNode; delta?: string; accent?: boolean }) {
@@ -74,8 +78,39 @@ function StatusBanner({ player, hideStartProbability }: { player: Player; hideSt
   );
 }
 
-function isPlayed(kickoff: string | null | undefined): boolean {
-  return !!kickoff && new Date(kickoff) < new Date();
+// Fixture data is cached for a day, so its finished flags would lag a live
+// matchday — go by the clock instead: a match is over ~115 min after kickoff.
+const MATCH_MS = 115 * 60 * 1000;
+
+function kickoffLabel(kickoff: string | null | undefined): string {
+  if (!kickoff) return fmtKickoff(null);
+  const since = Date.now() - new Date(kickoff).getTime();
+  if (since < 0) return fmtKickoff(kickoff);
+  return since < MATCH_MS ? "In play" : "Played";
+}
+
+/** "vs ARS", "@ LIV +1" for a double, "Blank GW" for none */
+function opponentsLabel(fixtures: FixtureLite[] | undefined): string | undefined {
+  if (!fixtures) return undefined;
+  if (fixtures.length === 0) return "Blank GW";
+  const [f] = fixtures;
+  return `${f.home ? "vs" : "@"} ${f.opp}${fixtures.length > 1 ? ` +${fixtures.length - 1}` : ""}`;
+}
+
+/** Points and minutes per GW for the last few finished GWs (a double's two
+ * matches summed). A GW with a match still to finish is left out, so a part-
+ * played GW never reads as the full one. */
+function recentGws(summary: PlayerSummaryResponse, count: number) {
+  const pending = new Set(summary.fixtures.map((f) => f.event));
+  const byGw = new Map<number, { gw: number; pts: number; mins: number }>();
+  for (const h of summary.history) {
+    if (pending.has(h.round)) continue;
+    const row = byGw.get(h.round) ?? { gw: h.round, pts: 0, mins: 0 };
+    row.pts += h.total_points;
+    row.mins += h.minutes;
+    byGw.set(h.round, row);
+  }
+  return [...byGw.values()].sort((a, b) => a.gw - b.gw).slice(-count);
 }
 
 const POS_STATS: Record<number, Array<{ key: keyof Player; unit: string; rankKey: keyof NonNullable<Player["ranks"]>; primary?: boolean }>> = {
@@ -152,7 +187,7 @@ function OverviewFixtureCard({ f }: { f: TeamFixture }) {
           GW{f.event}: {f.home ? "Home vs" : "Away at"} {f.opp}
         </span>
         <span className="text-xs text-muted-foreground mt-0.5">
-          {isPlayed(f.kickoff) ? "Played" : fmtKickoff(f.kickoff ?? null)}
+          {kickoffLabel(f.kickoff)}
         </span>
       </div>
       <span className={`text-xs px-2.5 py-1 rounded-lg font-bold tracking-[0.04em] ml-3 shrink-0 ${fdrClass(f.difficulty)}`}>
@@ -174,16 +209,18 @@ function FixtureCompactPill({ f }: { f: TeamFixture }) {
   );
 }
 
-export default function PlayerDetailModal({ open, onClose, player, hideStartProbability, season }: Props) {
-  const fixtUrl = open && player.team_id ? `/api/team-next/${player.team_id}?count=5` : null;
+export default function PlayerDetailModal({ open, onClose, player, hideStartProbability, season, pointsGw, fixtureGw }: Props) {
+  // One spare, since the Fixtures tab drops the GW it already shows
+  const fixtUrl = open && player.team_id ? `/api/team-next/${player.team_id}?count=6` : null;
   const { data: fixtData, loading, error: err } = useFetch<{ fixtures: TeamFixture[] }>(fixtUrl);
   const nextFixt = fixtData?.fixtures ?? null;
 
   const [tab, setTab] = React.useState<Tab>("overview");
 
-  const historyUrl = open && tab === "history" ? `/api/player/${player.element}/summary` : null;
+  // Overview's recent GWs and the History tab both read it
+  const summaryUrl = open ? `/api/player/${player.element}/summary` : null;
   const { data: historyData, loading: historyLoading, error: historyErr } =
-    useFetch<PlayerSummaryResponse>(historyUrl);
+    useFetch<PlayerSummaryResponse>(summaryUrl);
 
   const closeBtnRef = React.useRef<HTMLButtonElement>(null);
 
@@ -192,10 +229,19 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
   const posLabel = player.position ? POSITION_LABEL[player.position] : null;
   const hasGwPoints = player.gw_points != null;
   const costChange = fmtPriceDelta(player.cost_change_start);
-  const xPts = player.ep_next ? Number(player.ep_next).toFixed(1) : "—";
+  // The model's projection when there is one, as Captaincy and Best XI rank on
+  // it; it's for fixtureGw, while ep_next is always FPL's next GW.
+  const proj = player.projected_pts;
+  const xPts = proj != null ? proj.toFixed(1) : player.ep_next ? Number(player.ep_next).toFixed(1) : "—";
+  const xPtsLabel = proj != null && fixtureGw ? `GW${fixtureGw} xPTS` : "xPTS NEXT";
   const ppg = player.points_per_game ? Number(player.points_per_game).toFixed(1) : "—";
   const form = player.form ? Number(player.form).toFixed(1) : "—";
-  const xPtsDelta = nextFixt?.[0] ? `${nextFixt[0].home ? "vs" : "@"} ${nextFixt[0].opp}` : undefined;
+  const xPtsDelta = proj != null
+    ? opponentsLabel(player.fixtures)
+    : nextFixt?.[0] ? `${nextFixt[0].home ? "vs" : "@"} ${nextFixt[0].opp}` : undefined;
+  const recent = historyData ? recentGws(historyData, 5) : null;
+  // The Fixtures tab shows fixtureGw's own fixtures above, so its pills start after it
+  const laterFixt = nextFixt?.filter((f) => player.fixtures == null || f.event !== fixtureGw).slice(0, 5) ?? null;
 
   const name = player.name ?? "";
   const lastSpace = name.lastIndexOf(" ");
@@ -293,11 +339,11 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
         <div className="grid grid-cols-4 gap-2 sm:gap-3.5 px-4 sm:px-6 py-3.5 border-t border-border">
           <TopNum label="PRICE" value={fmtPrice(player.price)} delta={costChange ?? undefined} />
           <TopNum
-            label={hasGwPoints ? "GW PTS" : "FORM"}
+            label={hasGwPoints ? (pointsGw ? `GW${pointsGw} PTS` : "GW PTS") : "FORM"}
             value={hasGwPoints ? player.gw_points : form}
             delta={hasGwPoints ? `Form ${form}` : `PPG ${ppg}`}
           />
-          <TopNum label="xPTS NEXT" value={xPts} delta={xPtsDelta} accent />
+          <TopNum label={xPtsLabel} value={xPts} delta={xPtsDelta} accent />
           <TopNum
             label="OWNED"
             value={player.selected_by_percent != null ? `${Number(player.selected_by_percent).toFixed(1)}%` : "—"}
@@ -335,6 +381,30 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
         {tab === "overview" && (
           <div className="space-y-4">
             <StatusBanner player={player} hideStartProbability={hideStartProbability} />
+
+            {/* Per-GW returns — what form, an average, hides */}
+            {!historyErr && (
+              <section>
+                <SectionHeader label="Recent gameweeks" />
+                {historyLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+                {recent && recent.length === 0 && (
+                  <div className="text-sm text-muted-foreground">No matches played yet this season.</div>
+                )}
+                {recent && recent.length > 0 && (
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {recent.map((r) => (
+                      <div key={r.gw} className="flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl border border-border bg-muted/30">
+                        <span className="text-[10px] text-muted-foreground tracking-wide font-mono">GW{r.gw}</span>
+                        <span className="text-lg font-bold tabular-nums leading-none text-foreground">{r.pts}</span>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          {r.mins > 0 ? `${r.mins} min` : "DNP"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* Market */}
             <section>
@@ -507,7 +577,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
             {player.fixtures != null && (
               <section>
                 <SectionHeader
-                  label="This GW"
+                  label={fixtureGw ? `GW${fixtureGw}` : "This GW"}
                   right={
                     player.has_dgw
                       ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">DGW</span>
@@ -525,7 +595,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
                           <div className="flex flex-col">
                             <span className="font-medium">{f.home ? "Home vs" : "Away at"} {f.opp}</span>
                             <span className="text-xs text-muted-foreground">
-                              {isPlayed(f.kickoff) ? "Played" : fmtKickoff(f.kickoff ?? null)}
+                              {kickoffLabel(f.kickoff)}
                             </span>
                           </div>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${fdrClass(f.difficulty)}`}>FDR {f.difficulty}</span>
@@ -539,18 +609,18 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
 
             {/* Next fixtures — pills */}
             <section>
-              <SectionHeader label="Next fixtures" />
+              <SectionHeader label={player.fixtures != null ? "After that" : "Next fixtures"} />
               {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
               {err && <div className="text-sm text-destructive">{err}</div>}
               {!loading && !err && !player.team_id && (
                 <div className="text-sm text-muted-foreground">Not available.</div>
               )}
-              {!loading && !err && nextFixt && nextFixt.length === 0 && (
+              {!loading && !err && laterFixt && laterFixt.length === 0 && (
                 <div className="text-sm text-muted-foreground">No upcoming fixtures found.</div>
               )}
-              {!loading && !err && nextFixt && nextFixt.length > 0 && (
+              {!loading && !err && laterFixt && laterFixt.length > 0 && (
                 <div className="flex gap-1.5">
-                  {nextFixt.map((f) => (
+                  {laterFixt.map((f) => (
                     <FixtureCompactPill key={`${f.event}-${f.kickoff ?? ""}`} f={f} />
                   ))}
                 </div>

@@ -9,6 +9,8 @@ export type PlayerStatus = "a" | "d" | "i" | "s" | "n";
 
 export type FixtureLite = {
     opp: string; home: boolean; difficulty: 1 | 2 | 3 | 4 | 5; kickoff?: string;
+    /** GW — set on /api/players' fixtures, which span the next few GWs */
+    event?: number;
 };
 
 /** G+A well above ("over") or below ("under") xGI — see xgi_signal in
@@ -160,6 +162,8 @@ export type PoolPlayer = {
     status?: PlayerStatus;
     news?: string;
     ep_next?: string;
+    /** Points model projection for PlayersResponse.gw (null without usable projections) */
+    projected_pts?: number | null;
     total_points?: number;
     form?: string;
     penalties_order?: number;
@@ -193,6 +197,8 @@ export type PlayersResponse = {
     count: number;
     teams: PoolTeam[];
     players: PoolPlayer[];
+    /** GW the players' fixtures start from and projected_pts is for */
+    gw?: number | null;
     /** e.g. "2026/27" — current FPL season, derived from GW1's deadline year. */
     season?: string | null;
 };
@@ -208,8 +214,16 @@ export type PlayerSummaryHistoryPast = {
     end_cost: number;
 };
 
+/** One played fixture this season (element-summary `history`) */
+export type PlayerSummaryHistory = {
+    round: number;
+    total_points: number;
+    minutes: number;
+};
+
 export type PlayerSummaryResponse = {
-    fixtures: unknown[];
-    history: unknown[];
+    /** Fixtures not yet finished */
+    fixtures: Array<{ event: number | null }>;
+    history: PlayerSummaryHistory[];
     history_past: PlayerSummaryHistoryPast[];
 };

@@ -13,7 +13,11 @@ import type { Player, PlayersResponse, PoolPlayer } from "../lib/types";
 export default function PlannerPage() {
   const { data, loading, error } = useFetch<PlayersResponse>("/api/players");
   const draft = useDraft(data?.players);
-  const playerDetail = usePlayerDetailHost({ pool: data?.players, season: data?.season });
+  const playerDetail = usePlayerDetailHost({
+    pool: data?.players,
+    poolGw: data?.gw,
+    season: data?.season,
+  });
   const openPool = (p: PoolPlayer) => playerDetail.open(p.id);
   const [showPitch, setShowPitch] = React.useState(false);
   const [showBackToTop, setShowBackToTop] = React.useState(false);
@@ -24,7 +28,7 @@ export default function PlannerPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const squadPlayers = React.useMemo(() => poolToSquadPlayers(draft.picks), [draft.picks]);
+  const squadPlayers = React.useMemo(() => poolToSquadPlayers(draft.picks, data?.gw), [draft.picks, data?.gw]);
   const openPitch = (sp: Player) => playerDetail.open(sp.element);
 
   return (

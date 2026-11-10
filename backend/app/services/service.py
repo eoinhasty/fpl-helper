@@ -72,7 +72,7 @@ TTL_FDR = 60 * 60  # 1h fresh
 SWR_FDR = 24 * 60 * 60  # +24h stale
 TTL_PLAYERS = 30 * 60  # 30m fresh
 SWR_PLAYERS = 6 * 60 * 60  # +6h stale
-TTL_PLAYER_SUMMARY = 24 * 60 * 60  # 24h fresh
+TTL_PLAYER_SUMMARY = 60 * 60  # 1h fresh — its history gains a row per match
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
 TTL_PROJECTIONS = 60 * 60  # 1h fresh (republished at most once per GW)
 SWR_PROJECTIONS = 12 * 60 * 60  # +12h stale
@@ -273,6 +273,7 @@ class FPLService:
             if h in teams:
                 by_team[h].append(
                     {
+                        "event": ev,
                         "opp": teams.get(a, {}).get("short_name", "UNK"),
                         "home": True,
                         "difficulty": fx["team_h_difficulty"],
@@ -282,6 +283,7 @@ class FPLService:
             if a in teams:
                 by_team[a].append(
                     {
+                        "event": ev,
                         "opp": teams.get(h, {}).get("short_name", "UNK"),
                         "home": False,
                         "difficulty": fx["team_a_difficulty"],
@@ -303,6 +305,9 @@ class FPLService:
             fixtures_data, _, _ = await self.fixtures(None)
             teams = {t["id"]: t for t in boot["teams"]}
             upcoming = self._upcoming_by_team(boot, fixtures_data, 3)
+            base_event = upcoming_event(boot["events"])
+            gw = base_event["id"] if base_event else None
+            projections = await self.projections(boot["events"], gw) if gw else None
             positions = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
             pos_ranks, transfer_ranks = self._cached_ranks(boot)
 
@@ -339,6 +344,7 @@ class FPLService:
                     "status": p.get("status"),
                     "news": p.get("news") or None,
                     "ep_next": p.get("ep_next"),
+                    "projected_pts": projected_points(p, projections),
                     "total_points": p.get("total_points"),
                     "form": p.get("form"),
                     "penalties_order": p.get("penalties_order"),
@@ -383,6 +389,8 @@ class FPLService:
                 "count": len(players),
                 "teams": team_rows,
                 "players": players,
+                # the GW `fixtures` starts from and `projected_pts` is for
+                "gw": gw,
                 "season": season_label(boot.get("events", [])),
             }
 

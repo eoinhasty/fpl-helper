@@ -17,14 +17,22 @@ export const usePlayerDetail = () => React.useContext(PlayerDetailContext);
  * (start probability, GW points); anyone else — a buy target, a Hot News
  * player — comes from the player pool, fetched on first need unless the page
  * already has it. Pool players have no start-probability estimate, so the
- * modal hides it for them, as the planner always has. */
+ * modal hides it for them, as the planner always has.
+ *
+ * The modal names the GW each number belongs to, so the host passes them:
+ * the squad's points GW (`used_gw`) and fixture GW (`fixture_gw`), and the
+ * pool's `gw` (which its fixtures and projections start from). */
 export function usePlayerDetailHost({
   squad,
+  squadGws,
   pool,
+  poolGw,
   season,
 }: {
   squad?: Player[] | null;
+  squadGws?: { points?: number; fixtures?: number };
   pool?: PoolPlayer[] | null;
+  poolGw?: number | null;
   season?: string | null;
 }) {
   const [selected, setSelected] = React.useState<number | null>(null);
@@ -41,14 +49,26 @@ export function usePlayerDetailHost({
   let modal: React.ReactNode = null;
   if (selected != null) {
     if (fromSquad) {
-      modal = <PlayerDetailModal key={selected} open onClose={close} player={fromSquad} season={season} />;
-    } else if (fromPool) {
       modal = (
         <PlayerDetailModal
           key={selected}
           open
           onClose={close}
-          player={poolPlayerToPlayer(fromPool, 1)}
+          player={fromSquad}
+          pointsGw={squadGws?.points}
+          fixtureGw={squadGws?.fixtures}
+          season={season}
+        />
+      );
+    } else if (fromPool) {
+      const gw = pool ? poolGw : fetched.data?.gw;
+      modal = (
+        <PlayerDetailModal
+          key={selected}
+          open
+          onClose={close}
+          player={poolPlayerToPlayer(fromPool, 1, gw)}
+          fixtureGw={gw ?? undefined}
           hideStartProbability
           season={season ?? fetched.data?.season}
         />

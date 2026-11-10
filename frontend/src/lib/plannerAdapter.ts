@@ -7,7 +7,11 @@ const POSITION_ID: Record<PoolPosition, 1 | 2 | 3 | 4> = { GK: 1, DEF: 2, MID: 3
  * can be reused as-is. start_probability is deliberately 0 — it's a required Player field,
  * but planner surfaces must hide the StartMeter/start-prob badge rather than show a
  * meaningless 0%, via the hideStartMeter / hideStartProbability props on those components. */
-export function poolPlayerToPlayer(p: PoolPlayer, slot: number): Player {
+export function poolPlayerToPlayer(p: PoolPlayer, slot: number, gw?: number | null): Player {
+  // The pool's fixtures run over the next few GWs; a Player's are one GW's
+  // (more than one is a double). Without `gw`, take the first fixture's GW.
+  const thisGw = gw ?? p.fixtures?.[0]?.event;
+  const fixtures = p.fixtures?.filter((f) => f.event === thisGw) ?? [];
   return {
     element: p.id,
     name: p.web_name,
@@ -20,11 +24,12 @@ export function poolPlayerToPlayer(p: PoolPlayer, slot: number): Player {
     total_points: p.total_points,
     form: p.form,
     ep_next: p.ep_next,
+    projected_pts: p.projected_pts,
     selected_by_percent: p.selected_by_percent,
     start_probability: 0,
-    fixtures: p.fixtures,
-    fixture: p.fixtures?.[0] ?? null,
-    has_dgw: (p.fixtures?.length ?? 0) > 1,
+    fixtures,
+    fixture: fixtures[0] ?? null,
+    has_dgw: fixtures.length > 1,
     slot,
     multiplier: slot <= 11 ? 1 : 0,
     shirt_url: p.shirt_url,
@@ -59,7 +64,7 @@ function byPriceDesc(picks: PoolPlayer[], pos: PoolPosition): PoolPlayer[] {
  * squad. Remaining players (by position) go to the bench, slots 12-15. Degrades
  * gracefully for partial (mid-draft) squads: PitchView already tolerates fewer than
  * 11 starters. */
-export function poolToSquadPlayers(picks: PoolPlayer[]): Player[] {
+export function poolToSquadPlayers(picks: PoolPlayer[], gw?: number | null): Player[] {
   const gk = byPriceDesc(picks, "GK");
   const def = byPriceDesc(picks, "DEF");
   const mid = byPriceDesc(picks, "MID");
@@ -100,7 +105,7 @@ export function poolToSquadPlayers(picks: PoolPlayer[]): Player[] {
   ];
 
   return [
-    ...xi.map((p, i) => poolPlayerToPlayer(p, i + 1)),
-    ...bench.map((p, i) => poolPlayerToPlayer(p, 12 + i)),
+    ...xi.map((p, i) => poolPlayerToPlayer(p, i + 1, gw)),
+    ...bench.map((p, i) => poolPlayerToPlayer(p, 12 + i, gw)),
   ];
 }
