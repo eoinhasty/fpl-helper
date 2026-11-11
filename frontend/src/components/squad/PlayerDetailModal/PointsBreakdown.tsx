@@ -3,6 +3,7 @@ import type { FixturePoints, PointsLine } from "../../../lib/types";
 import { fmtKickoff, ordinal } from "../../../lib/format";
 import { SectionHeader } from "./parts";
 
+
 const LINE_LABEL: Record<string, string> = {
   minutes: "Minutes",
   goals_scored: "Goals",
@@ -104,6 +105,15 @@ function FixtureBlock({ f }: { f: FixturePoints }) {
   );
 }
 
+function Total({ points, provisional }: { points: number | null | undefined; provisional: number }) {
+  return (
+    <span className="text-xs tabular-nums text-muted-foreground">
+      <span className="font-semibold text-foreground">{points ?? 0} pts</span>
+      {provisional > 0 && ` +${provisional} bonus`}
+    </span>
+  );
+}
+
 /** The scoring lines behind a player's GW points, one block per fixture, with
  * where they stand for bonus. Hidden while none of the GW's fixtures has
  * started; `breakdown` is null while it loads. */
@@ -121,12 +131,7 @@ export default function PointsBreakdown({ breakdown, points, gw, loading, error 
     <section>
       <SectionHeader
         label={gw ? `GW${gw} points` : "GW points"}
-        right={breakdown && (
-          <span className="text-xs tabular-nums text-muted-foreground">
-            <span className="font-semibold text-foreground">{points ?? 0} pts</span>
-            {provisional > 0 && ` +${provisional} bonus`}
-          </span>
-        )}
+        right={breakdown && <Total points={points} provisional={provisional} />}
       />
       {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
       {error && <div className="text-sm text-destructive">{error}</div>}

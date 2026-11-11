@@ -31,10 +31,10 @@ function StatusBanner({ player, hideStartProbability }: { player: Player; hideSt
   );
 }
 
-/** Points and minutes per GW for the last few finished GWs (a double's two
+/** Points and minutes per GW this season, oldest first (a double's two
  * matches summed). A GW with a match still to finish is left out, so a part-
  * played GW never reads as the full one. */
-function recentGws(summary: PlayerSummaryResponse, count: number) {
+function seasonGws(summary: PlayerSummaryResponse) {
   const pending = new Set(summary.fixtures.map((f) => f.event));
   const byGw = new Map<number, { gw: number; pts: number; mins: number }>();
   for (const h of summary.history) {
@@ -44,7 +44,32 @@ function recentGws(summary: PlayerSummaryResponse, count: number) {
     row.mins += h.minutes;
     byGw.set(h.round, row);
   }
-  return [...byGw.values()].sort((a, b) => a.gw - b.gw).slice(-count);
+  return [...byGw.values()].sort((a, b) => a.gw - b.gw);
+}
+
+const TILES = 5;
+
+function StepArrow({ dir, onClick }: { dir: "prev" | "next"; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      // Not `disabled`: that would drop keyboard focus at the first/last GW
+      aria-disabled={!onClick}
+      aria-label={dir === "prev" ? "Previous gameweek" : "Next gameweek"}
+      className="w-8 shrink-0 flex items-center justify-center rounded-xl border border-border text-foreground/80 cursor-pointer transition-colors hover:border-foreground/30 aria-disabled:opacity-35 aria-disabled:cursor-default aria-disabled:hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path
+          d={dir === "prev" ? "M8.5 3L4.5 7L8.5 11" : "M5.5 3L9.5 7L5.5 11"}
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
 }
 
 function MarketRow({ label, value, valueClass, sub, right }: {
@@ -92,13 +117,35 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
   history: { data: PlayerSummaryResponse | null; loading: boolean; error: string | null };
   next: NextFixtures;
 }) {
-  const recent = history.data ? recentGws(history.data, 5) : null;
+  const season = React.useMemo(() => (history.data ? seasonGws(history.data) : null), [history.data]);
 
-  // The breakdown shows the squad's GW until a Recent gameweeks tile is picked;
-  // any other GW (or any GW for a non-squad player) is fetched on demand.
+  // The breakdown shows the squad's GW until a tile is picked; any other GW
+  // (or any GW for a non-squad player) is fetched on demand.
   const [pickedGw, setPickedGw] = React.useState<number | null>(null);
+  // Exclusive end of the five tiles on show; null = the latest five
+  const [winEnd, setWinEnd] = React.useState<number | null>(null);
   const shownGw = pickedGw ?? (player.gw_breakdown ? pointsGw : undefined);
   const fromSquad = player.gw_breakdown != null && shownGw === pointsGw;
+
+  const tiles = season ?? [];
+  const end = winEnd ?? tiles.length;
+  const shownTiles = tiles.slice(Math.max(end - TILES, 0), end);
+  // The arrows step through every tile's GW, plus the squad's when it's still
+  // in play (and so not a tile yet); with nothing shown, "previous" is the latest.
+  const steps = tiles.map((t) => t.gw);
+  if (player.gw_breakdown && pointsGw != null && !steps.includes(pointsGw)) steps.push(pointsGw);
+  const at = shownGw != null ? steps.indexOf(shownGw) : steps.length;
+
+  /** Show `gw` (null = the squad's), sliding the tiles along if it's off either edge */
+  const select = (gw: number | null) => {
+    setPickedGw(gw);
+    const i = tiles.findIndex((t) => t.gw === (gw ?? pointsGw));
+    if (i === -1) setWinEnd(null);
+    else if (i < end - TILES) setWinEnd(i + TILES);
+    else if (i >= end) setWinEnd(i + 1);
+  };
+  const stepBack = at > 0 ? () => select(steps[at - 1]) : undefined;
+  const stepOn = at !== -1 && at < steps.length - 1 ? () => select(steps[at + 1]) : undefined;
   const picked = useFetch<{ gw: number; points: number | null; breakdown: FixturePoints[] }>(
     shownGw != null && !fromSquad ? `/api/player/${player.element}/gw/${shownGw}/points` : null,
   );
@@ -124,39 +171,43 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
       {!history.error && (
         <section>
           <SectionHeader
-            label="Recent gameweeks"
-            right={recent && recent.length > 0 && (
+            label="Gameweeks"
+            right={tiles.length > 0 && (
               <span className="text-[10px] text-muted-foreground">Pick a week for its points</span>
             )}
           />
           {history.loading && <div className="text-sm text-muted-foreground">Loading…</div>}
-          {recent && recent.length === 0 && (
+          {season && season.length === 0 && (
             <div className="text-sm text-muted-foreground">No matches played yet this season.</div>
           )}
-          {recent && recent.length > 0 && (
-            <div className="grid grid-cols-5 gap-1.5">
-              {recent.map((r) => {
-                const on = r.gw === shownGw;
-                return (
-                  <button
-                    key={r.gw}
-                    type="button"
-                    aria-pressed={on}
-                    aria-label={`GW${r.gw}: ${r.pts} points — show breakdown`}
-                    // Picking the shown week again goes back to the squad's GW
-                    onClick={() => setPickedGw(on && pickedGw != null ? null : r.gw)}
-                    className={`flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl border cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      on ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:border-foreground/30"
-                    }`}
-                  >
-                    <span className={`text-[10px] tracking-wide font-mono ${on ? "text-primary-strong" : "text-muted-foreground"}`}>GW{r.gw}</span>
-                    <span className="text-lg font-bold tabular-nums leading-none text-foreground">{r.pts}</span>
-                    <span className="text-[10px] text-muted-foreground tabular-nums">
-                      {r.mins > 0 ? `${r.mins} min` : "DNP"}
-                    </span>
-                  </button>
-                );
-              })}
+          {tiles.length > 0 && (
+            <div className="flex items-stretch gap-1.5">
+              <StepArrow dir="prev" onClick={stepBack} />
+              <div className="flex-1 min-w-0 grid grid-cols-5 gap-1.5">
+                {shownTiles.map((r) => {
+                  const on = r.gw === shownGw;
+                  return (
+                    <button
+                      key={r.gw}
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={`GW${r.gw}: ${r.pts} points — show breakdown`}
+                      // Picking the shown week again goes back to the squad's GW
+                      onClick={() => (on && pickedGw != null ? select(null) : setPickedGw(r.gw))}
+                      className={`min-w-0 flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl border cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                        on ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:border-foreground/30"
+                      }`}
+                    >
+                      <span className={`text-[10px] tracking-wide font-mono ${on ? "text-primary-strong" : "text-muted-foreground"}`}>GW{r.gw}</span>
+                      <span className="text-lg font-bold tabular-nums leading-none text-foreground">{r.pts}</span>
+                      <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+                        {r.mins > 0 ? `${r.mins} min` : "DNP"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <StepArrow dir="next" onClick={stepOn} />
             </div>
           )}
         </section>
