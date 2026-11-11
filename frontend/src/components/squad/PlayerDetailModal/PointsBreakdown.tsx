@@ -105,31 +105,41 @@ function FixtureBlock({ f }: { f: FixturePoints }) {
 }
 
 /** The scoring lines behind a player's GW points, one block per fixture, with
- * where they stand for bonus. Hidden until one of the GW's fixtures starts. */
-export default function PointsBreakdown({ breakdown, points, gw }: {
-  breakdown: FixturePoints[];
-  points: number | undefined;
+ * where they stand for bonus. Hidden while none of the GW's fixtures has
+ * started; `breakdown` is null while it loads. */
+export default function PointsBreakdown({ breakdown, points, gw, loading, error }: {
+  breakdown: FixturePoints[] | null;
+  points: number | null | undefined;
   gw: number | undefined;
+  loading?: boolean;
+  error?: string | null;
 }) {
-  if (!breakdown.some((f) => f.started)) return null;
-  const provisional = breakdown.reduce((sum, f) => sum + (f.bonus_provisional ? f.bonus : 0), 0);
+  if (breakdown && breakdown.length > 0 && !breakdown.some((f) => f.started)) return null;
+  const provisional = breakdown?.reduce((sum, f) => sum + (f.bonus_provisional ? f.bonus : 0), 0) ?? 0;
 
   return (
     <section>
       <SectionHeader
         label={gw ? `GW${gw} points` : "GW points"}
-        right={
+        right={breakdown && (
           <span className="text-xs tabular-nums text-muted-foreground">
             <span className="font-semibold text-foreground">{points ?? 0} pts</span>
             {provisional > 0 && ` +${provisional} bonus`}
           </span>
-        }
+        )}
       />
-      <div className="flex flex-col gap-2">
-        {breakdown.map((f) => (
-          <FixtureBlock key={f.fixture} f={f} />
-        ))}
-      </div>
+      {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
+      {error && <div className="text-sm text-destructive">{error}</div>}
+      {breakdown && breakdown.length === 0 && (
+        <div className="text-sm text-muted-foreground">No match this gameweek.</div>
+      )}
+      {breakdown && breakdown.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {breakdown.map((f) => (
+            <FixtureBlock key={f.fixture} f={f} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

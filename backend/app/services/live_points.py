@@ -39,6 +39,20 @@ def bonus_confirmed(fixture: dict) -> bool:
     )
 
 
+def fixture_side(fixture: dict, team_id: Optional[int], element: int) -> Optional[bool]:
+    """True if the player was the home side. By club when it's one of the two;
+    a player who has since moved clubs is found in the fixture's BPS lists
+    instead — None if they aren't there either (0 BPS)."""
+    if team_id in (fixture.get("team_h"), fixture.get("team_a")):
+        return fixture.get("team_h") == team_id
+    for stat in fixture.get("stats") or []:
+        if stat.get("identifier") == "bps":
+            for side in ("h", "a"):
+                if any(r.get("element") == element for r in stat.get(side) or []):
+                    return side == "h"
+    return None
+
+
 def bps_rank(bps: int, table: Dict[int, int]) -> int:
     """Competition rank (1, 1, 3) — ties share the higher place."""
     return 1 + sum(1 for v in table.values() if v > bps)
@@ -102,11 +116,11 @@ def points_breakdown(
             "bonus_provisional": False,
         }
         if fx is not None:
-            home = fx.get("team_h") == team_id
-            opp_id = fx.get("team_a") if home else fx.get("team_h")
+            home = fixture_side(fx, team_id, element)
+            if home is not None:
+                opp_id = fx.get("team_a") if home else fx.get("team_h")
+                row.update(opp=short_names.get(opp_id), home=home)
             row.update(
-                opp=short_names.get(opp_id),
-                home=home,
                 kickoff=fx.get("kickoff_time"),
                 started=bool(fx.get("started")),
                 finished=bool(fx.get("finished") or fx.get("finished_provisional")),

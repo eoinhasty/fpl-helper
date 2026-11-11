@@ -656,6 +656,23 @@ async def player_summary(request: Request, response: Response, player_id: int):
     return data
 
 
+@router.get("/player/{player_id}/gw/{gw}/points")
+@limiter.limit("60/minute")
+async def player_gw_points(
+    request: Request, response: Response, player_id: int, gw: int
+):
+    svc: FPLService = request.app.state.svc
+    boot, _, _ = await svc.bootstrap()
+    player = next((p for p in boot["elements"] if p["id"] == player_id), None)
+    if player is None:
+        raise HTTPException(404, detail=f"Player {player_id} not found.")
+    if not any(e["id"] == gw for e in boot["events"]):
+        raise HTTPException(404, detail=f"Gameweek {gw} not found.")
+    body, readings = await svc.player_gw_points(boot, player, gw)
+    set_cache_headers(response, *combine_cache(*readings), TTL_PICKS)
+    return body
+
+
 @router.get("/pl/standings")
 @limiter.limit("30/minute")
 async def pl_standings(request: Request, response: Response):

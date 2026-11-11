@@ -189,6 +189,33 @@ class FPLService:
             stale_ttl,
         )
 
+    async def player_gw_points(
+        self, boot: dict, player: dict, gw: int
+    ) -> Tuple[dict, List[Tuple[str, float]]]:
+        """One player's points breakdown for any GW, from the same live data
+        the squad views use — so a past GW reads exactly as it did live."""
+        try:
+            live, live_status, live_age = await self.live_event(gw)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code != 404:  # GW not started yet
+                raise
+            live, live_status, live_age = {"elements": []}, "miss", 0.0
+        fixtures, fx_status, fx_age = await self.event_fixtures(gw)
+        el = next((e for e in live["elements"] if e["id"] == player["id"]), None)
+        short_names = {t["id"]: t.get("short_name") for t in boot["teams"]}
+        body = {
+            "gw": gw,
+            "points": (el.get("stats") or {}).get("total_points") if el else None,
+            "breakdown": points_breakdown(
+                player["id"],
+                (el or {}).get("explain") or [],
+                player.get("team"),
+                {fx["id"]: fx for fx in fixtures},
+                short_names,
+            ),
+        }
+        return body, [(live_status, live_age), (fx_status, fx_age)]
+
     async def fdr_grid(self, horizon: int) -> Tuple[dict, str, float]:
         key = f"fdr:{horizon}"
 

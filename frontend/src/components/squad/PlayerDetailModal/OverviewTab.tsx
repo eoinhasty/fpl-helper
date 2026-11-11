@@ -1,7 +1,8 @@
 import * as React from "react";
-import type { Player, PlayerSummaryResponse } from "../../../lib/types";
+import type { FixturePoints, Player, PlayerSummaryResponse } from "../../../lib/types";
 import { statusToText, fdrClass, TONE_CLASS, statusTone } from "../../../lib/utils";
 import { fmtPrice, pct, fmtCompact } from "../../../lib/format";
+import { useFetch } from "../../../hooks/useFetch";
 import { SectionHeader, PositionTag, KickoffLabel, NextFixturesStatus } from "./parts";
 import type { NextFixtures, TeamFixture } from "./parts";
 import PointsBreakdown from "./PointsBreakdown";
@@ -93,6 +94,15 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
 }) {
   const recent = history.data ? recentGws(history.data, 5) : null;
 
+  // The breakdown shows the squad's GW until a Recent gameweeks tile is picked;
+  // any other GW (or any GW for a non-squad player) is fetched on demand.
+  const [pickedGw, setPickedGw] = React.useState<number | null>(null);
+  const shownGw = pickedGw ?? (player.gw_breakdown ? pointsGw : undefined);
+  const fromSquad = player.gw_breakdown != null && shownGw === pointsGw;
+  const picked = useFetch<{ gw: number; points: number | null; breakdown: FixturePoints[] }>(
+    shownGw != null && !fromSquad ? `/api/player/${player.element}/gw/${shownGw}/points` : null,
+  );
+
   const netTransfers = (player.transfers_in_event ?? 0) - (player.transfers_out_event ?? 0);
   const hasTransferData = player.transfers_in_event != null || player.transfers_out_event != null;
   const netSign = netTransfers > 0 ? "+" : netTransfers < 0 ? "−" : "";
@@ -110,32 +120,58 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
     <div className="space-y-4">
       <StatusBanner player={player} hideStartProbability={hideStartProbability} />
 
-      {player.gw_breakdown && (
-        <PointsBreakdown breakdown={player.gw_breakdown} points={player.gw_points} gw={pointsGw} />
-      )}
-
       {/* Per-GW returns — what form, an average, hides */}
       {!history.error && (
         <section>
-          <SectionHeader label="Recent gameweeks" />
+          <SectionHeader
+            label="Recent gameweeks"
+            right={recent && recent.length > 0 && (
+              <span className="text-[10px] text-muted-foreground">Pick a week for its points</span>
+            )}
+          />
           {history.loading && <div className="text-sm text-muted-foreground">Loading…</div>}
           {recent && recent.length === 0 && (
             <div className="text-sm text-muted-foreground">No matches played yet this season.</div>
           )}
           {recent && recent.length > 0 && (
             <div className="grid grid-cols-5 gap-1.5">
-              {recent.map((r) => (
-                <div key={r.gw} className="flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl border border-border bg-muted/30">
-                  <span className="text-[10px] text-muted-foreground tracking-wide font-mono">GW{r.gw}</span>
-                  <span className="text-lg font-bold tabular-nums leading-none text-foreground">{r.pts}</span>
-                  <span className="text-[10px] text-muted-foreground tabular-nums">
-                    {r.mins > 0 ? `${r.mins} min` : "DNP"}
-                  </span>
-                </div>
-              ))}
+              {recent.map((r) => {
+                const on = r.gw === shownGw;
+                return (
+                  <button
+                    key={r.gw}
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={`GW${r.gw}: ${r.pts} points — show breakdown`}
+                    // Picking the shown week again goes back to the squad's GW
+                    onClick={() => setPickedGw(on && pickedGw != null ? null : r.gw)}
+                    className={`flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl border cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                      on ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:border-foreground/30"
+                    }`}
+                  >
+                    <span className={`text-[10px] tracking-wide font-mono ${on ? "text-primary-strong" : "text-muted-foreground"}`}>GW{r.gw}</span>
+                    <span className="text-lg font-bold tabular-nums leading-none text-foreground">{r.pts}</span>
+                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                      {r.mins > 0 ? `${r.mins} min` : "DNP"}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </section>
+      )}
+
+      {fromSquad ? (
+        <PointsBreakdown breakdown={player.gw_breakdown ?? null} points={player.gw_points} gw={pointsGw} />
+      ) : shownGw != null && (
+        <PointsBreakdown
+          breakdown={picked.data?.breakdown ?? null}
+          points={picked.data?.points}
+          gw={shownGw}
+          loading={picked.loading}
+          error={picked.error}
+        />
       )}
 
       {/* Market */}
