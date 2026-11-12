@@ -224,6 +224,8 @@ async def squad(
             raise
         live_data = {"elements": []}
         live_status, live_age = "miss", 0.0
+    # used_gw's fixtures on the live cadence, for the points breakdown's BPS
+    live_fixtures, lfx_status, lfx_age = await svc.event_fixtures(used_gw)
 
     # FPL only exposes next-GW picks once its deadline passes, so between
     # gameweeks the squad comes from the current GW's picks. Once that GW has
@@ -251,16 +253,18 @@ async def squad(
         fixtures_data,
         live_data,
         await svc.projections(events, fixture_gw),
+        live_fixtures,
     )
     used_event = next((e for e in events if e["id"] == used_gw), None)
     if used_event is None:
         raise HTTPException(404, detail=f"Gameweek {used_gw} not found.")
     fixture_event = next((e for e in events if e["id"] == fixture_gw), used_event)
 
-    # Report the older/worse of picks vs. live scoring — picks alone would
-    # understate staleness if live_event hasn't revalidated as recently.
+    # Report the older/worse of picks vs. live scoring (points and the BPS
+    # behind provisional bonus) — picks alone would understate staleness if
+    # those haven't revalidated as recently.
     combined_status, combined_age = combine_cache(
-        (pick_status, pick_age), (live_status, live_age)
+        (pick_status, pick_age), (live_status, live_age), (lfx_status, lfx_age)
     )
     set_cache_headers(response, combined_status, combined_age, TTL_PICKS)
     return {
@@ -311,6 +315,10 @@ async def live(
     )
 
     fixtures_data, _, _ = await svc.fixtures(used_gw)
+    # The same GW's fixtures on the live cadence, for the points breakdown's BPS
+    live_fixtures, lfx_status, lfx_age = await svc.event_fixtures(
+        used_gw, ttl=TTL_MYTEAM, stale_ttl=SWR_MYTEAM
+    )
     try:
         # Tighter TTL than the default (matches my_team's 30s cadence) — Live
         # mode is exactly the time-sensitive case this endpoint exists for.
@@ -330,6 +338,7 @@ async def live(
         fixtures_data,
         event_live,
         await svc.projections(events, used_gw),
+        live_fixtures,
     )
 
     summary = await _entry_summary(svc, entry_id, boot)
@@ -349,7 +358,7 @@ async def live(
     # reflect whichever is staler, not just whichever this endpoint happens
     # to name first in the response headers.
     combined_status, combined_age = combine_cache(
-        (mt_status, mt_age), (ev_status, ev_age)
+        (mt_status, mt_age), (ev_status, ev_age), (lfx_status, lfx_age)
     )
     set_cache_headers(response, combined_status, combined_age, TTL_MYTEAM)
     return {
@@ -645,6 +654,23 @@ async def player_summary(request: Request, response: Response, player_id: int):
     data, status, age = await svc.player_summary(player_id)
     set_cache_headers(response, status, age, TTL_PLAYER_SUMMARY)
     return data
+
+
+@router.get("/player/{player_id}/gw/{gw}/points")
+@limiter.limit("60/minute")
+async def player_gw_points(
+    request: Request, response: Response, player_id: int, gw: int
+):
+    svc: FPLService = request.app.state.svc
+    boot, _, _ = await svc.bootstrap()
+    player = next((p for p in boot["elements"] if p["id"] == player_id), None)
+    if player is None:
+        raise HTTPException(404, detail=f"Player {player_id} not found.")
+    if not any(e["id"] == gw for e in boot["events"]):
+        raise HTTPException(404, detail=f"Gameweek {gw} not found.")
+    body, readings = await svc.player_gw_points(boot, player, gw)
+    set_cache_headers(response, *combine_cache(*readings), TTL_PICKS)
+    return body
 
 
 @router.get("/pl/standings")

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from math import prod
 from app.simple_cache import AsyncCache
 from app.services.espn import EspnService
+from app.services.live_points import points_breakdown
 from app.services.gameweeks import (
     current_and_next,
     current_and_next_gw,
@@ -173,6 +174,47 @@ class FPLService:
             TTL_FIXTURES,
             SWR_FIXTURES,
         )
+
+    async def event_fixtures(
+        self, gw: int, ttl: float = TTL_PICKS, stale_ttl: float = SWR_PICKS
+    ) -> Tuple[list, str, float]:
+        # Same data as fixtures(gw), but on live_event's cadence: its BPS and
+        # started/finished flags are what the points breakdown reads, and
+        # fixtures(gw)'s day-long TTL would freeze them mid-matchday.
+        key = f"fixtures-live:{gw}"
+        return await self.cache.get_or_set(
+            key,
+            lambda: self._get_json("/fixtures/", params={"event": gw}),
+            ttl,
+            stale_ttl,
+        )
+
+    async def player_gw_points(
+        self, boot: dict, player: dict, gw: int
+    ) -> Tuple[dict, List[Tuple[str, float]]]:
+        """One player's points breakdown for any GW, from the same live data
+        the squad views use — so a past GW reads exactly as it did live."""
+        try:
+            live, live_status, live_age = await self.live_event(gw)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code != 404:  # GW not started yet
+                raise
+            live, live_status, live_age = {"elements": []}, "miss", 0.0
+        fixtures, fx_status, fx_age = await self.event_fixtures(gw)
+        el = next((e for e in live["elements"] if e["id"] == player["id"]), None)
+        short_names = {t["id"]: t.get("short_name") for t in boot["teams"]}
+        body = {
+            "gw": gw,
+            "points": (el.get("stats") or {}).get("total_points") if el else None,
+            "breakdown": points_breakdown(
+                player["id"],
+                (el or {}).get("explain") or [],
+                player.get("team"),
+                {fx["id"]: fx for fx in fixtures},
+                short_names,
+            ),
+        }
+        return body, [(live_status, live_age), (fx_status, fx_age)]
 
     async def fdr_grid(self, horizon: int) -> Tuple[dict, str, float]:
         key = f"fdr:{horizon}"
@@ -668,11 +710,15 @@ class FPLService:
         fixtures: list,
         live: dict,
         projections: Optional[Dict[int, float]] = None,
+        live_fixtures: Optional[list] = None,
     ) -> Tuple[List[dict], Optional[int], Optional[int]]:
-
+        # live_fixtures: the fixtures of the GW `live` belongs to, which can
+        # differ from `fixtures` (the GW ahead, between gameweeks). Without
+        # them there's no points breakdown.
+        live_elements = {e["id"]: e for e in (live.get("elements") or [])}
         live_points = {
-            e["id"]: (e.get("stats") or {}).get("total_points", 0)
-            for e in (live.get("elements") or [])
+            el: (e.get("stats") or {}).get("total_points", 0)
+            for el, e in live_elements.items()
         }
 
         played_gws = finished_gw_count(boot)
@@ -701,10 +747,14 @@ class FPLService:
                 }
             )
 
+        live_fixtures_by_id = {fx["id"]: fx for fx in live_fixtures or []}
+        short_names = {tid: t.get("short_name") for tid, t in teams.items()}
+
         enriched = []
         for pick in picks.get("picks", []):
             el = pick["element"]
             p = players.get(el, {})
+            live_el = live_elements.get(el)
             t = teams.get(p.get("team", 0), {})
             team_fixtures = fdr_by_team.get(p.get("team", 0), [])
             fdr = team_fixtures[0] if team_fixtures else None
@@ -728,6 +778,17 @@ class FPLService:
                     "news": p.get("news"),
                     "total_points": p.get("total_points"),
                     "gw_points": live_points.get(el),
+                    "gw_breakdown": (
+                        points_breakdown(
+                            el,
+                            live_el.get("explain") or [],
+                            p.get("team"),
+                            live_fixtures_by_id,
+                            short_names,
+                        )
+                        if live_el is not None and live_fixtures is not None
+                        else None
+                    ),
                     "selected_by_percent": p.get("selected_by_percent"),
                     "start_probability": start_prob_from(p, played_gws),
                     "form": p.get("form"),

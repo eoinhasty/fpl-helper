@@ -39,3 +39,9 @@ export function fmtRelTime(iso: string | null | undefined): string {
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
 }
+/** 1 → "1st", 22 → "22nd", 13 → "13th" */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th"}`;
+}

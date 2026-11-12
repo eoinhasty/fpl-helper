@@ -18,6 +18,32 @@ export type FixtureLite = {
  * players finishing roughly in line with their chances. */
 export type XgiSignal = { gap: number; direction: "over" | "under" };
 
+/** One of FPL's scoring lines for a fixture (`explain` on /event/{gw}/live/) */
+export type PointsLine = { identifier: string; value: number; points: number };
+
+/** A player's points in one fixture of the GW — see backend live_points.py */
+export type FixturePoints = {
+    fixture: number;
+    opp: string | null;
+    home: boolean | null;
+    kickoff: string | null;
+    started: boolean;
+    finished: boolean;
+    minutes: number;
+    /** Scoring lines without bonus, which is `bonus` below */
+    stats: PointsLine[];
+    /** Points FPL has awarded — includes `bonus` only once it's confirmed */
+    points: number;
+    /** BPS in this fixture and rank among both teams; null without minutes */
+    bps: number | null;
+    bps_rank: number | null;
+    /** BPS short of the lowest bonus place; null when in one */
+    bps_to_bonus: number | null;
+    bonus: number;
+    /** Bonus worked out from BPS, not yet in `points` */
+    bonus_provisional: boolean;
+};
+
 export type Player = {
     element: number;
     name: string;
@@ -54,6 +80,8 @@ export type Player = {
     selected_by_percent?: string;
     start_probability: number;
     gw_points?: number;
+    /** Per fixture of the GW `gw_points` belongs to; squad and live views only */
+    gw_breakdown?: FixturePoints[] | null;
     is_captain?: boolean; is_vice_captain?: boolean;
     fixture?: FixtureLite | null;
     has_dgw?: boolean;
