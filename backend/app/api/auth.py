@@ -1,5 +1,7 @@
 import base64
 import hashlib
+import hmac
+import logging
 import re
 import secrets
 import uuid
@@ -8,10 +10,43 @@ import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from app.deps import limiter, verify_api_key
+from app.deps import get_real_ip, limiter, verify_api_key
 from app.services.service import USER_AGENT as _UA
 
 router = APIRouter(prefix="/api/auth", dependencies=[Depends(verify_api_key)])
+
+logger = logging.getLogger("uvicorn.error")
+
+# Auth events are logged for incident investigation, never with the email,
+# password, tokens or IP (the privacy policy promises no personal data is kept
+# server-side). `client` is a keyed hash of the IP whose key lives only in this
+# process, so it links one client's events until the next restart and can't be
+# traced back to an address.
+_CLIENT_KEY = secrets.token_bytes(32)
+
+
+def _client_tag(request: Request) -> str:
+    ip = get_real_ip(request).encode()
+    return hmac.new(_CLIENT_KEY, ip, hashlib.sha256).hexdigest()[:10]
+
+
+def _log_auth(request: Request, event: str, outcome: str, reason: str = "") -> None:
+    logger.info(
+        "auth event=%s outcome=%s client=%s%s",
+        event,
+        outcome,
+        _client_tag(request),
+        f" reason={reason}" if reason else "",
+    )
+
+
+def _failure_reason(exc: Exception) -> str:
+    """A loggable cause: the HTTP status we answered with, or just the error
+    type — never the message, which could echo something sensitive."""
+    if isinstance(exc, HTTPException):
+        return str(exc.status_code)
+    return type(exc).__name__
+
 
 _COOKIE_NAME = "fpl_refresh_token"
 _COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
@@ -223,7 +258,12 @@ class TokenResponse(BaseModel):
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
 async def login(request: Request, response: Response, body: LoginRequest = Body(...)):
-    access_token, refresh_token = await _pkce_login(body.email, body.password)
+    try:
+        access_token, refresh_token = await _pkce_login(body.email, body.password)
+    except Exception as exc:
+        _log_auth(request, "login", "failure", _failure_reason(exc))
+        raise
+    _log_auth(request, "login", "success")
     _set_refresh_cookie(response, refresh_token)
     return TokenResponse(access_token=access_token)
 
@@ -233,13 +273,20 @@ async def login(request: Request, response: Response, body: LoginRequest = Body(
 async def refresh(request: Request, response: Response):
     refresh_token = request.cookies.get(_COOKIE_NAME)
     if not refresh_token:
+        _log_auth(request, "refresh", "failure", "no_cookie")
         raise HTTPException(401, detail="refresh_expired")
-    access_token, new_refresh_token = await _pkce_refresh(refresh_token)
+    try:
+        access_token, new_refresh_token = await _pkce_refresh(refresh_token)
+    except Exception as exc:
+        _log_auth(request, "refresh", "failure", _failure_reason(exc))
+        raise
+    _log_auth(request, "refresh", "success")
     _set_refresh_cookie(response, new_refresh_token)
     return TokenResponse(access_token=access_token)
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    _log_auth(request, "logout", "success")
     _clear_refresh_cookie(response)
     return {"ok": True}

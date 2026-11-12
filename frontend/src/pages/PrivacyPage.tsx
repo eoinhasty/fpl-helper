@@ -3,7 +3,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen page-bg">
       <div className="mx-auto max-w-2xl px-6 py-12 text-sm text-foreground leading-relaxed">
         <h1 className="text-2xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-muted-foreground mb-8">Last updated: October 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: November 2026</p>
 
         <section className="mb-6">
           <h2 className="font-semibold text-base mb-2">What we collect</h2>
@@ -35,6 +35,12 @@ export default function PrivacyPage() {
           <p className="text-muted-foreground">
             We have no database. No personal data is stored server-side after your authentication
             request completes. We do not use analytics, advertising, or tracking scripts.
+          </p>
+          <p className="text-muted-foreground mt-2">
+            For security, our server logs each sign-in, session refresh and sign-out: the time,
+            whether it succeeded, and an anonymous ID that links events from the same connection
+            until the server restarts. These logs never contain your email, password, session
+            tokens or IP address.
           </p>
         </section>
 
