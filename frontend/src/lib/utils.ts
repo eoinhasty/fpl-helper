@@ -39,6 +39,15 @@ export const fdrClass = (d?: number) =>
             ? "bg-destructive/20 text-destructive font-semibold"
             : "";
 
+/** The fixture ticker's Attack/Defence views on fdrClass's 1–5 scale (1 =
+ * easiest): expected goals as a ratio of a team's league average — scored
+ * when attacking (higher is easier), conceded when defending (lower is). The
+ * bands split the model's fixtures about as unevenly as FPL's FDR does. */
+export function xgBand(ratio: number, higherIsEasier: boolean): 1 | 2 | 3 | 4 | 5 {
+  const r = higherIsEasier ? ratio : 2 - ratio;
+  return r >= 1.3 ? 1 : r >= 1.1 ? 2 : r > 0.9 ? 3 : r > 0.7 ? 4 : 5;
+}
+
 /** Same FDR scale as fdrClass, as a solid dot color — for small indicators where
  * fdrClass's alpha-tinted pill backgrounds would be too faint to read. */
 export const fdrDotClass = (d?: number) =>
