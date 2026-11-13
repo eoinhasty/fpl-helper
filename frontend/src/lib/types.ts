@@ -14,6 +14,10 @@ export type FixtureLite = {
   kickoff?: string;
   /** GW — set on /api/players' fixtures, which span the next few GWs */
   event?: number;
+  /** Expected goals for and against from the team ratings published with the
+   * projections — /api/fixtures/grid only, for GWs the projections cover */
+  xg_for?: number;
+  xg_against?: number;
 };
 
 /** G+A well above ("over") or below ("under") xGI — see xgi_signal in
@@ -175,6 +179,9 @@ export type FdrGridResponse = {
   base_gw: number;
   gws: FdrGwMeta[];
   teams: FdrTeam[];
+  /** A team's league-average xG per game in the team ratings; null when no
+   * usable projections carry them (no Attack/Defence views then) */
+  league_xg?: number | null;
 };
 
 export type PoolPosition = "GK" | "DEF" | "MID" | "FWD";
@@ -197,6 +204,9 @@ export type PoolPlayer = {
   ep_next?: string;
   /** Points model projection for PlayersResponse.gw (null without usable projections) */
   projected_pts?: number | null;
+  /** The model's projections for up to 5 GWs from PlayersResponse.gw, the
+   * first scaled by chance of playing — absent without usable projections */
+  projected_gws?: number[];
   total_points?: number;
   form?: string;
   penalties_order?: number;

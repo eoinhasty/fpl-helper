@@ -14,14 +14,23 @@ function statusBadgeClass(s: string | undefined): string | null {
   return `${t.soft} ${t.text}`;
 }
 
-type SortKey = "now_cost" | "selected_by_percent" | "ep_next" | "form";
+type SortKey = "now_cost" | "selected_by_percent" | "xpts1" | "xpts3" | "xpts5" | "form";
 
-const SORT_OPTIONS: { label: string; value: SortKey }[] = [
-  { label: "Price", value: "now_cost" },
-  { label: "Ownership", value: "selected_by_percent" },
-  { label: "xPts next", value: "ep_next" },
-  { label: "Form", value: "form" },
-];
+/** GWs summed by each xPts sort */
+const XPTS_GWS: Partial<Record<SortKey, number>> = { xpts1: 1, xpts3: 3, xpts5: 5 };
+
+/** The points model's projection over the next `n` GWs (the first scaled by
+ * chance of playing, as on the squad view), or FPL's ep_next for one GW when
+ * no projections are published. */
+function xpts(p: PoolPlayer, n: number, model: boolean): number | null {
+  if (model) return (p.projected_gws ?? []).slice(0, n).reduce((a, b) => a + b, 0);
+  return n === 1 && p.ep_next != null ? num(p.ep_next) : null;
+}
+
+function gwRange(gw: number | null | undefined, n: number): string {
+  if (!gw) return n === 1 ? "next" : `${n} GW`;
+  return n === 1 ? `GW${gw}` : `GW${gw}–${gw + n - 1}`;
+}
 
 const POSITION_OPTIONS: { label: string; value: PoolPosition | "ALL" }[] = [
   { label: "All", value: "ALL" },
@@ -41,12 +50,15 @@ function num(v: string | undefined): number {
 export default function PlayerTable({
   players,
   teams,
+  gw,
   canAdd,
   onAdd,
   onSelect,
 }: {
   players: PoolPlayer[];
   teams: PoolTeam[];
+  /** GW the projections start from (PlayersResponse.gw) */
+  gw?: number | null;
   canAdd: (p: PoolPlayer) => { ok: boolean; reason?: string; warning?: string };
   onAdd: (p: PoolPlayer) => void;
   onSelect?: (p: PoolPlayer) => void;
@@ -55,6 +67,28 @@ export default function PlayerTable({
   const [teamId, setTeamId] = React.useState<string>("ALL");
   const [query, setQuery] = React.useState("");
   const [sortKey, setSortKey] = React.useState<SortKey>("now_cost");
+  // Whether the points model's projections are published: without them only
+  // FPL's one-GW ep_next is available, so the multi-GW sorts go
+  const model = React.useMemo(() => players.some((p) => p.projected_gws != null), [players]);
+  // The xPts column follows the last xPts sort chosen (one GW until then)
+  const [xptsGws, setXptsGws] = React.useState(1);
+  const shownGws = model ? xptsGws : 1;
+  const sortOptions: { label: string; value: SortKey }[] = [
+    { label: "Price", value: "now_cost" },
+    { label: "Ownership", value: "selected_by_percent" },
+    { label: `xPts ${gwRange(gw, 1)}`, value: "xpts1" },
+    ...(model
+      ? [
+          { label: `xPts ${gwRange(gw, 3)}`, value: "xpts3" as const },
+          { label: `xPts ${gwRange(gw, 5)}`, value: "xpts5" as const },
+        ]
+      : []),
+    { label: "Form", value: "form" },
+  ];
+  const changeSort = (key: SortKey) => {
+    setSortKey(key);
+    if (XPTS_GWS[key]) setXptsGws(XPTS_GWS[key]);
+  };
   const [sortDesc, setSortDesc] = React.useState(true);
   const [visible, setVisible] = React.useState(PAGE_SIZE);
 
@@ -66,13 +100,15 @@ export default function PlayerTable({
     if (q) {
       rows = rows.filter((p) => p.web_name.toLowerCase().includes(q) || (p.full_name ?? "").toLowerCase().includes(q));
     }
-    const sorted = [...rows].sort((a, b) => {
-      const av = sortKey === "now_cost" ? (a.now_cost ?? 0) : num(a[sortKey] as string | undefined);
-      const bv = sortKey === "now_cost" ? (b.now_cost ?? 0) : num(b[sortKey] as string | undefined);
-      return sortDesc ? bv - av : av - bv;
-    });
+    const value = (p: PoolPlayer): number => {
+      const n = XPTS_GWS[sortKey];
+      if (n) return xpts(p, n, model) ?? 0;
+      if (sortKey === "now_cost") return p.now_cost ?? 0;
+      return num(p[sortKey as "selected_by_percent" | "form"]);
+    };
+    const sorted = [...rows].sort((a, b) => (sortDesc ? value(b) - value(a) : value(a) - value(b)));
     return sorted;
-  }, [players, position, teamId, query, sortKey, sortDesc]);
+  }, [players, position, teamId, query, sortKey, sortDesc, model]);
 
   React.useEffect(() => setVisible(PAGE_SIZE), [position, teamId, query, sortKey, sortDesc]);
 
@@ -117,10 +153,10 @@ export default function PlayerTable({
         />
         <SelectMenu
           value={sortKey}
-          onChange={setSortKey}
+          onChange={changeSort}
           ariaLabel="Sort by"
-          className="w-40"
-          options={SORT_OPTIONS.map((o) => ({ label: `Sort: ${o.label}`, value: o.value }))}
+          className="w-52"
+          options={sortOptions.map((o) => ({ label: `Sort: ${o.label}`, value: o.value }))}
         />
         <button
           type="button"
@@ -220,11 +256,13 @@ export default function PlayerTable({
                   {p.selected_by_percent != null ? `${p.selected_by_percent}%` : "—"}
                 </div>
               </div>
-              <div className="w-12 shrink-0 text-right">
-                <div className="text-sm font-semibold text-primary tabular-nums">
-                  {p.ep_next ? Number(p.ep_next).toFixed(1) : "—"}
+              <div className="w-14 shrink-0 text-right" title={`Projected points, ${gwRange(gw, shownGws)}`}>
+                <div className="text-sm font-semibold text-primary-strong tabular-nums">
+                  {xpts(p, shownGws, model)?.toFixed(1) ?? "—"}
                 </div>
-                <div className="text-[10px] text-muted-foreground">xPts</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {shownGws === 1 ? "xPts" : `xPts ${shownGws}GW`}
+                </div>
               </div>
 
               <button
