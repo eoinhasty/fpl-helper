@@ -1,0 +1,5 @@
+# Bulk reformats - skipped by git blame (GitHub reads this file automatically;
+# locally: git config blame.ignoreRevsFile .git-blame-ignore-revs)
+
+# style: format frontend src with prettier
+109ef70c200d5b847cf521be29c762d09e71125e
