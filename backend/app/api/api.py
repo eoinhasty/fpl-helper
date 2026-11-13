@@ -23,6 +23,7 @@ from app.services.service import (
     SWR_STANDINGS,
 )
 from app.services import gameweeks
+from app.services.transfer_plan import build_transfer_plan
 from app.services.espn import (
     TTL_ESPN_FOOTBALL,
     SWR_ESPN_FOOTBALL,
@@ -620,7 +621,8 @@ async def transfer_plan(
     def chip(choice: Optional[str]):
         return int(choice) if choice and choice.isdigit() else choice
 
-    data, readings, ttl = await svc.transfer_plan(
+    data, readings, ttl = await build_transfer_plan(
+        svc,
         entry_id,
         token=token,
         no_hits=no_hits,

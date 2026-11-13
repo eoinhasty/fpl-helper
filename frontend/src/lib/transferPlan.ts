@@ -19,7 +19,7 @@ export type PlanPlayer = {
 /** A GW to play a chip in, or "best" for the solver to pick the week */
 export type ChipChoice = number | "best" | null;
 
-/** The card's options, as planner.build's (see FPLService.transfer_plan) */
+/** The card's options, as planner.build's (see build_transfer_plan in transfer_plan.py) */
 export type PlanOptions = {
   no_hits: boolean;
   /** GW to play a wildcard in, from wildcard_gws */

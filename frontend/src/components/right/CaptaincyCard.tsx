@@ -1,5 +1,5 @@
 import * as React from "react";
-import Card from "../ui/Card";
+import DataCard from "../ui/DataCard";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
 import { captaincyPicks } from "../../lib/captaincy";
@@ -93,89 +93,50 @@ export default function CaptaincyCard({
   /** The shown GW is past its deadline: its captain can't be changed */
   lockedGw?: number;
 }) {
-  // Above the early returns, as hooks must be
   const ranked = React.useMemo(() => (players ? captaincyPicks(players) : null), [players]);
-
-  if (lockedGw != null) {
-    return (
-      <Card className="p-4">
-        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
-        <div className="text-sm text-muted-foreground">
-          GW{lockedGw}'s captain is locked — picks for the next GW appear once it finishes.
-        </div>
-      </Card>
-    );
-  }
-
-  if (isHistorical) {
-    return (
-      <Card className="p-4">
-        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
-        <div className="text-sm text-muted-foreground">Captain picks use live data — not available for past GWs.</div>
-      </Card>
-    );
-  }
-
-  if (!entry) {
-    return (
-      <Card className="p-4">
-        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
-        <div className="text-sm text-muted-foreground">Set your entry id to see captain picks.</div>
-      </Card>
-    );
-  }
-
-  if (loading && !players) {
-    return (
-      <Card className="p-4">
-        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
-        <CaptaincySkeleton />
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="p-4">
-        <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
-        <div className="text-sm text-destructive">{error}</div>
-      </Card>
-    );
-  }
-
   const { picks, differential, projected } = ranked ?? { picks: [], differential: null, projected: false };
 
-  return (
-    <Card className="p-4">
-      <div className="text-sm font-semibold text-foreground mb-2">Captaincy Picks</div>
-      {picks.length === 0 ? (
-        <div className="text-sm text-muted-foreground">Captain picks appear once your squad is loaded.</div>
-      ) : (
-        <>
-          <ul className="space-y-2">
-            {picks.map(({ p, pts }, i) => (
-              <PlayerRow key={p.element} p={p} pts={pts} projected={projected} rank={i} />
-            ))}
-          </ul>
-          {/* Measured on the model's projections only (CAPTAIN_CLOSE_GAP in lib/confidence.ts) */}
-          {projected && picks.length > 1 && picks[0].pts - picks[1].pts < CAPTAIN_CLOSE_GAP && (
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Close call: in past seasons, top captain picks within {CAPTAIN_CLOSE_GAP} pts of each other went the
-              model's way only about half the time. Weigh news, fixtures and ownership.
-            </p>
-          )}
+  // States where picks don't apply, ahead of loading and errors
+  const unavailable =
+    lockedGw != null
+      ? `GW${lockedGw}'s captain is locked — picks for the next GW appear once it finishes.`
+      : isHistorical
+        ? "Captain picks use live data — not available for past GWs."
+        : !entry
+          ? "Set your entry id to see captain picks."
+          : null;
 
-          {differential && (
-            <>
-              <div className="mt-3 mb-2 border-t border-border" />
-              <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Differential</div>
-              <ul>
-                <PlayerRow p={differential.p} pts={differential.pts} projected={projected} />
-              </ul>
-            </>
-          )}
+  return (
+    <DataCard
+      title="Captaincy Picks"
+      loading={!unavailable && loading && !players}
+      loadingContent={<CaptaincySkeleton />}
+      error={unavailable ? null : error}
+      empty={!!unavailable || picks.length === 0}
+      emptyMessage={unavailable ?? "Captain picks appear once your squad is loaded."}
+    >
+      <ul className="space-y-2">
+        {picks.map(({ p, pts }, i) => (
+          <PlayerRow key={p.element} p={p} pts={pts} projected={projected} rank={i} />
+        ))}
+      </ul>
+      {/* Measured on the model's projections only (CAPTAIN_CLOSE_GAP in lib/confidence.ts) */}
+      {projected && picks.length > 1 && picks[0].pts - picks[1].pts < CAPTAIN_CLOSE_GAP && (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Close call: in past seasons, top captain picks within {CAPTAIN_CLOSE_GAP} pts of each other went the
+          model's way only about half the time. Weigh news, fixtures and ownership.
+        </p>
+      )}
+
+      {differential && (
+        <>
+          <div className="mt-3 mb-2 border-t border-border" />
+          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Differential</div>
+          <ul>
+            <PlayerRow p={differential.p} pts={differential.pts} projected={projected} />
+          </ul>
         </>
       )}
-    </Card>
+    </DataCard>
   );
 }

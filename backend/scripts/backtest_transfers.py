@@ -446,13 +446,13 @@ def run_transfer_policy(
         ]
         if chip_rule == "chips_best":
             return [g for g in window if g in gws]
-        if chip_rule == "chips_best_dgw":  # mirrors FPLService.transfer_plan
+        if chip_rule == "chips_best_dgw":  # mirrors chips.chip_play
             return [g for g in doubles or window[-1:] if g in gws]
         if chip_rule == "chips_dgw":
             target = (doubles or window[-1:])[0]
         elif chip_rule == "chips_last":
             target = window[-1]
-        else:  # chips_peak (mirrors FPLService.transfer_plan's Bench Boost): only ever this GW
+        else:  # chips_peak (mirrors chips.chip_play's Bench Boost): only ever this GW
             if window[0] != gw:
                 return []
             value = {g: chip_projection(g, gw) for g in window if g in gws}
