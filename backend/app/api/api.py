@@ -18,6 +18,7 @@ from app.services.service import (
     TTL_FDR,
     TTL_PLAYERS,
     TTL_PLAYER_SUMMARY,
+    TTL_TRACK,
     SWR_NEXTMATCH,
     SWR_NEWS,
     SWR_STANDINGS,
@@ -634,6 +635,27 @@ async def transfer_plan(
     )
     combined_status, combined_age = combine_cache(*readings)
     set_cache_headers(response, combined_status, combined_age, ttl)
+    return data
+
+
+@router.get("/model/track-record")
+# A first load fetches every finished GW (and the entry's picks for each)
+@limiter.limit("10/minute")
+async def model_track_record(
+    request: Request, response: Response, entry: Optional[int] = Query(None, gt=0)
+):
+    svc: FPLService = request.app.state.svc
+    if entry is not None:
+        try:
+            await svc.entry(entry)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise HTTPException(
+                    404, detail=f"FPL entry {entry} not found. Check your team ID."
+                )
+            raise
+    data, status, age = await svc.track_record(entry)
+    set_cache_headers(response, status, age, TTL_TRACK)
     return data
 
 

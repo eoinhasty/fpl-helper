@@ -32,5 +32,11 @@ const plannerRoute = createRoute({
   component: lazyRouteComponent(() => import("./pages/PlannerPage")),
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, privacyRoute, fixturesRoute, plannerRoute]);
+const trackRecordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/model",
+  component: lazyRouteComponent(() => import("./pages/TrackRecordPage")),
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, privacyRoute, fixturesRoute, plannerRoute, trackRecordRoute]);
 export const router = createRouter({ routeTree, defaultPreload: "intent", defaultNotFoundComponent: NotFoundPage });

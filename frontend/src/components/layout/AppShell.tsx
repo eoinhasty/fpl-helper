@@ -24,6 +24,10 @@ export default function AppShell({ children }: Props) {
 
       <footer className="mt-auto pt-2 pb-2 text-center text-[10px] text-muted-foreground/70 lg:py-4 lg:text-xs lg:text-muted-foreground/60">
         Not affiliated with or endorsed by Fantasy Premier League or the Premier League.{" "}
+        <Link to="/model" className="underline hover:text-muted-foreground">
+          Model track record
+        </Link>
+        {" · "}
         <Link to="/privacy" className="underline hover:text-muted-foreground">
           Privacy policy
         </Link>

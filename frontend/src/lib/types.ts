@@ -270,3 +270,28 @@ export type PlayerSummaryResponse = {
   history: PlayerSummaryHistory[];
   history_past: PlayerSummaryHistoryPast[];
 };
+
+/** One player's line in a track-record captain comparison; points are his own, not doubled */
+export type TrackCaptainRow = { element: number; name: string; projected: number; points: number };
+
+/** /api/model/track-record — the points model's predicted vs actual, per finished GW */
+export type TrackRecordGw = {
+  gw: number;
+  /** Rebuilt after the fact rather than published before the deadline */
+  backfilled: boolean;
+  /** Players who played; every number below is among them only */
+  played: number;
+  rank_corr: number | null;
+  /** Actual points of the model's 15 highest-projected players */
+  top_model: number;
+  /** The GW's best 15 in hindsight */
+  top_best: number;
+  /** 15 × the average player's points */
+  top_average: number;
+  /** Only with ?entry=; null when the entry had no outfield starters that GW */
+  captain?: { model: TrackCaptainRow | null; yours: TrackCaptainRow | null; best: TrackCaptainRow | null } | null;
+  /** The GW's top scorer across every player, in hindsight */
+  best_captain: TrackCaptainRow | null;
+};
+
+export type TrackRecordResponse = { season: string | null; gws: TrackRecordGw[] };

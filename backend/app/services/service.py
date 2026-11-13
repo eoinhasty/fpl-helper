@@ -20,6 +20,7 @@ from app.services.gameweeks import (
     upcoming_event,
 )
 from app.services.planner import MAX_PER_CLUB
+from app.services import track_record
 from app.services.scoring import (
     gain_driver,
     fixture_goals,
@@ -39,6 +40,8 @@ logger = logging.getLogger("uvicorn.error")
 FPL_BASE = "https://fantasy.premierleague.com/api"
 # Published by .github/workflows/projections.yml after each finished GW
 PROJECTIONS_URL = "https://github.com/eoinhasty/fpl-helper/releases/download/projections/projections.json"
+# The same file as built before GW {gw}, kept per GW for the track record
+PROJECTIONS_GW_URL = "https://github.com/eoinhasty/fpl-helper/releases/download/projections/projections-{season}-gw{gw}.json"
 
 # ---- TTL policy  ----
 TTL_BOOTSTRAP = 6 * 60 * 60  # 6h fresh
@@ -69,6 +72,11 @@ TTL_PLAYER_SUMMARY = 60 * 60  # 1h fresh — its history gains a row per match
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
 TTL_PROJECTIONS = 60 * 60  # 1h fresh (republished at most once per GW)
 SWR_PROJECTIONS = 12 * 60 * 60  # +12h stale
+# Track record: a finished GW's scores only move until FPL marks its data
+# checked (late bonus/corrections), then never
+TTL_TRACK_UNCHECKED = 60 * 60  # 1h fresh
+TTL_TRACK = 24 * 60 * 60  # 24h fresh once checked
+SWR_TRACK = 7 * 24 * 60 * 60  # +7d stale
 
 # One honest User-Agent for FPL, its auth server and football-data.org. The
 # "Mozilla/5.0 (compatible; ...)" prefix is what the auth flow has always sent
@@ -477,6 +485,114 @@ class FPLService:
             logger.warning("projections fetch failed", exc_info=True)
             return {}
         return proj
+
+    async def track_record(self, entry_id: Optional[int]) -> Tuple[dict, str, float]:
+        """The points model's record over this season's finished GWs (see
+        track_record.py), plus — with an entry — the captain it would have
+        picked from that entry's XI each GW against the entry's own."""
+        boot, status, age = await self.bootstrap()
+        events = boot.get("events") or []
+        if not events:
+            return {"season": None, "gws": []}, status, age
+        season = int(events[0]["deadline_time"][:4])
+        players = {p["id"]: p for p in boot["elements"]}
+        positions = {el: p["element_type"] for el, p in players.items()}
+        finished = [e for e in events if e.get("finished")]
+        limit = asyncio.Semaphore(4)
+
+        def named(row: Optional[dict]) -> Optional[dict]:
+            if row:
+                row["name"] = players.get(row["element"], {}).get("web_name", "Unknown")
+            return row
+
+        async def one(event: dict) -> Optional[dict]:
+            gw = event["id"]
+            async with limit:
+                kept = await self.track_record_gw(
+                    season, gw, bool(event.get("data_checked"))
+                )
+            if kept is None:
+                return None
+            rows = kept["rows"]
+            summary = track_record.gw_summary(rows)
+            if summary is None:
+                return None
+            out = {"gw": gw, "backfilled": kept["backfilled"], **summary}
+            out["best_captain"] = named(track_record.best_captain(rows))
+            if entry_id is not None:
+                async with limit:
+                    picks = await self.finished_picks(entry_id, gw)
+                pick = track_record.captain_pick(rows, picks, positions)
+                for row in (pick or {}).values():
+                    named(row)
+                out["captain"] = pick
+            return out
+
+        gws = [g for g in await asyncio.gather(*map(one, finished)) if g]
+        return (
+            {
+                "season": season_label(events),
+                "gws": gws,
+            },
+            status,
+            age,
+        )
+
+    async def track_record_gw(
+        self, season: int, gw: int, checked: bool
+    ) -> Optional[dict]:
+        """{"backfilled", "rows": {element: (projected, actual pts, minutes)}}
+        for a finished GW, from the projections file built before it and its
+        live data; None when no file was kept for that GW (GW1, or before
+        files were kept). Cached as these rows only — the live file behind
+        them is ~480 KB."""
+
+        async def _fetch():
+            r = await self.public.get(
+                PROJECTIONS_GW_URL.format(season=season, gw=gw),
+                follow_redirects=True,
+            )
+            if r.status_code == 404:
+                return None
+            r.raise_for_status()
+            proj = r.json()
+            live = await self._get_json(f"/event/{gw}/live/")
+            rows = track_record.gw_rows(proj, live, gw)
+            if rows is None:
+                return None
+            return {"backfilled": bool(proj.get("backfilled")), "rows": rows}
+
+        ttl = TTL_TRACK if checked else TTL_TRACK_UNCHECKED
+        kept, _, _ = await self.cache.get_or_set(
+            f"trackgw:{season}:{gw}", _fetch, ttl, SWR_TRACK
+        )
+        return kept
+
+    async def finished_picks(self, entry_id: int, gw: int) -> List[dict]:
+        """An entry's picks for a finished GW, trimmed to what the track
+        record reads; [] when the entry has none (it joined later). Unlike
+        picks() these never change, so they're kept as long as the GW rows."""
+
+        async def _fetch():
+            try:
+                data = await self._get_json(f"/entry/{entry_id}/event/{gw}/picks/")
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    return []
+                raise
+            return [
+                {
+                    "element": p["element"],
+                    "position": p["position"],
+                    "is_captain": p.get("is_captain", False),
+                }
+                for p in data.get("picks") or []
+            ]
+
+        picks, _, _ = await self.cache.get_or_set(
+            f"trackpicks:{entry_id}:{gw}", _fetch, TTL_TRACK, SWR_TRACK
+        )
+        return picks
 
     async def player_summary(self, player_id: int) -> Tuple[dict, str, float]:
         key = f"elsum:{player_id}"
