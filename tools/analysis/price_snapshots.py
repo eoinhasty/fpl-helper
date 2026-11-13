@@ -45,7 +45,8 @@ def save(out: Path) -> Path:
     players = {
         str(e["code"]): {
             "id": e["id"], "name": e["web_name"], "team": e["team"], "now_cost": e["now_cost"],
-            "status": e["status"], "selected_by_percent": e["selected_by_percent"],
+            "status": e["status"], "chance_of_playing_next_round": e["chance_of_playing_next_round"],
+            "selected_by_percent": e["selected_by_percent"],
             "transfers_in_event": e["transfers_in_event"], "transfers_out_event": e["transfers_out_event"],
             **{k: e.get(k) for k in PRICE_FIELDS},
         }
