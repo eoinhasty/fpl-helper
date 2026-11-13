@@ -1,27 +1,37 @@
 /**
- * How often the points model's favourite actually outscored the alternative,
- * by the projected gap between them and how many GWs it covers. Measured on
- * out-of-sample walk-forward projections (tools/analysis data/walkforward,
- * 2024-25 + 2025-26 pooled, GW4+), every pair of regular starters (started 4 of
- * their last 5) in the same position, ties counted half. The 5-GW row
- * reproduces the gap table in tools/analysis/README.md.
+ * How often a move the points model picked actually paid off, by its projected
+ * gain and how many GWs that gain covers. From tools/analysis/confidence_table.py
+ * (regenerate both together): out-of-sample walk-forward projections, 2024-25 +
+ * 2025-26 pooled, GW4+. Each "move" is a regular starter (started 4 of his last
+ * 5) swapped for the best-projected regular starter in his position costing at
+ * most £1.0m more — measured on chosen moves, not all pairs, because picking the
+ * best option inflates its projected gap (all pairs read 2-5 points higher).
+ * Paid off = outscored the player it replaced over those GWs, ties half.
+ * Bins with under 100 moves are pooled with a neighbour and rates made
+ * non-decreasing in the gap.
  *
- * Not used for captaincy: among each GW's top candidates the model's #1 beat
- * its #2 only 47-49% of the time in both seasons, so every week would read
- * "toss-up".
+ * Approximate for the app's moves: the planner chooses under budget and squad
+ * constraints rather than a £1m band, and players at rotation risk weren't in
+ * the sample. Captaincy uses its own numbers (CAPTAIN_CLOSE_GAP below).
  */
 const GAP_FROM = [0, 0.5, 1, 1.5, 2, 3, 5, 8];
 const WIN_RATE: Record<number, number[]> = {
-  1: [0.52, 0.57, 0.61, 0.66, 0.71, 0.79, 0.83, 0.97],
-  2: [0.51, 0.55, 0.58, 0.61, 0.65, 0.71, 0.78, 0.85],
-  3: [0.51, 0.54, 0.56, 0.58, 0.62, 0.67, 0.75, 0.82],
-  4: [0.5, 0.53, 0.55, 0.57, 0.6, 0.65, 0.72, 0.8],
-  5: [0.51, 0.53, 0.54, 0.56, 0.58, 0.63, 0.7, 0.78],
+  1: [0.53, 0.55, 0.6, 0.62, 0.67, 0.73, 0.83, 0.83],
+  2: [0.46, 0.54, 0.54, 0.57, 0.6, 0.67, 0.79, 0.86],
+  3: [0.52, 0.56, 0.56, 0.56, 0.59, 0.64, 0.72, 0.82],
+  4: [0.5, 0.5, 0.5, 0.52, 0.59, 0.61, 0.71, 0.78],
+  5: [0.46, 0.48, 0.53, 0.57, 0.57, 0.6, 0.67, 0.75],
 };
 
-/** Below this the call is close to a coin flip; at or above EDGE it's about two in three. */
+/** At or below 56% the call is close to a coin flip; at 65%+ it's about two in three or better. */
 const TOSS_UP = 0.57;
 const EDGE = 0.65;
+
+/**
+ * Among each GW's top-10 captain candidates, the favourite won 52% of pairs
+ * within 1 pt and 55% within 1-2 pts, but 62% at 2+ (confidence_table.py).
+ */
+export const CAPTAIN_CLOSE_GAP = 2;
 
 export type Confidence = { level: "toss-up" | "edge" | null; winRate: number };
 
@@ -38,6 +48,6 @@ export function confidence(gap: number, gws: number): Confidence {
 export function confidenceTitle(c: Confidence): string {
   const pct = Math.round(c.winRate * 100);
   return c.level === "toss-up"
-    ? `Close call: in past seasons the model's pick won only ${pct}% of calls this close. Decide on news, price or fixtures.`
-    : `In past seasons the model's pick came out ahead in ${pct}% of calls with a gap this size.`;
+    ? `Close call: in past seasons, moves the model picked with a gain this small paid off ${pct}% of the time. Decide on news, price or fixtures.`
+    : `In past seasons, moves the model picked with a gain this size paid off ${pct}% of the time.`;
 }
