@@ -1,13 +1,19 @@
-"""Team attack/defence ratings from match xG, shrunk toward league average.
+"""Team attack/defence ratings from match xG, shrunk toward a prior.
 
-FPL zeroed its own team strength ratings this season, so the only prior is
-"average": each team gets PRIOR_GAMES pseudo-matches at a rating of 1.0.
+FPL zeroed its own team strength ratings this season, so by default the prior
+is "average": each team gets PRIOR_GAMES pseudo-matches at a rating of 1.0.
+The fixture ticker's numbers (publish_projections.team_goals) instead start
+each team from its last RECENT_WINDOW fixtures, reaching into last season
+(recent_ratings, RECENT_PRIOR_GAMES pseudo-matches) — backtest_ticker.py found
+that better early in a season and no worse later.
 """
 import math
 from collections import defaultdict
 from dataclasses import dataclass
 
 PRIOR_GAMES = 4
+RECENT_WINDOW = 12  # features.TEAM_WINDOW: the points model's own team-form window
+RECENT_PRIOR_GAMES = 8  # 4-12 scored within noise of each other in backtest_ticker.py
 
 
 @dataclass
@@ -38,7 +44,9 @@ class TeamModel:
         return out
 
 
-def fit(data, upto: int) -> TeamModel:
+def fit(data, upto: int, prior: tuple | None = None, prior_games: float = PRIOR_GAMES) -> TeamModel:
+    """Ratings from this season's finished fixtures up to GW `upto` (common.Data);
+    `prior` as in fit_matches, keyed by FPL team id."""
     xg = defaultdict(float)
     for (pid, gw), s in data.games.items():
         if gw > upto or not s["fixture"] or pid not in data.els:
@@ -48,12 +56,34 @@ def fit(data, upto: int) -> TeamModel:
         if team in (f["team_h"], f["team_a"]):  # skip players who've since changed clubs
             xg[(f["id"], team)] += float(s["expected_goals"])
 
+    played = [
+        (f["team_h"], f["team_a"], xg[(f["id"], f["team_h"])], xg[(f["id"], f["team_a"])])
+        for f in data.fixtures
+        if f["finished"] and f["event"] is not None and f["event"] <= upto
+    ]
+    return fit_matches(played, data.team_name, prior, prior_games)
+
+
+def recent_ratings(tf, season: int, origin: int) -> tuple:
+    """({team: att}, {team: dfn}) from each team's last RECENT_WINDOW fixtures before
+    `origin` of `season`, relative to the league mean over those rows. `tf` is
+    features.team_fixtures(history.load()[0]) — teams keyed by FPL team *code*.
+    Promoted teams without top-flight rows are left out (league average)."""
+    past = tf[tf["key"] < season * 100 + origin]
+    recent = past.groupby("team").tail(RECENT_WINDOW)
+    state = recent.groupby("team").agg(xgf=("xgf", "mean"), xga=("xga", "mean"))
+    mean = recent["xgf"].mean()
+    return (state["xgf"] / mean).to_dict(), (state["xga"] / mean).to_dict()
+
+
+def fit_matches(played: list, teams, prior: tuple | None = None, prior_games: float = PRIOR_GAMES) -> TeamModel:
+    """Ratings from [(home team, away team, home xG, away xG)] of played
+    fixtures; `teams` lists every team to rate. Each team starts from
+    `prior_games` pseudo-games at its prior rating — `prior` = ({team: att},
+    {team: dfn}), 1.0 (league average) for teams it leaves out or without one."""
+    prior_att, prior_dfn = prior or ({}, {})
     rows = defaultdict(lambda: {"for_h": [], "ag_h": [], "for_a": [], "ag_a": []})
-    for f in data.fixtures:
-        if not f["finished"] or f["event"] is None or f["event"] > upto:
-            continue
-        h, a = f["team_h"], f["team_a"]
-        xh, xa = xg[(f["id"], h)], xg[(f["id"], a)]
+    for h, a, xh, xa in played:
         rows[h]["for_h"].append(xh)
         rows[h]["ag_h"].append(xa)
         rows[a]["for_a"].append(xa)
@@ -64,19 +94,20 @@ def fit(data, upto: int) -> TeamModel:
     lg_h, lg_a = sum(home_xg) / len(home_xg), sum(away_xg) / len(away_xg)
 
     att, dfn, xgf, xga = {}, {}, {}, {}
-    for team in data.team_name:
+    for team in teams:
         r = rows[team]
         n = len(r["for_h"]) + len(r["for_a"])
+        pa, pd_ = prior_att.get(team, 1.0), prior_dfn.get(team, 1.0)
         if n == 0:
-            att[team] = dfn[team] = 1.0
+            att[team], dfn[team] = pa, pd_
             xgf[team], xga[team] = (lg_h + lg_a) / 2, (lg_h + lg_a) / 2
             continue
         exp_for = lg_h * len(r["for_h"]) + lg_a * len(r["for_a"])
         exp_ag = lg_a * len(r["ag_h"]) + lg_h * len(r["ag_a"])
         att_obs = sum(r["for_h"] + r["for_a"]) / exp_for
         dfn_obs = sum(r["ag_h"] + r["ag_a"]) / exp_ag
-        att[team] = (att_obs * n + PRIOR_GAMES) / (n + PRIOR_GAMES)
-        dfn[team] = (dfn_obs * n + PRIOR_GAMES) / (n + PRIOR_GAMES)
+        att[team] = (att_obs * n + pa * prior_games) / (n + prior_games)
+        dfn[team] = (dfn_obs * n + pd_ * prior_games) / (n + prior_games)
         xgf[team] = sum(r["for_h"] + r["for_a"]) / n
         xga[team] = sum(r["ag_h"] + r["ag_a"]) / n
     return TeamModel(lg_h, lg_a, att, dfn, xgf, xga)

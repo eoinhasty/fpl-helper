@@ -83,7 +83,34 @@ def build() -> dict:
         "last_finished_gw": last_finished,
         "gws": gws,
         "players": players,
+        **team_goals(gws),
     }
+
+
+def team_goals(gws: list) -> dict:
+    """Expected goals for each side of every fixture in `gws`, from team_model's
+    attack/defence ratings (this season, starting from each team's recent form) —
+    the app's fixture ticker colours by these; backtest_ticker.py tests them.
+    Added without a version bump: readers that don't know the keys ignore them."""
+    import history
+    import team_model
+    from common import Data
+    from features import team_fixtures
+
+    d = Data()
+    matches, _, season = history.load()
+    att, dfn = team_model.recent_ratings(team_fixtures(matches), season, d.next_gw)
+    team_id = {t["code"]: t["id"] for t in d.boot["teams"]}
+    prior = ({team_id[c]: v for c, v in att.items() if c in team_id},
+             {team_id[c]: v for c, v in dfn.items() if c in team_id})
+    tm = team_model.fit(d, d.last_finished, prior, team_model.RECENT_PRIOR_GAMES)
+    fixtures = {}
+    for g in gws:
+        for f in d.fixtures_by_gw.get(g, []):
+            home, away = tm.expected_goals(f["team_h"], f["team_a"])
+            fixtures[str(f["id"])] = [round(home, 2), round(away, 2)]
+    # a team's average xG per game, home and away together: the ticker's "average"
+    return {"league_xg": round((tm.lg_home + tm.lg_away) / 2, 3), "fixtures": fixtures}
 
 
 if __name__ == "__main__":

@@ -26,9 +26,11 @@ class SquadState:
 
 class Data:
     def __init__(self, data_dir: Path = DATA_DIR):
-        def load(name):
+        def load(name, required=True):
             path = data_dir / name
             if not path.exists():
+                if not required:
+                    return None
                 raise SystemExit(f"{path} missing — run fetch_data.py --entry <id> first")
             return json.loads(path.read_text())
 
@@ -36,7 +38,8 @@ class Data:
         self.fixtures = load("fixtures.json")
         self.live = {int(k): v for k, v in load("live.json").items()}
         self.history_past = {int(k): v for k, v in load("history_past.json").items()}
-        self.entry = load("entry.json")
+        # Only fetched with --entry; the projections don't need it, squad_state() does
+        self.entry = load("entry.json", required=False)
 
         self.els = {e["id"]: e for e in self.boot["elements"]}
         self.team_name = {t["id"]: t["short_name"] for t in self.boot["teams"]}
@@ -78,6 +81,8 @@ class Data:
         return f"{e['web_name']} ({self.team_name[e['team']]})"
 
     def squad_state(self) -> SquadState:
+        if self.entry is None:
+            raise SystemExit(f"{DATA_DIR / 'entry.json'} missing — run fetch_data.py --entry <id> first")
         picks = self.entry["picks"]
         squad = [p["element"] for p in picks["picks"]]
         bank = picks["entry_history"]["bank"]
