@@ -74,3 +74,8 @@ jobs:
               --notes "Machine-published by the Projections workflow after each gameweek; read by the app's backend. Not a software release."
           fi
           gh release upload "$RELEASE_TAG" projections.json --clobber
+          # Keep each GW's file too (the one above is overwritten) for a predicted-vs-actual
+          # track record; --clobber here only replaces a forced re-run of the same GW
+          archive="projections-$(jq -r '"\(.season)-gw\(.gws[0])"' projections.json).json"
+          cp projections.json "$archive"
+          gh release upload "$RELEASE_TAG" "$archive" --clobber
