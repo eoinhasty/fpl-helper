@@ -23,6 +23,7 @@ import {
 import { fmtPrice } from "../../lib/format";
 import { TONE_CLASS } from "../../lib/utils";
 import PlayerOpen from "../squad/PlayerOpen";
+import ConfidenceTag from "../ui/ConfidenceTag";
 
 type Available = Extract<TransferPlanResponse, { available: true }>;
 
@@ -85,6 +86,7 @@ function MoveRow({
             {gain > 0 && (
               <div className={`text-[11px] ${TONE_CLASS.success.text}`}>
                 +{gain.toFixed(1)} pts {resp.gws[gwIndex] === lastGw ? "this GW" : `by GW${lastGw}`}
+                <ConfidenceTag gap={gain} gws={resp.gws.length - gwIndex} />
               </div>
             )}
           </div>

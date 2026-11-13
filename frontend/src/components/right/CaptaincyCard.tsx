@@ -156,6 +156,13 @@ export default function CaptaincyCard({
               <PlayerRow key={p.element} p={p} pts={pts} projected={projected} rank={i} />
             ))}
           </ul>
+          {/* Measured on the model only: its #1 beat its #2 in 47-49% of past GWs (see lib/confidence.ts) */}
+          {projected && picks.length > 1 && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              The top picks are usually close: in past seasons the model's #1 beat its #2 about half the time. Weigh
+              news, fixtures and ownership.
+            </p>
+          )}
 
           {differential && (
             <>
