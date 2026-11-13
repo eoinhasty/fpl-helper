@@ -22,8 +22,11 @@ from app.services.gameweeks import (
 from app.services.planner import MAX_PER_CLUB
 from app.services.scoring import (
     gain_driver,
+    fixture_goals,
     gw_projections,
+    horizon_projections,
     position_ranks,
+    projected_horizon,
     projected_points,
     score_factors,
     start_prob_from,
@@ -60,6 +63,8 @@ TTL_FDR = 60 * 60  # 1h fresh
 SWR_FDR = 24 * 60 * 60  # +24h stale
 TTL_PLAYERS = 30 * 60  # 30m fresh
 SWR_PLAYERS = 6 * 60 * 60  # +6h stale
+# GWs of projections /api/players carries (projected_gws), for the planner
+POOL_HORIZON = 5
 TTL_PLAYER_SUMMARY = 60 * 60  # 1h fresh — its history gains a row per match
 SWR_PLAYER_SUMMARY = 7 * 24 * 60 * 60  # +7d stale
 TTL_PROJECTIONS = 60 * 60  # 1h fresh (republished at most once per GW)
@@ -207,6 +212,20 @@ class FPLService:
             gw_ids = list(range(base_gw, min(base_gw + horizon, 39)))
 
             fixtures, _, _ = await self.fixtures(None)
+            # Team ratings published with the projections (team_model.py):
+            # expected goals for each side, for the ticker's Attack/Defence views
+            goals = fixture_goals(await self.projections_file(), events, base_gw)
+            xg, league_xg = goals if goals else ({}, None)
+
+            def model(fx: dict, home: bool) -> dict:
+                pair = xg.get(fx["id"])
+                if not pair:
+                    return {}
+                return {
+                    "xg_for": pair[0 if home else 1],
+                    "xg_against": pair[1 if home else 0],
+                }
+
             grid: Dict[int, Dict[int, list]] = {
                 t["id"]: {g: [] for g in gw_ids} for t in teams
             }
@@ -222,6 +241,7 @@ class FPLService:
                             "home": True,
                             "difficulty": fx["team_h_difficulty"],
                             "kickoff": fx.get("kickoff_time"),
+                            **model(fx, True),
                         }
                     )
                 if a in grid:
@@ -231,6 +251,7 @@ class FPLService:
                             "home": False,
                             "difficulty": fx["team_a_difficulty"],
                             "kickoff": fx.get("kickoff_time"),
+                            **model(fx, False),
                         }
                     )
 
@@ -269,7 +290,12 @@ class FPLService:
                     }
                 )
 
-            return {"base_gw": base_gw, "gws": gw_meta, "teams": team_rows}
+            return {
+                "base_gw": base_gw,
+                "gws": gw_meta,
+                "teams": team_rows,
+                "league_xg": league_xg,
+            }
 
         return await self.cache.get_or_set(key, _fetch, TTL_FDR, SWR_FDR)
 
@@ -326,7 +352,16 @@ class FPLService:
             upcoming = self._upcoming_by_team(boot, fixtures_data, 3)
             base_event = upcoming_event(boot["events"])
             gw = base_event["id"] if base_event else None
-            projections = await self.projections(boot["events"], gw) if gw else None
+            horizon = (
+                horizon_projections(
+                    await self.projections_file(), boot["events"], gw, POOL_HORIZON
+                )
+                if gw
+                else None
+            )
+            projections = (
+                None if horizon is None else {el: p[0] for el, p in horizon.items()}
+            )
             positions = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
             pos_ranks, transfer_ranks = self._cached_ranks(boot)
 
@@ -364,6 +399,8 @@ class FPLService:
                     "news": p.get("news") or None,
                     "ep_next": p.get("ep_next"),
                     "projected_pts": projected_points(p, projections),
+                    # from `gw` on, for the planner's multi-GW sorts
+                    "projected_gws": projected_horizon(p, horizon),
                     "total_points": p.get("total_points"),
                     "form": p.get("form"),
                     "penalties_order": p.get("penalties_order"),

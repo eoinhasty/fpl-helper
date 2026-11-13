@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from math import log, prod
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 # Fixture multiplier by FDR, interpolated for a DGW's fractional average.
 # Deliberately gentle: ep_next already carries FPL's own fixture adjustment
@@ -257,6 +257,32 @@ def gw_projections(proj: dict, events: list, gw: int) -> Optional[Dict[int, floa
     return None if horizon is None else {el: pts[0] for el, pts in horizon.items()}
 
 
+def _usable(proj: dict, events: list, first_gw: int) -> bool:
+    """gw_projections' trust rules: this format version and season, covering
+    `first_gw`, built at most one finished GW before it."""
+    if not proj or proj.get("version") != PROJECTIONS_VERSION or not events:
+        return False
+    if proj.get("season") != int(events[0]["deadline_time"][:4]):
+        return False
+    gws = proj.get("gws") or []
+    return first_gw in gws and (proj.get("last_finished_gw") or 0) >= first_gw - 2
+
+
+def fixture_goals(
+    proj: dict, events: list, first_gw: int
+) -> Optional[Tuple[Dict[int, List[float]], float]]:
+    """({fixture: [home xG, away xG]}, a team's league-average xG per game)
+    from the projections file's team ratings, under the same trust rules as
+    horizon_projections; None when unusable or published before the file
+    carried them."""
+    if not _usable(proj, events, first_gw):
+        return None
+    fixtures, league = proj.get("fixtures"), proj.get("league_xg")
+    if not fixtures or not league:
+        return None
+    return {int(f): xg for f, xg in fixtures.items()}, float(league)
+
+
 def horizon_projections(
     proj: dict, events: list, first_gw: int, n: int
 ) -> Optional[Dict[int, List[float]]]:
@@ -264,19 +290,29 @@ def horizon_projections(
     GWs from `first_gw` that the file covers (fewer near the season's end),
     under gw_projections' trust rules — freshness is judged against
     `first_gw`. Players the file leaves out (all-zero rows) are absent."""
-    if not proj or proj.get("version") != PROJECTIONS_VERSION or not events:
+    if not _usable(proj, events, first_gw):
         return None
-    if proj.get("season") != int(events[0]["deadline_time"][:4]):
-        return None
-    gws = proj.get("gws") or []
-    if first_gw not in gws or (proj.get("last_finished_gw") or 0) < first_gw - 2:
-        return None
-    i = gws.index(first_gw)
+    i = proj["gws"].index(first_gw)
     return {
         int(el): pts[i : i + n]
         for el, pts in (proj.get("players") or {}).items()
         if i < len(pts)
     }
+
+
+def projected_horizon(
+    player: dict, horizon: Optional[Dict[int, List[float]]]
+) -> Optional[List[float]]:
+    """projected_points over horizon_projections' GWs: the first scaled by
+    FPL's chance of playing (it's only for the next round), later ones as
+    projected — the transfer planner's rule. None without usable projections."""
+    if horizon is None:
+        return None
+    pts = horizon.get(player.get("id")) or []
+    if not pts:
+        return []
+    first = projected_points(player, {player.get("id"): pts[0]})
+    return [first] + [round(x, 2) for x in pts[1:]]
 
 
 def projected_points(

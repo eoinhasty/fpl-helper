@@ -65,6 +65,7 @@ export default function PlannerPage() {
               <PlayerTable
                 players={data.players}
                 teams={data.teams}
+                gw={data.gw}
                 canAdd={draft.canAdd}
                 onAdd={draft.add}
                 onSelect={openPool}
