@@ -3,6 +3,7 @@ import Card from "../ui/Card";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
 import { captaincyPicks } from "../../lib/captaincy";
+import { CAPTAIN_CLOSE_GAP } from "../../lib/confidence";
 import PlayerOpen from "../squad/PlayerOpen";
 
 const RANK_ICON = ["⭐", "🥈", "🥉"];
@@ -156,11 +157,11 @@ export default function CaptaincyCard({
               <PlayerRow key={p.element} p={p} pts={pts} projected={projected} rank={i} />
             ))}
           </ul>
-          {/* Measured on the model only: its #1 beat its #2 in 47-49% of past GWs (see lib/confidence.ts) */}
-          {projected && picks.length > 1 && (
+          {/* Measured on the model's projections only (CAPTAIN_CLOSE_GAP in lib/confidence.ts) */}
+          {projected && picks.length > 1 && picks[0].pts - picks[1].pts < CAPTAIN_CLOSE_GAP && (
             <p className="mt-2 text-[11px] text-muted-foreground">
-              The top picks are usually close: in past seasons the model's #1 beat its #2 about half the time. Weigh
-              news, fixtures and ownership.
+              Close call: in past seasons, top captain picks within {CAPTAIN_CLOSE_GAP} pts of each other went the
+              model's way only about half the time. Weigh news, fixtures and ownership.
             </p>
           )}
 

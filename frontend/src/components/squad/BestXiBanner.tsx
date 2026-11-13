@@ -23,8 +23,9 @@ export default function BestXiBanner({
         {s.gain > 0 && (
           <span className="ml-1.5 font-semibold text-success">
             +{s.gain.toFixed(1)} {unit}
-            {/* Measured on the model's projections only, not FPL's xPts */}
-            {s.projected && <ConfidenceTag gap={s.gain} gws={1} />}
+            {/* Measured on single swaps on the model's projections; a multi-player
+                gain sums several noisy swaps, and FPL's xPts wasn't measured */}
+            {s.projected && s.bringIn.length === 1 && <ConfidenceTag gap={s.gain} gws={1} />}
           </span>
         )}
         <span className="text-muted-foreground">
