@@ -26,7 +26,7 @@ const TABS = [
 export default function MobileTabBar() {
   return (
     <nav
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/90 backdrop-blur select-none"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/90 backdrop-blur select-none lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Primary"
     >
@@ -47,7 +47,11 @@ export default function MobileTabBar() {
                   {isActive && (
                     <span className="absolute top-0 h-0.75 w-8 rounded-b-full bg-primary" aria-hidden="true" />
                   )}
-                  {isActive ? <Solid className="w-6 h-6" aria-hidden="true" /> : <Outline className="w-6 h-6" aria-hidden="true" />}
+                  {isActive ? (
+                    <Solid className="h-6 w-6" aria-hidden="true" />
+                  ) : (
+                    <Outline className="h-6 w-6" aria-hidden="true" />
+                  )}
                   <span className="text-[10px] font-medium">{label}</span>
                 </span>
               )}

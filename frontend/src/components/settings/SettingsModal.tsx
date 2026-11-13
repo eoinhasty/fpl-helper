@@ -48,25 +48,24 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
       initialFocusRef={closeBtnRef}
     >
       {/* header */}
-      <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border shrink-0">
-        <h2 id="settings-modal-title" className="text-lg font-semibold">Settings</h2>
-        <button
-          ref={closeBtnRef}
-          onClick={close}
-          className="btn"
-          aria-label="Close settings"
-        >
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-4 sm:px-5">
+        <h2 id="settings-modal-title" className="text-lg font-semibold">
+          Settings
+        </h2>
+        <button ref={closeBtnRef} onClick={close} className="btn" aria-label="Close settings">
           Close
         </button>
       </div>
 
       {/* body */}
-      <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-4 pb-3 overflow-y-auto flex-1 min-h-0">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 pb-3 sm:p-5 lg:grid-cols-2">
         {/* Account & Token */}
         <Card className="p-4">
-          <div className="text-sm font-semibold mb-3">Account</div>
+          <div className="mb-3 text-sm font-semibold">Account</div>
 
-          <label htmlFor="settings-entry-id" className="block text-sm mb-1">Your FPL Entry ID</label>
+          <label htmlFor="settings-entry-id" className="mb-1 block text-sm">
+            Your FPL Entry ID
+          </label>
           <form
             className="flex gap-2"
             onSubmit={(e) => {
@@ -98,19 +97,19 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
             </button>
           </form>
           {invalid && (
-            <p className="text-xs text-destructive mt-1">Entry ID must be a positive whole number — not saved.</p>
+            <p className="mt-1 text-xs text-destructive">Entry ID must be a positive whole number — not saved.</p>
           )}
 
-          <div className="text-sm font-semibold mt-5 mb-2">FPL Account</div>
+          <div className="mt-5 mb-2 text-sm font-semibold">FPL Account</div>
           <SettingsPanel />
         </Card>
 
         {/* Preferences */}
         <Card className="p-4">
-          <div className="text-sm font-semibold mb-3">Preferences</div>
+          <div className="mb-3 text-sm font-semibold">Preferences</div>
 
           {/* Theme */}
-          <label className="block text-sm mb-1">Theme</label>
+          <label className="mb-1 block text-sm">Theme</label>
           <Segmented<Theme>
             value={prefs.theme}
             onChange={(v) => set("theme", v)}
@@ -124,27 +123,33 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
 
           {/* Defaults */}
           <div className="mt-4">
-            <label className="block text-sm mb-1">Default view</label>
+            <label className="mb-1 block text-sm">Default view</label>
             <Segmented<DefaultView>
               value={prefs.defaultView}
               onChange={(v) => set("defaultView", v)}
-              options={(["squad", "live"] as DefaultView[]).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
+              options={(["squad", "live"] as DefaultView[]).map((v) => ({
+                value: v,
+                label: v[0].toUpperCase() + v.slice(1),
+              }))}
               ariaLabel="Default view"
             />
           </div>
 
           <div className="mt-4">
-            <label className="block text-sm mb-1">Squad layout</label>
+            <label className="mb-1 block text-sm">Squad layout</label>
             <Segmented<SquadLayout>
               value={prefs.squadLayout}
               onChange={(v) => set("squadLayout", v)}
-              options={(["list", "pitch"] as SquadLayout[]).map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
+              options={(["list", "pitch"] as SquadLayout[]).map((v) => ({
+                value: v,
+                label: v[0].toUpperCase() + v.slice(1),
+              }))}
               ariaLabel="Squad layout"
             />
           </div>
 
           {/* Reset */}
-          <div className="mt-6 pt-4 border-t border-border">
+          <div className="mt-6 border-t border-border pt-4">
             {confirmingReset ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Reset theme, default view, and squad layout?</span>
@@ -153,25 +158,19 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
                     reset();
                     setConfirmingReset(false);
                   }}
-                  className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
-                             focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="rounded-lg border border-border bg-destructive/10 px-3 py-1.5 text-destructive transition hover:bg-destructive/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   type="button"
                 >
                   Confirm reset
                 </button>
-                <button
-                  onClick={() => setConfirmingReset(false)}
-                  className="btn"
-                  type="button"
-                >
+                <button onClick={() => setConfirmingReset(false)} className="btn" type="button">
                   Cancel
                 </button>
               </div>
             ) : (
               <button
                 onClick={() => setConfirmingReset(true)}
-                className="px-3 py-1.5 rounded-lg border border-border bg-destructive/10 text-destructive hover:bg-destructive/15 transition
-                           focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="rounded-lg border border-border bg-destructive/10 px-3 py-1.5 text-destructive transition hover:bg-destructive/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 type="button"
               >
                 Reset preferences
@@ -180,7 +179,7 @@ export default function SettingsModal({ open, onClose, entry, setEntry }: Props)
           </div>
         </Card>
       </div>
-      <p className="shrink-0 text-xs text-muted-foreground/60 text-center px-4 sm:px-5 py-3 border-t border-border">
+      <p className="shrink-0 border-t border-border px-4 py-3 text-center text-xs text-muted-foreground/60 sm:px-5">
         Not affiliated with Fantasy Premier League or the Premier League.{" "}
         <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">
           Privacy policy

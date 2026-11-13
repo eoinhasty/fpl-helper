@@ -11,9 +11,7 @@ function CaptainBadge({ c, v }: { c?: boolean; v?: boolean }) {
 
   return (
     <div
-      className="absolute -top-2 -left-2 h-5 w-5 grid place-items-center
-                 rounded-full shadow ring-1 ring-black/15 text-[11px] font-bold
-                 bg-fpl-purple text-fpl-purple-foreground"
+      className="absolute -top-2 -left-2 grid h-5 w-5 place-items-center rounded-full bg-fpl-purple text-[11px] font-bold text-fpl-purple-foreground shadow ring-1 ring-black/15"
       title={c ? "Captain" : "Vice-captain"}
     >
       {label}
@@ -25,7 +23,7 @@ function StatusTriangle({ status }: { status?: string }) {
   if (!status || status === "a") return null;
 
   return (
-    <div className="absolute -bottom-1 -right-1">
+    <div className="absolute -right-1 -bottom-1">
       <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
         <path d="M0 20 L20 20 L20 0 Z" className={TONE_CLASS[statusTone(status)].fill} />
       </svg>
@@ -41,8 +39,14 @@ function Shirt({ url }: { url?: string | null }) {
         className="absolute -top-7 left-1/2 -translate-x-1/2"
         style={{ width: CHIP.SHIRT_BOX, height: CHIP.SHIRT_BOX }}
       >
-        <div className="h-full w-full rounded-lg bg-white/95 ring-1 ring-black/5 shadow-md grid place-items-center">
-          <img src={url} alt="" className="object-contain" style={{ width: CHIP.SHIRT_IMG, height: CHIP.SHIRT_IMG }} loading="lazy" />
+        <div className="grid h-full w-full place-items-center rounded-lg bg-white/95 shadow-md ring-1 ring-black/5">
+          <img
+            src={url}
+            alt=""
+            className="object-contain"
+            style={{ width: CHIP.SHIRT_IMG, height: CHIP.SHIRT_IMG }}
+            loading="lazy"
+          />
         </div>
       </div>
       <div className="h-10" />
@@ -63,8 +67,7 @@ function Points({
 }) {
   if (typeof n !== "number") return null;
 
-  const base =
-    "absolute top-1 right-1 px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums rounded-md";
+  const base = "absolute top-1 right-1 px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums rounded-md";
 
   const styles =
     variant === "bench"
@@ -80,15 +83,13 @@ function Points({
   );
 }
 
-
 /** Best XI preview: who the suggestion moves in or out of the XI. */
 // Top-left, since the GW points sit top-right; stepped down below a C/V badge.
 function LineupChangeBadge({ change, belowCaptain }: { change?: "start" | "bench"; belowCaptain?: boolean }) {
   if (!change) return null;
   return (
     <div
-      className={`absolute ${belowCaptain ? "top-4" : "-top-2"} -left-2 z-10 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none
-                  bg-card text-foreground shadow ring-2 ${change === "start" ? "ring-success" : "ring-warning"}`}
+      className={`absolute ${belowCaptain ? "top-4" : "-top-2"} -left-2 z-10 rounded-full bg-card px-1.5 py-0.5 text-[10px] leading-none font-bold text-foreground shadow ring-2 ${change === "start" ? "ring-success" : "ring-warning"}`}
       title={change === "start" ? "Suggested to start" : "Suggested to bench"}
     >
       {change === "start" ? "IN" : "OUT"}
@@ -98,18 +99,23 @@ function LineupChangeBadge({ change, belowCaptain }: { change?: "start" | "bench
 
 function BenchOrderBadge({ label }: { label: string }) {
   return (
-    <div
-      className="absolute left-1/2 -translate-x-1/2 -bottom-5
-                 text-[10px] font-semibold px-2 py-0.5 rounded-full
-                 bg-muted text-muted-foreground ring-1 ring-border"
-    >
+    <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground ring-1 ring-border">
       {label}
     </div>
   );
 }
 
-
-export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { p: Player; onClick?: () => void; hideStartMeter?: boolean; scale?: number }) {
+export default function PlayerChip({
+  p,
+  onClick,
+  hideStartMeter,
+  scale = 1,
+}: {
+  p: Player;
+  onClick?: () => void;
+  hideStartMeter?: boolean;
+  scale?: number;
+}) {
   const isBench = (p.slot ?? 99) >= 12 || (p.multiplier ?? 1) === 0;
 
   const benchLabel = BENCH_LABEL[p.slot ?? 0];
@@ -137,7 +143,11 @@ export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { 
         }
       }}
     >
-      <div className="relative select-none" title={`${p.name} (${p.team})`} style={{ pointerEvents: "auto", width: CHIP.WIDTH }}>
+      <div
+        className="relative select-none"
+        title={`${p.name} (${p.team})`}
+        style={{ pointerEvents: "auto", width: CHIP.WIDTH }}
+      >
         <div className="transition-transform duration-150 hover:-translate-y-0.5">
           <div className="relative rounded-xl bg-white/90 shadow-[0_6px_16px_rgba(0,0,0,0.25)] ring-1 ring-black/5">
             <Shirt url={p.shirt_url} />
@@ -153,15 +163,24 @@ export default function PlayerChip({ p, onClick, hideStartMeter, scale = 1 }: { 
 
             {isBench && benchLabel && <BenchOrderBadge label={benchLabel} />}
 
-            <div className="rounded-b-xl grid place-items-center bg-fpl-purple text-fpl-purple-foreground" style={{ height: CHIP.BANNER_H }}>
-              <div className="px-2 w-full flex items-center justify-center gap-1">
-                <span className="font-semibold leading-none" style={{ fontSize: CHIP.NAME_FS }}>{p.name}</span>
-                {p.team && <span className="opacity-80 tracking-wide" style={{ fontSize: CHIP.TEAM_FS }}>{p.team}</span>}
+            <div
+              className="grid place-items-center rounded-b-xl bg-fpl-purple text-fpl-purple-foreground"
+              style={{ height: CHIP.BANNER_H }}
+            >
+              <div className="flex w-full items-center justify-center gap-1 px-2">
+                <span className="leading-none font-semibold" style={{ fontSize: CHIP.NAME_FS }}>
+                  {p.name}
+                </span>
+                {p.team && (
+                  <span className="tracking-wide opacity-80" style={{ fontSize: CHIP.TEAM_FS }}>
+                    {p.team}
+                  </span>
+                )}
               </div>
             </div>
           </div>
           {!isBench && !hideStartMeter && p.start_probability != null && (
-            <StartMeter probability={p.start_probability} showLabel className="justify-center mt-1 w-14 mx-auto" />
+            <StartMeter probability={p.start_probability} showLabel className="mx-auto mt-1 w-14 justify-center" />
           )}
         </div>
       </div>

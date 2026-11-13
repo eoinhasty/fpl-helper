@@ -8,9 +8,12 @@ export type PlayerRank = { rank: number; of: number; pct: number };
 export type PlayerStatus = "a" | "d" | "i" | "s" | "n";
 
 export type FixtureLite = {
-    opp: string; home: boolean; difficulty: 1 | 2 | 3 | 4 | 5; kickoff?: string;
-    /** GW — set on /api/players' fixtures, which span the next few GWs */
-    event?: number;
+  opp: string;
+  home: boolean;
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  kickoff?: string;
+  /** GW — set on /api/players' fixtures, which span the next few GWs */
+  event?: number;
 };
 
 /** G+A well above ("over") or below ("under") xGI — see xgi_signal in
@@ -23,235 +26,237 @@ export type PointsLine = { identifier: string; value: number; points: number };
 
 /** A player's points in one fixture of the GW — see backend live_points.py */
 export type FixturePoints = {
-    fixture: number;
-    opp: string | null;
-    home: boolean | null;
-    kickoff: string | null;
-    started: boolean;
-    finished: boolean;
-    minutes: number;
-    /** Scoring lines without bonus, which is `bonus` below */
-    stats: PointsLine[];
-    /** Points FPL has awarded — includes `bonus` only once it's confirmed */
-    points: number;
-    /** BPS in this fixture and rank among both teams; null without minutes */
-    bps: number | null;
-    bps_rank: number | null;
-    /** BPS short of the lowest bonus place; null when in one */
-    bps_to_bonus: number | null;
-    bonus: number;
-    /** Bonus worked out from BPS, not yet in `points` */
-    bonus_provisional: boolean;
+  fixture: number;
+  opp: string | null;
+  home: boolean | null;
+  kickoff: string | null;
+  started: boolean;
+  finished: boolean;
+  minutes: number;
+  /** Scoring lines without bonus, which is `bonus` below */
+  stats: PointsLine[];
+  /** Points FPL has awarded — includes `bonus` only once it's confirmed */
+  points: number;
+  /** BPS in this fixture and rank among both teams; null without minutes */
+  bps: number | null;
+  bps_rank: number | null;
+  /** BPS short of the lowest bonus place; null when in one */
+  bps_to_bonus: number | null;
+  bonus: number;
+  /** Bonus worked out from BPS, not yet in `points` */
+  bonus_provisional: boolean;
 };
 
 export type Player = {
-    element: number;
-    name: string;
-    team: string;
-    team_id?: number;
-    position: 1 | 2 | 3 | 4;
-    price: number;
-    status?: PlayerStatus;
-    news?: string | null;
-    total_points?: number;
-    form?: string;
-    ict_index?: string;
-    minutes?: number;
-    ep_next?: string | null;
-    /** Points model projection for the GW × chance of playing; null without usable projections */
-    projected_pts?: number | null;
-    /** Client-side only: set by previewLineup() on players the Best XI suggestion moves */
-    lineup_change?: "start" | "bench";
-    points_per_game?: string;
-    goals_scored?: number;
-    assists?: number;
-    clean_sheets?: number;
-    saves?: number;
-    bonus?: number;
-    expected_goals?: string;
-    expected_assists?: string;
-    expected_goal_involvements?: string;
-    xgi_signal?: XgiSignal | null;
-    cost_change_event?: number;
-    transfer_rank?: { rank: number; of: number };
-    transfers_in_event?: number;
-    transfers_out_event?: number;
-    cost_change_start?: number;
-    selected_by_percent?: string;
-    start_probability: number;
-    gw_points?: number;
-    /** Per fixture of the GW `gw_points` belongs to; squad and live views only */
-    gw_breakdown?: FixturePoints[] | null;
-    is_captain?: boolean; is_vice_captain?: boolean;
-    fixture?: FixtureLite | null;
-    has_dgw?: boolean;
-    fixtures?: FixtureLite[];
-    slot?: number; multiplier?: number;
-    shirt_url?: string;
-    ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
+  element: number;
+  name: string;
+  team: string;
+  team_id?: number;
+  position: 1 | 2 | 3 | 4;
+  price: number;
+  status?: PlayerStatus;
+  news?: string | null;
+  total_points?: number;
+  form?: string;
+  ict_index?: string;
+  minutes?: number;
+  ep_next?: string | null;
+  /** Points model projection for the GW × chance of playing; null without usable projections */
+  projected_pts?: number | null;
+  /** Client-side only: set by previewLineup() on players the Best XI suggestion moves */
+  lineup_change?: "start" | "bench";
+  points_per_game?: string;
+  goals_scored?: number;
+  assists?: number;
+  clean_sheets?: number;
+  saves?: number;
+  bonus?: number;
+  expected_goals?: string;
+  expected_assists?: string;
+  expected_goal_involvements?: string;
+  xgi_signal?: XgiSignal | null;
+  cost_change_event?: number;
+  transfer_rank?: { rank: number; of: number };
+  transfers_in_event?: number;
+  transfers_out_event?: number;
+  cost_change_start?: number;
+  selected_by_percent?: string;
+  start_probability: number;
+  gw_points?: number;
+  /** Per fixture of the GW `gw_points` belongs to; squad and live views only */
+  gw_breakdown?: FixturePoints[] | null;
+  is_captain?: boolean;
+  is_vice_captain?: boolean;
+  fixture?: FixtureLite | null;
+  has_dgw?: boolean;
+  fixtures?: FixtureLite[];
+  slot?: number;
+  multiplier?: number;
+  shirt_url?: string;
+  ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
 };
 
 export type TransferSuggestion = {
+  element: number;
+  name: string;
+  team: string | null;
+  price: number;
+  ep_next: string | null;
+  form: string | null;
+  score: number;
+  start_probability: number;
+  selected_by_percent: string | null;
+  fixture: FixtureLite | null;
+  has_dgw: boolean;
+  shirt_url: string | null;
+  /** Score improvement over the owned player it replaces (always > 0) */
+  gain: number;
+  /** Which scoring factor contributes most to `gain` ("blank": the owned player has no fixture) */
+  driver: "form" | "fixture" | "dgw" | "minutes" | "blank";
+  /** The owned player this buy is paired with — the sale that funds it */
+  replaces: {
     element: number;
     name: string;
-    team: string | null;
-    price: number;
+    sell_price: number;
     ep_next: string | null;
-    form: string | null;
-    score: number;
     start_probability: number;
-    selected_by_percent: string | null;
-    fixture: FixtureLite | null;
-    has_dgw: boolean;
-    shirt_url: string | null;
-    /** Score improvement over the owned player it replaces (always > 0) */
-    gain: number;
-    /** Which scoring factor contributes most to `gain` ("blank": the owned player has no fixture) */
-    driver: "form" | "fixture" | "dgw" | "minutes" | "blank";
-    /** The owned player this buy is paired with — the sale that funds it */
-    replaces: {
-        element: number;
-        name: string;
-        sell_price: number;
-        ep_next: string | null;
-        start_probability: number;
-    };
+  };
 };
 
 export type TransferSuggestionGroup = {
-    position: 1 | 2 | 3 | 4;
-    /** Bank + the highest sale price in this position */
-    budget: number;
-    players: TransferSuggestion[];
+  position: 1 | 2 | 3 | 4;
+  /** Bank + the highest sale price in this position */
+  budget: number;
+  players: TransferSuggestion[];
 };
 
 export type TransferSuggestionsResponse = {
-    entry_id: number;
-    bank: number;
-    suggestions: TransferSuggestionGroup[];
-    season_status?: "pre_season" | "in_season";
+  entry_id: number;
+  bank: number;
+  suggestions: TransferSuggestionGroup[];
+  season_status?: "pre_season" | "in_season";
 };
 
 export type SquadResponse = {
-    entry_id: number;
-    entry_name?: string;
-    player_name?: string;
-    overall_rank?: number | null;
-    favourite_team?: string;
-    season_status?: "pre_season" | "in_season";
-    /** e.g. "2026/27" — current FPL season, derived from GW1's deadline year. */
-    season?: string | null;
-    used_gw: number;
-    current_gw: number;
-    used_label: "next" | "current" | "explicit" | "live" | "pre_season";
-    /** GW the fixtures and deadline refer to — the next GW once used_gw has finished. */
-    fixture_gw?: number;
-    deadline: string;
-    team_value: number | null;
-    team_bank?: number | null;
-    players: Player[];
-    active_chip?: string | null;
+  entry_id: number;
+  entry_name?: string;
+  player_name?: string;
+  overall_rank?: number | null;
+  favourite_team?: string;
+  season_status?: "pre_season" | "in_season";
+  /** e.g. "2026/27" — current FPL season, derived from GW1's deadline year. */
+  season?: string | null;
+  used_gw: number;
+  current_gw: number;
+  used_label: "next" | "current" | "explicit" | "live" | "pre_season";
+  /** GW the fixtures and deadline refer to — the next GW once used_gw has finished. */
+  fixture_gw?: number;
+  deadline: string;
+  team_value: number | null;
+  team_bank?: number | null;
+  players: Player[];
+  active_chip?: string | null;
 };
 
 export type FdrGwMeta = { id: number; name: string; deadline: string | null };
 
 export type FdrTeam = {
-    id: number;
-    name: string;
-    short_name: string;
-    code: number;
-    badge_url: string;
-    gws: FixtureLite[][];
-    avg_difficulty: number | null;
-    fixture_count: number;
+  id: number;
+  name: string;
+  short_name: string;
+  code: number;
+  badge_url: string;
+  gws: FixtureLite[][];
+  avg_difficulty: number | null;
+  fixture_count: number;
 };
 
 export type FdrGridResponse = {
-    base_gw: number;
-    gws: FdrGwMeta[];
-    teams: FdrTeam[];
+  base_gw: number;
+  gws: FdrGwMeta[];
+  teams: FdrTeam[];
 };
 
 export type PoolPosition = "GK" | "DEF" | "MID" | "FWD";
 
 export type PoolPlayer = {
-    id: number;
-    /** Stable per-player identifier that persists across seasons (unlike `id`,
-     * which FPL recycles/reassigns to different players each season) — use this,
-     * not `id`, for anything persisted across time (e.g. localStorage). */
-    code: number;
-    web_name: string;
-    full_name?: string;
-    team: number;
-    team_short?: string;
-    position: PoolPosition;
-    now_cost: number;
-    selected_by_percent?: string;
-    status?: PlayerStatus;
-    news?: string;
-    ep_next?: string;
-    /** Points model projection for PlayersResponse.gw (null without usable projections) */
-    projected_pts?: number | null;
-    total_points?: number;
-    form?: string;
-    penalties_order?: number;
-    corners_order?: number;
-    freekicks_order?: number;
-    shirt_url?: string;
-    fixtures?: FixtureLite[];
-    ict_index?: string;
-    minutes?: number;
-    points_per_game?: string;
-    goals_scored?: number;
-    assists?: number;
-    clean_sheets?: number;
-    saves?: number;
-    bonus?: number;
-    expected_goals?: string;
-    expected_assists?: string;
-    expected_goal_involvements?: string;
-    xgi_signal?: XgiSignal;
-    ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
-    transfer_rank?: { rank: number; of: number };
-    transfers_in_event?: number;
-    transfers_out_event?: number;
-    cost_change_start?: number;
-    cost_change_event?: number;
+  id: number;
+  /** Stable per-player identifier that persists across seasons (unlike `id`,
+   * which FPL recycles/reassigns to different players each season) — use this,
+   * not `id`, for anything persisted across time (e.g. localStorage). */
+  code: number;
+  web_name: string;
+  full_name?: string;
+  team: number;
+  team_short?: string;
+  position: PoolPosition;
+  now_cost: number;
+  selected_by_percent?: string;
+  status?: PlayerStatus;
+  news?: string;
+  ep_next?: string;
+  /** Points model projection for PlayersResponse.gw (null without usable projections) */
+  projected_pts?: number | null;
+  total_points?: number;
+  form?: string;
+  penalties_order?: number;
+  corners_order?: number;
+  freekicks_order?: number;
+  shirt_url?: string;
+  fixtures?: FixtureLite[];
+  ict_index?: string;
+  minutes?: number;
+  points_per_game?: string;
+  goals_scored?: number;
+  assists?: number;
+  clean_sheets?: number;
+  saves?: number;
+  bonus?: number;
+  expected_goals?: string;
+  expected_assists?: string;
+  expected_goal_involvements?: string;
+  xgi_signal?: XgiSignal;
+  ranks?: Partial<Record<"goals" | "assists" | "clean_sheets" | "ppg" | "saves", PlayerRank>>;
+  transfer_rank?: { rank: number; of: number };
+  transfers_in_event?: number;
+  transfers_out_event?: number;
+  cost_change_start?: number;
+  cost_change_event?: number;
 };
 
 export type PoolTeam = { id: number; name: string; short_name: string };
 
 export type PlayersResponse = {
-    count: number;
-    teams: PoolTeam[];
-    players: PoolPlayer[];
-    /** GW the players' fixtures start from and projected_pts is for */
-    gw?: number | null;
-    /** e.g. "2026/27" — current FPL season, derived from GW1's deadline year. */
-    season?: string | null;
+  count: number;
+  teams: PoolTeam[];
+  players: PoolPlayer[];
+  /** GW the players' fixtures start from and projected_pts is for */
+  gw?: number | null;
+  /** e.g. "2026/27" — current FPL season, derived from GW1's deadline year. */
+  season?: string | null;
 };
 
 export type PlayerSummaryHistoryPast = {
-    season_name: string;
-    total_points: number;
-    minutes: number;
-    goals_scored: number;
-    assists: number;
-    clean_sheets: number;
-    start_cost: number;
-    end_cost: number;
+  season_name: string;
+  total_points: number;
+  minutes: number;
+  goals_scored: number;
+  assists: number;
+  clean_sheets: number;
+  start_cost: number;
+  end_cost: number;
 };
 
 /** One played fixture this season (element-summary `history`) */
 export type PlayerSummaryHistory = {
-    round: number;
-    total_points: number;
-    minutes: number;
+  round: number;
+  total_points: number;
+  minutes: number;
 };
 
 export type PlayerSummaryResponse = {
-    /** Fixtures not yet finished */
-    fixtures: Array<{ event: number | null }>;
-    history: PlayerSummaryHistory[];
-    history_past: PlayerSummaryHistoryPast[];
+  /** Fixtures not yet finished */
+  fixtures: Array<{ event: number | null }>;
+  history: PlayerSummaryHistory[];
+  history_past: PlayerSummaryHistoryPast[];
 };

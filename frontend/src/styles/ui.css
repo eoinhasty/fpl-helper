@@ -10,37 +10,37 @@
 
   /* Button */
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg border border-input
-           px-3 py-1.5 text-sm font-medium min-h-11
-           bg-card text-card-foreground
-           transition active:scale-[0.98]
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-input bg-card px-3 py-1.5 text-sm font-medium text-card-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.98];
   }
-  .btn:hover { @apply bg-accent text-accent-foreground; }
-  .btn:active { @apply bg-accent text-accent-foreground; }
+  .btn:hover {
+    @apply bg-accent text-accent-foreground;
+  }
+  .btn:active {
+    @apply bg-accent text-accent-foreground;
+  }
 
   .btn-primary {
-    @apply border-0 bg-primary text-primary-foreground min-h-11
-           transition active:scale-[0.98]
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+    @apply min-h-11 border-0 bg-primary text-primary-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.98];
   }
-  .btn-primary:hover { @apply bg-primary-700; }
-  .btn-primary:active { @apply bg-primary-700; }
+  .btn-primary:hover {
+    @apply bg-primary-700;
+  }
+  .btn-primary:active {
+    @apply bg-primary-700;
+  }
 
   /* Badge */
   .badge {
-    @apply inline-flex items-center rounded-full border border-border
-           px-2 py-0.5 text-xs
-           bg-card text-muted-foreground;
+    @apply inline-flex items-center rounded-full border border-border bg-card px-2 py-0.5 text-xs text-muted-foreground;
   }
 
   /* Input */
   .input {
-    @apply w-full rounded-lg border border-input px-2 py-1 text-sm min-h-11
-           bg-card text-foreground
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+    @apply min-h-11 w-full rounded-lg border border-input bg-card px-2 py-1 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   /* Status pills */
-  .pill-warn { @apply bg-warning/20 text-warning; }
+  .pill-warn {
+    @apply bg-warning/20 text-warning;
+  }
 }

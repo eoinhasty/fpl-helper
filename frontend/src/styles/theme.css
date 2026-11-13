@@ -1,9 +1,9 @@
 /* LIGHT is default */
 @theme {
   /* brand */
-  --color-primary:       #0284c7; /* sky-600 */
-  --color-primary-600:   #0284c7;
-  --color-primary-700:   #0369a1; /* sky-700 */
+  --color-primary: #0284c7; /* sky-600 */
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1; /* sky-700 */
   /* Text-on-page use of "primary" (e.g. an active tab/toggle label) needs
    * higher contrast than the brand color itself provides in light mode —
    * --color-primary on white is ~4.0:1, just under AA. --color-primary-700
@@ -12,80 +12,80 @@
   --color-primary-strong: var(--color-primary-700);
   /* FPL's own brand purple — captain armband and pitch name banner. Same in
    * both themes: it's a fixed brand colour, not a surface. */
-  --color-fpl-purple:            #38003c;
+  --color-fpl-purple: #38003c;
   --color-fpl-purple-foreground: #fcfcfc;
 
   /* base surfaces (LIGHT) */
-  --color-bg:            #f8fafc;    /* slate-50 */
-  --color-surface:       #ffffff;    /* card surfaces */
-  --color-surface-2:     #eef2f6;   /* secondary surfaces */
-  --color-elevated:      rgba(255,255,255,0.9);
+  --color-bg: #f8fafc; /* slate-50 */
+  --color-surface: #ffffff; /* card surfaces */
+  --color-surface-2: #eef2f6; /* secondary surfaces */
+  --color-elevated: rgba(255, 255, 255, 0.9);
 
   /* text (LIGHT) */
-  --color-text:          #0f172a;    /* slate-900 */
-  --color-text-weak:     #475569;    /* slate-600 */
-  --color-invert:        #ffffff;
+  --color-text: #0f172a; /* slate-900 */
+  --color-text-weak: #475569; /* slate-600 */
+  --color-invert: #ffffff;
 
   /* borders & rings (LIGHT) */
-  --color-border:        rgba(2,6,23,0.18);
+  --color-border: rgba(2, 6, 23, 0.18);
   /* Solid, not translucent: a focus indicator needs >=3:1 against what's
    * around it (WCAG 1.4.11). sky-700 is ~5.9:1 on white; with the ring offset
    * it also reads clearly around primary-filled (blue) controls. */
-  --color-ring:          #0369a1; /* sky-700 */
+  --color-ring: #0369a1; /* sky-700 */
 
   /* status */
-  --success:             #16a34a;    /* green-600 */
-  --warning:             #d97706;    /* amber-600 */
-  --danger:              #dc2626;    /* red-600 */
-  --fdr-good:            #0d9488;    /* teal-600 — FDR "easy fixture" accent; distinct from --color-primary so it doesn't read as a CTA */
+  --success: #16a34a; /* green-600 */
+  --warning: #d97706; /* amber-600 */
+  --danger: #dc2626; /* red-600 */
+  --fdr-good: #0d9488; /* teal-600 — FDR "easy fixture" accent; distinct from --color-primary so it doesn't read as a CTA */
 
   /* elevation & radius */
-  --shadow-card:         0 4px 20px -4px rgb(2 6 23 / 0.12), 0 1px 4px -1px rgb(2 6 23 / 0.07);
-  --radius-xl:           1rem;
+  --shadow-card: 0 4px 20px -4px rgb(2 6 23 / 0.12), 0 1px 4px -1px rgb(2 6 23 / 0.07);
+  --radius-xl: 1rem;
 
   /* semantic aliases (Tailwind v4 picks these up) */
-  --color-background:            var(--color-bg);
-  --color-foreground:            var(--color-text);
-  --color-card:                  var(--color-surface);
-  --color-card-foreground:       var(--color-text);
-  --color-muted:                 var(--color-surface-2);
-  --color-muted-foreground:      var(--color-text-weak);
-  --color-popover:               var(--color-elevated);
-  --color-popover-foreground:    var(--color-text);
-  --color-accent:                var(--color-surface-2);
-  --color-accent-foreground:     var(--color-text);
-  --color-secondary:             var(--color-surface-2);
-  --color-secondary-foreground:  var(--color-text);
-  --color-input:                 var(--color-border);
-  --color-success:               var(--success);
-  --color-warning:               var(--warning);
-  --color-destructive:           var(--danger);
-  --color-destructive-foreground:#fff;
-  --color-primary-foreground:    #ffffff;
-  --color-fdr-good:              var(--fdr-good);
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text);
+  --color-muted: var(--color-surface-2);
+  --color-muted-foreground: var(--color-text-weak);
+  --color-popover: var(--color-elevated);
+  --color-popover-foreground: var(--color-text);
+  --color-accent: var(--color-surface-2);
+  --color-accent-foreground: var(--color-text);
+  --color-secondary: var(--color-surface-2);
+  --color-secondary-foreground: var(--color-text);
+  --color-input: var(--color-border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: #fff;
+  --color-primary-foreground: #ffffff;
+  --color-fdr-good: var(--fdr-good);
 }
 
 /* DARK overrides */
 :root.dark {
-  --color-primary:       #38bdf8; /* sky-400 */
-  --color-primary-600:   #0ea5e9; /* sky-500 */
-  --color-primary-700:   #0284c7; /* sky-600 */
+  --color-primary: #38bdf8; /* sky-400 */
+  --color-primary-600: #0ea5e9; /* sky-500 */
+  --color-primary-700: #0284c7; /* sky-600 */
   --color-primary-strong: var(--color-primary);
 
-  --color-bg:            #0b1022;               /* deep navy */
-  --color-surface:       rgba(2,6,23,0.9);
-  --color-surface-2:     #0f172a;
-  --color-elevated:      rgba(15,23,42,0.7);
+  --color-bg: #0b1022; /* deep navy */
+  --color-surface: rgba(2, 6, 23, 0.9);
+  --color-surface-2: #0f172a;
+  --color-elevated: rgba(15, 23, 42, 0.7);
 
-  --color-text:          #e2e8f0;
-  --color-text-weak:     #94a3b8;
-  --color-invert:        #0b1022;
+  --color-text: #e2e8f0;
+  --color-text-weak: #94a3b8;
+  --color-invert: #0b1022;
 
-  --color-border:        rgba(255,255,255,0.12);
-  --color-ring:          #38bdf8; /* sky-400 */
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-ring: #38bdf8; /* sky-400 */
 
-  --success:             #4ade80; /* green-400 */
-  --warning:             #fcd34d; /* amber-300 */
-  --danger:              #fca5a5; /* red-300 */
-  --fdr-good:            #2dd4bf; /* teal-400 */
+  --success: #4ade80; /* green-400 */
+  --warning: #fcd34d; /* amber-300 */
+  --danger: #fca5a5; /* red-300 */
+  --fdr-good: #2dd4bf; /* teal-400 */
 }

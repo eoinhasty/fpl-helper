@@ -44,7 +44,14 @@ export default function RightPanel({
 
       {tab === "squad" && (
         <>
-          <CaptaincyCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} lockedGw={lockedGw} />
+          <CaptaincyCard
+            entry={entry}
+            players={players}
+            loading={loading}
+            error={error}
+            isHistorical={isHistorical}
+            lockedGw={lockedGw}
+          />
           <HealthCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} />
           <InternationalDutyCard players={players} />
           <HotNewsCard />

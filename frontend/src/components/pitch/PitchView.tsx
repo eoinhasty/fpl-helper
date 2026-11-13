@@ -28,7 +28,15 @@ const VB_H = 788;
 const CHIP_W_PX = 128;
 const CHIP_MARGIN_PX = 14;
 
-export default function PitchView({ players, brand = "YOUR BRAND", className, onPlayerClick, loading, error, hideStartMeter }: Props) {
+export default function PitchView({
+  players,
+  brand = "YOUR BRAND",
+  className,
+  onPlayerClick,
+  loading,
+  error,
+  hideStartMeter,
+}: Props) {
   const all = players ?? [];
 
   const xi = all.filter(isStarting);
@@ -57,9 +65,10 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
     { id: "GK", y: PITCH.Y_GK, list: gk },
     ...fieldRows.map((r, i) => ({
       ...r,
-      y: numField === 1
-        ? (Y_FIELD_TOP + Y_FIELD_BOT) / 2
-        : Y_FIELD_TOP + (Y_FIELD_BOT - Y_FIELD_TOP) * (i / (numField - 1)),
+      y:
+        numField === 1
+          ? (Y_FIELD_TOP + Y_FIELD_BOT) / 2
+          : Y_FIELD_TOP + (Y_FIELD_BOT - Y_FIELD_TOP) * (i / (numField - 1)),
     })),
   ];
 
@@ -71,7 +80,7 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
       { label: "2", player: benchPlayers[2] },
       { label: "3", player: benchPlayers[3] },
     ],
-    [benchPlayers]
+    [benchPlayers],
   );
 
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -105,22 +114,22 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
   const chipScale = boxW ? Math.min(1, Math.max(0.4, boxW / neededPx)) : 1;
 
   return (
-    <div className={`w-full select-none relative ${className ?? ""}`}>
-      {loading && (
-        <div className="absolute inset-0 z-20 rounded-2xl animate-pulse bg-black/25" />
-      )}
+    <div className={`relative w-full select-none ${className ?? ""}`}>
+      {loading && <div className="absolute inset-0 z-20 animate-pulse rounded-2xl bg-black/25" />}
       {!loading && error && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/55 backdrop-blur-[3px] rounded-2xl">
-          <div className="text-center px-10 space-y-2">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-black/55 backdrop-blur-[3px]">
+          <div className="space-y-2 px-10 text-center">
             <p className="text-base font-semibold text-white">Live squad unavailable</p>
-            <p className="text-sm text-white/65 leading-snug">{error}</p>
+            <p className="text-sm leading-snug text-white/65">{error}</p>
           </div>
         </div>
       )}
-      <div className={`relative overflow-hidden w-full`}>
+      <div className={`relative w-full overflow-hidden`}>
         <div className="-mx-6 sm:-mx-8">
           <div className="relative w-full" style={{ aspectRatio: "1417 / 1200" }}>
-            <div className="absolute inset-0"><PitchSVG brandLeft={brand} brandRight={brand} /></div>
+            <div className="absolute inset-0">
+              <PitchSVG brandLeft={brand} brandRight={brand} />
+            </div>
             <div ref={boxRef} className="absolute inset-0">
               {rows.map(({ id, y, list }, rIdx) => {
                 const xs = spreadXsSymmetric(list.length, id, VB_W, { chipGapVB, gutterVB }); // <—
@@ -134,7 +143,12 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
                       className="absolute -translate-x-1/2 -translate-y-1/2"
                       style={{ left: `${leftPct}%`, top: `${topPct}%` }}
                     >
-                      <PlayerChip p={p} onClick={() => onPlayerClick?.(p)} hideStartMeter={hideStartMeter} scale={chipScale} />
+                      <PlayerChip
+                        p={p}
+                        onClick={() => onPlayerClick?.(p)}
+                        hideStartMeter={hideStartMeter}
+                        scale={chipScale}
+                      />
                     </div>
                   );
                 });
@@ -146,10 +160,7 @@ export default function PitchView({ players, brand = "YOUR BRAND", className, on
 
       {/* Bench band (visually attached to pitch) */}
       <div className="-mt-6 sm:-mt-8">
-        <div className="rounded-b-2xl border-t border-border
-                  bg-card/80 backdrop-blur-sm
-                  shadow-[0_-6px_18px_rgba(0,0,0,0.05)]
-                  overflow-hidden">
+        <div className="overflow-hidden rounded-b-2xl border-t border-border bg-card/80 shadow-[0_-6px_18px_rgba(0,0,0,0.05)] backdrop-blur-sm">
           {/* subtle fade from pitch -> band */}
           <div className="h-5 bg-gradient-to-b from-emerald-900/10 to-transparent" />
 

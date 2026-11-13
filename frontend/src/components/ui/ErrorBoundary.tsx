@@ -31,13 +31,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
     const label = this.props.name ?? "This section";
     const fallback = (
-      <div className="rounded-2xl border border-border bg-card shadow-card p-6 text-center space-y-3">
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-6 text-center shadow-card">
         <p className="text-sm font-semibold text-foreground">{label} ran into a problem</p>
         <p className="text-xs text-muted-foreground">{this.state.message}</p>
-        <button
-          onClick={this.retry}
-          className="text-xs underline text-muted-foreground hover:text-foreground"
-        >
+        <button onClick={this.retry} className="text-xs text-muted-foreground underline hover:text-foreground">
           Try again
         </button>
       </div>
@@ -45,8 +42,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
     if (this.props.fullPage) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)]">
-          <div className="max-w-sm w-full mx-4">{fallback}</div>
+        <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)]">
+          <div className="mx-4 w-full max-w-sm">{fallback}</div>
         </div>
       );
     }

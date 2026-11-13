@@ -10,7 +10,10 @@ type Timer = ReturnType<typeof setTimeout>;
 const STALE_REFRESH_DELAY_MS = 4000;
 
 function clearTimer(ref: React.MutableRefObject<Timer | null>) {
-  if (ref.current) { clearTimeout(ref.current); ref.current = null; }
+  if (ref.current) {
+    clearTimeout(ref.current);
+    ref.current = null;
+  }
 }
 
 export function useSquad(entry: number | "") {
@@ -52,72 +55,105 @@ export function useSquad(entry: number | "") {
   // Keeps rescheduling itself as long as the backend keeps reporting stale-serve
   // (e.g. its own background revalidation is still in flight), so the badge
   // can't get stuck after a single retry.
-  const _pollIfStale = useCallback((
-    reqIdRef: React.MutableRefObject<number>,
-    fetcher: Fetcher,
-    staleTimerRef: React.MutableRefObject<Timer | null>,
-    id: number,
-  ) => {
-    staleTimerRef.current = setTimeout(async () => {
-      staleTimerRef.current = null;
-      if (id !== reqIdRef.current) return; // superseded by a real load meanwhile
+  const _pollIfStale = useCallback(
+    (
+      reqIdRef: React.MutableRefObject<number>,
+      fetcher: Fetcher,
+      staleTimerRef: React.MutableRefObject<Timer | null>,
+      id: number,
+    ) => {
+      staleTimerRef.current = setTimeout(async () => {
+        staleTimerRef.current = null;
+        if (id !== reqIdRef.current) return; // superseded by a real load meanwhile
+        try {
+          const res = await fetcher();
+          if (id !== reqIdRef.current) return;
+          setData(res.data);
+          setCache(res.cache);
+          if (res.data.season_status) setSeasonStatus(res.data.season_status);
+          if (res.cache.status === "stale-serve") {
+            _pollIfStale(reqIdRef, fetcher, staleTimerRef, id);
+          }
+        } catch {
+          // opportunistic refresh; a real load will surface any persistent error
+        }
+      }, STALE_REFRESH_DELAY_MS);
+    },
+    [],
+  );
+
+  const _load = useCallback(
+    async (
+      reqIdRef: React.MutableRefObject<number>,
+      fetcher: Fetcher,
+      fallbackMsg: string,
+      staleTimerRef: React.MutableRefObject<Timer | null>,
+      setLoadingFn: (v: boolean) => void,
+      setErrorFn: (v: string | null) => void,
+      onError?: (msg: string) => void,
+    ) => {
+      clearTimer(staleTimerRef);
+      const id = ++reqIdRef.current;
       try {
+        setLoadingFn(true);
+        setErrorFn(null);
         const res = await fetcher();
-        if (id !== reqIdRef.current) return;
-        setData(res.data); setCache(res.cache);
+        if (id !== reqIdRef.current) return; // stale response
+        setData(res.data);
+        setCache(res.cache);
         if (res.data.season_status) setSeasonStatus(res.data.season_status);
         if (res.cache.status === "stale-serve") {
           _pollIfStale(reqIdRef, fetcher, staleTimerRef, id);
         }
-      } catch {
-        // opportunistic refresh; a real load will surface any persistent error
+      } catch (e: unknown) {
+        if (id !== reqIdRef.current) return;
+        const msg = (e as Error)?.message ?? fallbackMsg;
+        onError?.(msg);
+        setErrorFn(msg);
+      } finally {
+        if (id === reqIdRef.current) {
+          setLoadingFn(false);
+          setIsSwitching(false);
+        }
       }
-    }, STALE_REFRESH_DELAY_MS);
-  }, []);
+    },
+    [_pollIfStale],
+  );
 
-  const _load = useCallback(async (
-    reqIdRef: React.MutableRefObject<number>,
-    fetcher: Fetcher,
-    fallbackMsg: string,
-    staleTimerRef: React.MutableRefObject<Timer | null>,
-    setLoadingFn: (v: boolean) => void,
-    setErrorFn: (v: string | null) => void,
-    onError?: (msg: string) => void,
-  ) => {
-    clearTimer(staleTimerRef);
-    const id = ++reqIdRef.current;
-    try {
-      setLoadingFn(true); setErrorFn(null);
-      const res = await fetcher();
-      if (id !== reqIdRef.current) return; // stale response
-      setData(res.data); setCache(res.cache);
-      if (res.data.season_status) setSeasonStatus(res.data.season_status);
-      if (res.cache.status === "stale-serve") {
-        _pollIfStale(reqIdRef, fetcher, staleTimerRef, id);
-      }
-    } catch (e: unknown) {
-      if (id !== reqIdRef.current) return;
-      const msg = (e as Error)?.message ?? fallbackMsg;
-      onError?.(msg);
-      setErrorFn(msg);
-    } finally {
-      if (id === reqIdRef.current) { setLoadingFn(false); setIsSwitching(false); }
-    }
-  }, [_pollIfStale]);
+  const loadSquad = useCallback(
+    (opts: LoadSquadOpts = {}) => {
+      if (!entry) return;
+      const { gw, forceRefresh } = opts;
+      return _load(
+        squadReqId,
+        () => getSquad(Number(entry), { gw, forceRefresh }),
+        "Failed to load squad",
+        squadStaleTimer,
+        setSquadLoading,
+        setSquadError,
+      );
+    },
+    [entry, _load],
+  );
 
-  const loadSquad = useCallback((opts: LoadSquadOpts = {}) => {
-    if (!entry) return;
-    const { gw, forceRefresh } = opts;
-    return _load(squadReqId, () => getSquad(Number(entry), { gw, forceRefresh }), "Failed to load squad", squadStaleTimer, setSquadLoading, setSquadError);
-  }, [entry, _load]);
-
-  const loadLive = useCallback((forceRefresh = false) => {
-    if (!entry) return;
-    return _load(liveReqId, () => getLive(Number(entry), { forceRefresh }), "Failed to load live squad", liveStaleTimer, setLiveLoading, setLiveError, (msg) => {
-      // Logged out already (no token): nothing to clear, so no logout request
-      if (msg === "AUTH_EXPIRED" && isAuthenticated()) clearAuth();
-    });
-  }, [entry, _load]);
+  const loadLive = useCallback(
+    (forceRefresh = false) => {
+      if (!entry) return;
+      return _load(
+        liveReqId,
+        () => getLive(Number(entry), { forceRefresh }),
+        "Failed to load live squad",
+        liveStaleTimer,
+        setLiveLoading,
+        setLiveError,
+        (msg) => {
+          // Logged out already (no token): nothing to clear, so no logout request
+          if (msg === "AUTH_EXPIRED" && isAuthenticated()) clearAuth();
+        },
+      );
+    },
+    [entry, _load],
+  );
 
   // Drop stale cross-mode data (e.g. a "pre_season" squad snapshot lingering
   // after switching to Live) so mode-dependent UI doesn't render off it. Cache
@@ -133,14 +169,25 @@ export function useSquad(entry: number | "") {
     setData(null);
   }, []);
 
-  useEffect(() => () => {
-    clearTimer(squadStaleTimer);
-    clearTimer(liveStaleTimer);
-  }, []);
+  useEffect(
+    () => () => {
+      clearTimer(squadStaleTimer);
+      clearTimer(liveStaleTimer);
+    },
+    [],
+  );
 
   return {
-    data, cache, seasonStatus, isSwitching,
-    squadLoading, squadError, liveLoading, liveError,
-    loadSquad, loadLive, clearData,
+    data,
+    cache,
+    seasonStatus,
+    isSwitching,
+    squadLoading,
+    squadError,
+    liveLoading,
+    liveError,
+    loadSquad,
+    loadLive,
+    clearData,
   };
 }

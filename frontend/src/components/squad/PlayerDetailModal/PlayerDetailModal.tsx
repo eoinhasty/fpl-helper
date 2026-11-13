@@ -29,14 +29,28 @@ type Props = {
   fixtureGw?: number;
 };
 
-function TopNum({ label, value, delta, accent }: { label: string; value: React.ReactNode; delta?: string; accent?: boolean }) {
+function TopNum({
+  label,
+  value,
+  delta,
+  accent,
+}: {
+  label: string;
+  value: React.ReactNode;
+  delta?: string;
+  accent?: boolean;
+}) {
   return (
     <div>
-      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.14em] leading-none">{label}</div>
-      <div className={`text-[24px] font-bold tabular-nums tracking-[-0.02em] leading-tight mt-0.75 ${accent ? "text-primary" : "text-foreground"}`}>
+      <div className="text-[10px] leading-none font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+        {label}
+      </div>
+      <div
+        className={`mt-0.75 text-[24px] leading-tight font-bold tracking-[-0.02em] tabular-nums ${accent ? "text-primary" : "text-foreground"}`}
+      >
         {value ?? "—"}
       </div>
-      {delta && <div className="font-mono text-[10px] text-muted-foreground mt-0.5 leading-none">{delta}</div>}
+      {delta && <div className="mt-0.5 font-mono text-[10px] leading-none text-muted-foreground">{delta}</div>}
     </div>
   );
 }
@@ -49,7 +63,15 @@ function opponentsLabel(fixtures: FixtureLite[] | undefined): string | undefined
   return `${f.home ? "vs" : "@"} ${f.opp}${fixtures.length > 1 ? ` +${fixtures.length - 1}` : ""}`;
 }
 
-export default function PlayerDetailModal({ open, onClose, player, hideStartProbability, season, pointsGw, fixtureGw }: Props) {
+export default function PlayerDetailModal({
+  open,
+  onClose,
+  player,
+  hideStartProbability,
+  season,
+  pointsGw,
+  fixtureGw,
+}: Props) {
   // One spare, since the Fixtures tab drops the GW it already shows
   const fixtUrl = open && player.team_id ? `/api/team-next/${player.team_id}?count=6` : null;
   const { data: fixtData, loading, error: err } = useFetch<{ fixtures: TeamFixture[] }>(fixtUrl);
@@ -76,15 +98,17 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
   const ppg = player.points_per_game ? Number(player.points_per_game).toFixed(1) : "—";
   const form = player.form ? Number(player.form).toFixed(1) : "—";
   const nextFixt = next.fixtures;
-  const xPtsDelta = proj != null
-    ? opponentsLabel(player.fixtures)
-    : nextFixt?.[0] ? `${nextFixt[0].home ? "vs" : "@"} ${nextFixt[0].opp}` : undefined;
+  const xPtsDelta =
+    proj != null
+      ? opponentsLabel(player.fixtures)
+      : nextFixt?.[0]
+        ? `${nextFixt[0].home ? "vs" : "@"} ${nextFixt[0].opp}`
+        : undefined;
 
   const name = player.name ?? "";
   const lastSpace = name.lastIndexOf(" ");
-  const nameParts = lastSpace === -1
-    ? { first: "", last: name }
-    : { first: name.slice(0, lastSpace), last: name.slice(lastSpace + 1) };
+  const nameParts =
+    lastSpace === -1 ? { first: "", last: name } : { first: name.slice(0, lastSpace), last: name.slice(lastSpace + 1) };
 
   return (
     <Modal
@@ -99,7 +123,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
         {/* watermark club code */}
         <div
           aria-hidden="true"
-          className="absolute pointer-events-none select-none font-bold leading-[0.85] tracking-[-0.04em]"
+          className="pointer-events-none absolute leading-[0.85] font-bold tracking-[-0.04em] select-none"
           style={{ top: -36, right: -8, fontSize: 180, fontWeight: 800, color: "rgba(94,234,212,0.04)" }}
         >
           {player.team}
@@ -110,45 +134,45 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
           ref={closeBtnRef}
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3 right-3 z-10 min-h-9 text-[12px] font-medium text-foreground/70 border border-border/60 px-3 py-2 rounded-lg"
+          className="absolute top-3 right-3 z-10 min-h-9 rounded-lg border border-border/60 px-3 py-2 text-[12px] font-medium text-foreground/70"
         >
           Close
         </button>
 
         {/* identity row */}
-        <div className="relative flex gap-3.5 px-4 sm:px-6 pt-5 pb-4">
-          <div className="w-15 h-19 shrink-0 rounded-[10px] bg-muted/50 border border-border flex items-center justify-center overflow-hidden">
-            {player.shirt_url
-              ? <img src={player.shirt_url} alt={`${player.team} shirt`} className="w-full h-full object-contain p-2" />
-              : <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M5 7L9 4H19L23 7L21 12L18 11V23H10V11L7 12L5 7Z" fill="currentColor" opacity="0.4" /></svg>
-            }
+        <div className="relative flex gap-3.5 px-4 pt-5 pb-4 sm:px-6">
+          <div className="flex h-19 w-15 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-border bg-muted/50">
+            {player.shirt_url ? (
+              <img src={player.shirt_url} alt={`${player.team} shirt`} className="h-full w-full object-contain p-2" />
+            ) : (
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <path d="M5 7L9 4H19L23 7L21 12L18 11V23H10V11L7 12L5 7Z" fill="currentColor" opacity="0.4" />
+              </svg>
+            )}
           </div>
-          <div className="flex-1 min-w-0 pr-16">
-            <div className="flex gap-1.25 flex-wrap mb-1.25">
+          <div className="min-w-0 flex-1 pr-16">
+            <div className="mb-1.25 flex flex-wrap gap-1.25">
               {posLabel && (
-                <span className="text-[10px] font-semibold text-foreground/70 border border-border/60 px-2 py-0.5 rounded-full tracking-[0.06em]">
+                <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-foreground/70">
                   {posLabel}
                 </span>
               )}
               {player.team && (
-                <span className="text-[10px] font-medium text-foreground/70 border border-border/60 px-2 py-0.5 rounded-full">
+                <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-medium text-foreground/70">
                   {player.team}
                 </span>
               )}
             </div>
-            <h2
-              id="player-modal-title"
-              className="text-[28px] font-bold leading-none tracking-tight m-0"
-            >
+            <h2 id="player-modal-title" className="m-0 text-[28px] leading-none font-bold tracking-tight">
               {nameParts.first && <span>{nameParts.first} </span>}
               <span className="text-primary">{nameParts.last}</span>
               {player.is_captain && (
-                <span className="inline-block align-middle ml-2 text-[11px] font-bold text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-md tracking-[0.08em]">
+                <span className="ml-2 inline-block rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 align-middle text-[11px] font-bold tracking-[0.08em] text-primary">
                   C
                 </span>
               )}
               {player.is_vice_captain && (
-                <span className="inline-block align-middle ml-2 text-[11px] font-bold text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-md tracking-[0.08em]">
+                <span className="ml-2 inline-block rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 align-middle text-[11px] font-bold tracking-[0.08em] text-primary">
                   VC
                 </span>
               )}
@@ -157,7 +181,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
         </div>
 
         {/* topline strip */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-3.5 px-4 sm:px-6 py-3.5 border-t border-border">
+        <div className="grid grid-cols-4 gap-2 border-t border-border px-4 py-3.5 sm:gap-3.5 sm:px-6">
           <TopNum label="PRICE" value={fmtPrice(player.price)} delta={costChange ?? undefined} />
           <TopNum
             label={hasGwPoints ? (pointsGw ? `GW${pointsGw} PTS` : "GW PTS") : "FORM"}
@@ -174,7 +198,7 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
 
       {/* tab bar */}
       <div
-        className="flex gap-6 px-4 border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+        className="flex shrink-0 gap-6 overflow-x-auto border-b border-border px-4 [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: "none" }}
       >
         {(["overview", "stats", "fixtures", "history"] as const).map((t) => (
@@ -183,20 +207,18 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
             type="button"
             aria-pressed={tab === t}
             onClick={() => setTab(t)}
-            className={`py-3 text-sm font-medium capitalize relative transition-colors shrink-0 cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`relative shrink-0 cursor-pointer rounded py-3 text-sm font-medium capitalize transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
               tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {t}
-            {tab === t && (
-              <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary rounded-full" />
-            )}
+            {tab === t && <span className="absolute right-0 -bottom-px left-0 h-0.5 rounded-full bg-primary" />}
           </button>
         ))}
       </div>
 
       {/* scrollable body */}
-      <div className="p-4 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
+      <div className="flex-1 overflow-y-auto p-4 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: "none" }}>
         {tab === "overview" && (
           <OverviewTab
             player={player}
@@ -213,9 +235,9 @@ export default function PlayerDetailModal({ open, onClose, player, hideStartProb
       </div>
 
       {/* Sticky action bar */}
-      <div className="shrink-0 flex gap-2 px-4.5 py-3 border-t border-border bg-card">
+      <div className="flex shrink-0 gap-2 border-t border-border bg-card px-4.5 py-3">
         <button
-          className="flex-1 bg-transparent border border-border/60 text-foreground/40 rounded-[10px] px-3.5 py-2.75 text-[13px] font-semibold cursor-not-allowed"
+          className="flex-1 cursor-not-allowed rounded-[10px] border border-border/60 bg-transparent px-3.5 py-2.75 text-[13px] font-semibold text-foreground/40"
           disabled
           title="Compare — coming soon"
         >

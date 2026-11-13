@@ -22,7 +22,12 @@ type RecentMatch = {
   subbed_in?: boolean | null;
   subbed_out?: boolean | null;
 };
-type PlayerNews = { country: string | null; on_squad: boolean | null; news: NewsItem[]; recent_match: RecentMatch | null };
+type PlayerNews = {
+  country: string | null;
+  on_squad: boolean | null;
+  news: NewsItem[];
+  recent_match: RecentMatch | null;
+};
 type Resp = { players: Record<string, PlayerNews> };
 
 function matchBadge(m: RecentMatch): { Icon: typeof CheckCircleIcon; color: string; label: string } {
@@ -56,24 +61,37 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
           const match = info!.recent_match;
           const badge = match ? matchBadge(match) : null;
           const squadLabel =
-            info!.on_squad === false ? "Not on current squad list" : info!.on_squad === true ? "On current squad list" : undefined;
+            info!.on_squad === false
+              ? "Not on current squad list"
+              : info!.on_squad === true
+                ? "On current squad list"
+                : undefined;
           return (
             <div key={player.element} className="flex items-start gap-2">
               <span
-                className={`inline-block w-2 h-2 mt-1.5 rounded-full shrink-0 ${
-                  info!.on_squad === false ? "bg-destructive" : info!.on_squad === true ? "bg-success" : "bg-muted-foreground"
+                className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${
+                  info!.on_squad === false
+                    ? "bg-destructive"
+                    : info!.on_squad === true
+                      ? "bg-success"
+                      : "bg-muted-foreground"
                 }`}
                 title={squadLabel}
                 role={squadLabel ? "img" : undefined}
                 aria-label={squadLabel}
               />
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                  <PlayerOpen id={player.element} inline className="truncate">{player.name}</PlayerOpen>
-                  {info!.country && <span className="text-xs text-muted-foreground shrink-0">({info!.country})</span>}
+                  <PlayerOpen id={player.element} inline className="truncate">
+                    {player.name}
+                  </PlayerOpen>
+                  {info!.country && <span className="shrink-0 text-xs text-muted-foreground">({info!.country})</span>}
                   {badge && (
-                    <span className={`flex items-center gap-0.5 text-[11px] font-normal shrink-0 ${badge.color}`} title={match!.opponent ? `vs ${match!.opponent}` : undefined}>
-                      <badge.Icon className="w-3.5 h-3.5" />
+                    <span
+                      className={`flex shrink-0 items-center gap-0.5 text-[11px] font-normal ${badge.color}`}
+                      title={match!.opponent ? `vs ${match!.opponent}` : undefined}
+                    >
+                      <badge.Icon className="h-3.5 w-3.5" />
                       {badge.label}
                     </span>
                   )}
@@ -85,14 +103,14 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
                         href={item.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-muted-foreground mt-0.5 line-clamp-2 hover:text-foreground hover:underline block"
+                        className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground hover:text-foreground hover:underline"
                       >
                         {item.headline}
                       </a>
                     ) : (
-                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.headline}</div>
+                      <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.headline}</div>
                     )}
-                    <div className="text-[11px] text-muted-foreground mt-0.5">{fmtRelTime(item.published)}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">{fmtRelTime(item.published)}</div>
                   </>
                 )}
               </div>

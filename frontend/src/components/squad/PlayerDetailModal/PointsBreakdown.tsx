@@ -3,7 +3,6 @@ import type { FixturePoints, PointsLine } from "../../../lib/types";
 import { fmtKickoff, ordinal } from "../../../lib/format";
 import { SectionHeader } from "./parts";
 
-
 const LINE_LABEL: Record<string, string> = {
   minutes: "Minutes",
   goals_scored: "Goals",
@@ -34,14 +33,14 @@ function lineValue({ identifier, value }: PointsLine): string {
 
 function Pts({ n, muted }: { n: number; muted?: boolean }) {
   const tone = muted ? "text-muted-foreground" : n < 0 ? "text-destructive" : "text-foreground";
-  return <span className={`tabular-nums font-semibold text-right ${tone}`}>{n > 0 ? `+${n}` : n}</span>;
+  return <span className={`text-right font-semibold tabular-nums ${tone}`}>{n > 0 ? `+${n}` : n}</span>;
 }
 
 function Row({ label, value, children }: { label: ReactNode; value?: string; children: ReactNode }) {
   return (
     <div className="grid items-baseline gap-3 py-1" style={{ gridTemplateColumns: "1fr auto 2.5rem" }}>
-      <span className="text-foreground/80 min-w-0">{label}</span>
-      <span className="tabular-nums text-muted-foreground">{value}</span>
+      <span className="min-w-0 text-foreground/80">{label}</span>
+      <span className="text-muted-foreground tabular-nums">{value}</span>
       {children}
     </div>
   );
@@ -64,11 +63,9 @@ function bpsNote(f: FixturePoints): string | null {
 function FixtureBlock({ f }: { f: FixturePoints }) {
   const note = bpsNote(f);
   return (
-    <div className="px-3 py-2 rounded-xl border border-border bg-muted/30 text-sm">
-      <div className="flex items-baseline justify-between gap-3 pb-1.5 mb-0.5 border-b border-border/60">
-        <span className="font-semibold text-foreground">
-          {f.opp ? `${f.home ? "vs" : "@"} ${f.opp}` : "Fixture"}
-        </span>
+    <div className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm">
+      <div className="mb-0.5 flex items-baseline justify-between gap-3 border-b border-border/60 pb-1.5">
+        <span className="font-semibold text-foreground">{f.opp ? `${f.home ? "vs" : "@"} ${f.opp}` : "Fixture"}</span>
         <span className="text-xs text-muted-foreground">{matchState(f)}</span>
       </div>
       {!f.started ? (
@@ -88,7 +85,7 @@ function FixtureBlock({ f }: { f: FixturePoints }) {
                 <>
                   Bonus
                   {f.bonus_provisional && (
-                    <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-widest text-warning">
+                    <span className="ml-1.5 text-[10px] font-semibold tracking-widest text-warning uppercase">
                       provisional
                     </span>
                   )}
@@ -100,14 +97,14 @@ function FixtureBlock({ f }: { f: FixturePoints }) {
           )}
         </>
       )}
-      {note && <div className="pt-1.5 mt-0.5 border-t border-border/60 text-xs text-muted-foreground">{note}</div>}
+      {note && <div className="mt-0.5 border-t border-border/60 pt-1.5 text-xs text-muted-foreground">{note}</div>}
     </div>
   );
 }
 
 function Total({ points, provisional }: { points: number | null | undefined; provisional: number }) {
   return (
-    <span className="text-xs tabular-nums text-muted-foreground">
+    <span className="text-xs text-muted-foreground tabular-nums">
       <span className="font-semibold text-foreground">{points ?? 0} pts</span>
       {provisional > 0 && ` +${provisional} bonus`}
     </span>
@@ -117,7 +114,13 @@ function Total({ points, provisional }: { points: number | null | undefined; pro
 /** The scoring lines behind a player's GW points, one block per fixture, with
  * where they stand for bonus. Hidden while none of the GW's fixtures has
  * started; `breakdown` is null while it loads. */
-export default function PointsBreakdown({ breakdown, points, gw, loading, error }: {
+export default function PointsBreakdown({
+  breakdown,
+  points,
+  gw,
+  loading,
+  error,
+}: {
   breakdown: FixturePoints[] | null;
   points: number | null | undefined;
   gw: number | undefined;

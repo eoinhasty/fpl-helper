@@ -18,12 +18,13 @@ export default function PlayerOpen({
   children: ReactNode;
 }) {
   const open = usePlayerDetail();
-  if (!open) return inline ? <span className={className}>{children}</span> : <div className={className}>{children}</div>;
+  if (!open)
+    return inline ? <span className={className}>{children}</span> : <div className={className}>{children}</div>;
   return (
     <button
       type="button"
       onClick={() => open(id)}
-      className={`${className} text-left cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      className={`${className} cursor-pointer rounded text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
         inline ? "hover:underline" : "transition-colors hover:bg-muted/50"
       }`}
     >

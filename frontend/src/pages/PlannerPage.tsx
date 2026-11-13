@@ -33,14 +33,14 @@ export default function PlannerPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full px-4 py-4 flex flex-col lg:flex-row gap-5" style={{ maxWidth: 1400 }}>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-4 mb-3">
+      <div className="mx-auto flex w-full flex-col gap-5 px-4 py-4 lg:flex-row" style={{ maxWidth: 1400 }}>
+        <div className="min-w-0 flex-1">
+          <div className="mb-3 flex items-center justify-between gap-4">
             <h1 className="text-lg font-semibold text-foreground">Squad planner</h1>
             <button
               type="button"
               onClick={() => setShowPitch((v) => !v)}
-              className="h-9 px-3 rounded-xl border border-border bg-card text-sm text-foreground cursor-pointer transition hover:bg-muted/60"
+              className="h-9 cursor-pointer rounded-xl border border-border bg-card px-3 text-sm text-foreground transition hover:bg-muted/60"
             >
               {showPitch ? "Hide pitch" : "View pitch"}
             </button>
@@ -50,7 +50,7 @@ export default function PlannerPage() {
             <div className="mb-4">
               <DataCard title={`Your squad (${draft.picks.length}/15)`}>
                 {draft.picks.length === 0 ? (
-                  <div className="text-sm text-muted-foreground text-center py-12">
+                  <div className="py-12 text-center text-sm text-muted-foreground">
                     Add players from the pool below to see your squad on the pitch.
                   </div>
                 ) : (
@@ -74,7 +74,7 @@ export default function PlannerPage() {
         </div>
 
         <aside
-          className="w-full lg:w-80 shrink-0 self-start lg:sticky lg:overflow-y-auto lg:max-h-[calc(100vh-80px)]"
+          className="w-full shrink-0 self-start lg:sticky lg:max-h-[calc(100vh-80px)] lg:w-80 lg:overflow-y-auto"
           style={{ top: 64 }}
         >
           <DataCard title="Your draft">
@@ -96,7 +96,7 @@ export default function PlannerPage() {
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] right-4 lg:bottom-6 lg:right-6 z-30 h-11 w-11 rounded-full border border-border bg-card text-foreground shadow-card cursor-pointer transition hover:bg-muted/60 flex items-center justify-center"
+          className="fixed right-4 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-border bg-card text-foreground shadow-card transition hover:bg-muted/60 lg:right-6 lg:bottom-6"
           aria-label="Back to top"
           title="Back to top"
         >

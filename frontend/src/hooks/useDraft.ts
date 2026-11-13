@@ -31,9 +31,7 @@ function parseDraft(raw: string | null): DraftState | null {
 }
 
 export function useDraft(pool: PoolPlayer[] | undefined) {
-  const [state, setState] = useState<DraftState>(
-    () => parseDraft(localStorage.getItem(KEY)) ?? DEFAULTS
-  );
+  const [state, setState] = useState<DraftState>(() => parseDraft(localStorage.getItem(KEY)) ?? DEFAULTS);
 
   // persist + tell other instances on this tab
   useEffect(() => {
@@ -77,9 +75,7 @@ export function useDraft(pool: PoolPlayer[] | undefined) {
   }, [pool]);
 
   const byCode = new Map((pool ?? []).map((p) => [p.code, p]));
-  const picks = state.picks
-    .map((code) => byCode.get(code))
-    .filter((p): p is PoolPlayer => !!p);
+  const picks = state.picks.map((code) => byCode.get(code)).filter((p): p is PoolPlayer => !!p);
 
   const counts: Record<PoolPosition, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
   const clubCounts = new Map<number, number>();
@@ -104,9 +100,7 @@ export function useDraft(pool: PoolPlayer[] | undefined) {
   }
   for (const [teamId, n] of clubCounts) {
     if (n > MAX_PER_CLUB) {
-      violations.push(
-        `Too many players from ${clubShortNames.get(teamId) ?? "one club"} (${n}/${MAX_PER_CLUB})`
-      );
+      violations.push(`Too many players from ${clubShortNames.get(teamId) ?? "one club"} (${n}/${MAX_PER_CLUB})`);
     }
   }
 

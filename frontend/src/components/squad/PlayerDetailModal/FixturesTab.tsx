@@ -5,17 +5,21 @@ import type { NextFixtures, TeamFixture } from "./parts";
 
 function FixtureCompactPill({ f }: { f: TeamFixture }) {
   return (
-    <div className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border border-border bg-muted/30 text-center min-w-0">
-      <span className="text-[10px] text-muted-foreground tracking-wide font-mono">GW{f.event}</span>
-      <span className="text-sm font-semibold text-foreground leading-none">{f.opp}</span>
-      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${fdrClass(f.difficulty)}`}>
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-xl border border-border bg-muted/30 px-2 py-3 text-center">
+      <span className="font-mono text-[10px] tracking-wide text-muted-foreground">GW{f.event}</span>
+      <span className="text-sm leading-none font-semibold text-foreground">{f.opp}</span>
+      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${fdrClass(f.difficulty)}`}>
         {f.home ? "H" : "A"} · {f.difficulty}
       </span>
     </div>
   );
 }
 
-export default function FixturesTab({ player, fixtureGw, next }: {
+export default function FixturesTab({
+  player,
+  fixtureGw,
+  next,
+}: {
   player: Player;
   fixtureGw?: number;
   next: NextFixtures;
@@ -31,31 +35,41 @@ export default function FixturesTab({ player, fixtureGw, next }: {
           <SectionHeader
             label={fixtureGw ? `GW${fixtureGw}` : "This GW"}
             right={
-              player.has_dgw
-                ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">DGW</span>
-                : player.fixtures.length === 0
-                ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">BGW</span>
-                : undefined
+              player.has_dgw ? (
+                <span className="rounded-full border border-primary/30 bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">
+                  DGW
+                </span>
+              ) : player.fixtures.length === 0 ? (
+                <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  BGW
+                </span>
+              ) : undefined
             }
           />
-          {player.fixtures.length === 0
-            ? <div className="text-sm text-muted-foreground">No fixture this gameweek.</div>
-            : (
-              <ul className="space-y-1">
-                {player.fixtures.map((f) => (
-                  <li key={`${f.opp}-${f.kickoff ?? ""}`} className="text-sm flex items-center justify-between border border-border rounded-md px-3 py-2">
-                    <div className="flex flex-col">
-                      <span className="font-medium">{f.home ? "Home vs" : "Away at"} {f.opp}</span>
-                      <span className="text-xs text-muted-foreground">
-                        <KickoffLabel kickoff={f.kickoff} />
-                      </span>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${fdrClass(f.difficulty)}`}>FDR {f.difficulty}</span>
-                  </li>
-                ))}
-              </ul>
-            )
-          }
+          {player.fixtures.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No fixture this gameweek.</div>
+          ) : (
+            <ul className="space-y-1">
+              {player.fixtures.map((f) => (
+                <li
+                  key={`${f.opp}-${f.kickoff ?? ""}`}
+                  className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {f.home ? "Home vs" : "Away at"} {f.opp}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      <KickoffLabel kickoff={f.kickoff} />
+                    </span>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${fdrClass(f.difficulty)}`}>
+                    FDR {f.difficulty}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 

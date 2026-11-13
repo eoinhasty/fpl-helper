@@ -35,14 +35,18 @@ export function SelectMenu<T>({
           aria-label={ariaLabel}
           className={[
             variant === "plain"
-              // Content-width, chevron hugs the label — a fixed w-full +
-              // justify-between (like the default variant) left a visible
-              // gap between short labels ("GW 1") and the chevron once the
-              // bordered box that used to fill that space was removed.
-              ? "inline-flex min-h-11 items-center gap-1 px-1 text-sm text-foreground"
+              ? // Content-width, chevron hugs the label — a fixed w-full +
+                // justify-between (like the default variant) left a visible
+                // gap between short labels ("GW 1") and the chevron once the
+                // bordered box that used to fill that space was removed.
+                "inline-flex min-h-11 items-center gap-1 px-1 text-sm text-foreground"
               : "flex h-11 w-full items-center justify-between gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-foreground",
             "transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            disabled ? "opacity-60 cursor-not-allowed" : variant === "plain" ? "hover:text-primary" : "hover:bg-muted/60",
+            disabled
+              ? "cursor-not-allowed opacity-60"
+              : variant === "plain"
+                ? "hover:text-primary"
+                : "hover:bg-muted/60",
           ].join(" ")}
         >
           <span className="truncate">{current?.label ?? placeholder}</span>
@@ -52,9 +56,15 @@ export function SelectMenu<T>({
             viewBox="0 0 12 12"
             fill="none"
             aria-hidden="true"
-            className="text-muted-foreground shrink-0"
+            className="shrink-0 text-muted-foreground"
           >
-            <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M2.5 4.5L6 8L9.5 4.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </ListboxButton>
         <ListboxOptions
@@ -68,7 +78,7 @@ export function SelectMenu<T>({
             // inheriting that narrowness and wrapping option labels.
             variant === "plain" ? "min-w-32" : "w-(--button-width)",
             "focus:outline-none",
-            "transition duration-100 ease-out data-[closed]:opacity-0 data-[closed]:scale-95",
+            "transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0",
           ].join(" ")}
         >
           {options.map((o) => (
@@ -77,7 +87,7 @@ export function SelectMenu<T>({
               value={o.value}
               className={({ focus, selected }) =>
                 [
-                  "cursor-pointer select-none rounded-lg px-3 py-2 text-sm",
+                  "cursor-pointer rounded-lg px-3 py-2 text-sm select-none",
                   selected
                     ? "bg-primary text-primary-foreground"
                     : focus

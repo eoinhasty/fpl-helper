@@ -10,18 +10,16 @@ export default function SettingsPanel() {
   }
 
   return (
-    <div className="p-3 border border-border rounded-xl bg-card text-foreground">
+    <div className="rounded-xl border border-border bg-card p-3 text-foreground">
       {authed ? (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-success font-medium">✓ FPL account connected</span>
+          <span className="text-sm font-medium text-success">✓ FPL account connected</span>
           <button className="btn text-sm" type="button" onClick={onDisconnect}>
             Disconnect
           </button>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          Not connected. Switch to Live mode to connect your FPL account.
-        </p>
+        <p className="text-sm text-muted-foreground">Not connected. Switch to Live mode to connect your FPL account.</p>
       )}
     </div>
   );

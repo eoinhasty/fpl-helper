@@ -22,7 +22,7 @@ function norm(v: number, { mn, mx }: { mn: number; mx: number }) {
   return mx === mn ? 0.5 : (v - mn) / (mx - mn);
 }
 
-const posMult = (pos?: number) => pos === 4 ? 1.0 : pos === 3 ? 0.92 : 0.72;
+const posMult = (pos?: number) => (pos === 4 ? 1.0 : pos === 3 ? 0.92 : 0.72);
 
 /** XI outfield players, best captain first. `projected` says the ranking is
  * the points model's projection rather than the fallback formula. */
@@ -83,11 +83,12 @@ export function captaincyPicks(players: Player[]) {
   const { rows, projected } = rankCaptains(players);
   const picks = rows.slice(0, 3);
   const topIds = new Set(picks.map((r) => r.p.element));
-  const differential = rows.find(
-    (r) =>
-      !topIds.has(r.p.element) &&
-      typeof r.p.selected_by_percent !== "undefined" &&
-      Number(r.p.selected_by_percent) < DIFF_THRESHOLD
-  ) ?? null;
+  const differential =
+    rows.find(
+      (r) =>
+        !topIds.has(r.p.element) &&
+        typeof r.p.selected_by_percent !== "undefined" &&
+        Number(r.p.selected_by_percent) < DIFF_THRESHOLD,
+    ) ?? null;
   return { picks, differential, projected };
 }

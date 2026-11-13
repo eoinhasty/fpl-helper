@@ -12,13 +12,13 @@ export const PITCH = {
   FIELD_Y: { TOP: 265, BOT: 655 } as const,
   Y_GK: 100,
   ROW_CFG: {
-    GK:  { widthFactor: 0.76, pinch: 1.45 },
+    GK: { widthFactor: 0.76, pinch: 1.45 },
     // pinch: governs inner player spacing for n>3. Lower = more even spread.
     // DEF 1.3: good even spacing for 4 or 5 defenders.
     // MID 1.0: perfect equal gaps for 5 midfielders (most common janky case).
     // FWD 2.0: only affects n≥4 which never occurs in FPL — safe to leave high.
-    DEF: { widthFactor: 0.84, pinch: 1.30 },
-    MID: { widthFactor: 0.88, pinch: 1.00 },
-    FWD: { widthFactor: 0.50, pinch: 2.00 },
+    DEF: { widthFactor: 0.84, pinch: 1.3 },
+    MID: { widthFactor: 0.88, pinch: 1.0 },
+    FWD: { widthFactor: 0.5, pinch: 2.0 },
   } as const,
 };

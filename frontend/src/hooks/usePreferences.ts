@@ -62,7 +62,9 @@ export function usePreferences() {
   // follow system dark/light if theme is "system"
   useEffect(() => {
     const mm = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => { if (prefs.theme === "system") applyTheme("system"); };
+    const onChange = () => {
+      if (prefs.theme === "system") applyTheme("system");
+    };
     mm.addEventListener("change", onChange);
     return () => mm.removeEventListener("change", onChange);
   }, [prefs.theme]);

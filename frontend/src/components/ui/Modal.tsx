@@ -66,7 +66,7 @@ export default function Modal({ open, onClose, labelledBy, widthClass, initialFo
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className={`absolute left-1/2 top-4 lg:top-10 -translate-x-1/2 ${widthClass} max-h-[calc(100dvh-2rem-3.5rem-env(safe-area-inset-bottom))] lg:max-h-[calc(100vh-5rem)] rounded-2xl bg-card text-foreground shadow-card border border-border flex flex-col overflow-hidden`}
+        className={`absolute top-4 left-1/2 -translate-x-1/2 lg:top-10 ${widthClass} flex max-h-[calc(100dvh-2rem-3.5rem-env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-card lg:max-h-[calc(100vh-5rem)]`}
       >
         {children}
       </div>

@@ -62,28 +62,27 @@ export default function LiveAuthGate({ children, onAuthenticated }: Props) {
   }
 
   return (
-    <div className="flex items-start justify-center pt-16 px-4">
+    <div className="flex items-start justify-center px-4 pt-16">
       <Card className="w-full max-w-sm p-6">
         <div className="mb-5 text-center">
-          <div className="text-2xl font-bold tracking-tight mb-1">Live Points</div>
-          <p className="text-sm text-muted-foreground leading-snug">
+          <div className="mb-1 text-2xl font-bold tracking-tight">Live Points</div>
+          <p className="text-sm leading-snug text-muted-foreground">
             Connect your FPL account to see live scores and your actual team.
           </p>
         </div>
 
         {!consented && (
-          <div className="mb-4 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground leading-relaxed">
-            <p className="font-medium text-foreground mb-1">How this works</p>
+          <div className="mb-4 rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-1 font-medium text-foreground">How this works</p>
             <p>
-              Your email and password are sent over HTTPS to the FPL Helper server,
-              which authenticates with Fantasy Premier League on your behalf. Your
-              credentials are never stored — only the resulting session token is kept
-              in your browser.{" "}
+              Your email and password are sent over HTTPS to the FPL Helper server, which authenticates with Fantasy
+              Premier League on your behalf. Your credentials are never stored — only the resulting session token is
+              kept in your browser.{" "}
               <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
                 Privacy policy
               </a>
             </p>
-            <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+            <label className="mt-3 flex cursor-pointer items-center gap-2 select-none">
               <input
                 type="checkbox"
                 className="rounded border-border"
@@ -97,7 +96,7 @@ export default function LiveAuthGate({ children, onAuthenticated }: Props) {
 
         <form onSubmit={onSubmit} className="flex flex-col gap-3">
           <div>
-            <label className="block text-sm font-medium mb-1" htmlFor="fpl-email">
+            <label className="mb-1 block text-sm font-medium" htmlFor="fpl-email">
               FPL Email
             </label>
             <input
@@ -114,7 +113,7 @@ export default function LiveAuthGate({ children, onAuthenticated }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1" htmlFor="fpl-password">
+            <label className="mb-1 block text-sm font-medium" htmlFor="fpl-password">
               Password
             </label>
             <input
@@ -130,23 +129,13 @@ export default function LiveAuthGate({ children, onAuthenticated }: Props) {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <button
-            className="btn btn-primary w-full py-2 mt-1"
-            type="submit"
-            disabled={loading || !consented}
-          >
+          <button className="btn btn-primary mt-1 w-full py-2" type="submit" disabled={loading || !consented}>
             {loading ? "Connecting…" : "Connect FPL Account"}
           </button>
 
-          {!consented && (
-            <p className="text-xs text-center text-muted-foreground">
-              Check the box above to continue.
-            </p>
-          )}
+          {!consented && <p className="text-center text-xs text-muted-foreground">Check the box above to continue.</p>}
         </form>
       </Card>
     </div>

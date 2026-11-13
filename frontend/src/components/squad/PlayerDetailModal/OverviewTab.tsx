@@ -12,20 +12,16 @@ function StatusBanner({ player, hideStartProbability }: { player: Player; hideSt
   const cfg = TONE_CLASS[statusTone(s)];
 
   return (
-    <div className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${cfg.soft}`}>
-      <div className={`mt-0.75 w-2 h-2 rounded-full shrink-0 ${cfg.bg}`} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
+    <div className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${cfg.soft}`}>
+      <div className={`mt-0.75 h-2 w-2 shrink-0 rounded-full ${cfg.bg}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
           <span className={`text-sm font-medium ${cfg.text}`}>{statusToText(s)}</span>
           {!hideStartProbability && (
-            <span className="text-xs text-muted-foreground">
-              {pct(player.start_probability)} start prob
-            </span>
+            <span className="text-xs text-muted-foreground">{pct(player.start_probability)} start prob</span>
           )}
         </div>
-        {player.news && (
-          <p className="text-xs text-muted-foreground mt-1 leading-snug">{player.news}</p>
-        )}
+        {player.news && <p className="mt-1 text-xs leading-snug text-muted-foreground">{player.news}</p>}
       </div>
     </div>
   );
@@ -57,7 +53,7 @@ function StepArrow({ dir, onClick }: { dir: "prev" | "next"; onClick?: () => voi
       // Not `disabled`: that would drop keyboard focus at the first/last GW
       aria-disabled={!onClick}
       aria-label={dir === "prev" ? "Previous gameweek" : "Next gameweek"}
-      className="w-8 shrink-0 flex items-center justify-center rounded-xl border border-border text-foreground/80 cursor-pointer transition-colors hover:border-foreground/30 aria-disabled:opacity-35 aria-disabled:cursor-default aria-disabled:hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="flex w-8 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-border text-foreground/80 transition-colors hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none aria-disabled:cursor-default aria-disabled:opacity-35 aria-disabled:hover:border-border"
     >
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
         <path
@@ -72,7 +68,13 @@ function StepArrow({ dir, onClick }: { dir: "prev" | "next"; onClick?: () => voi
   );
 }
 
-function MarketRow({ label, value, valueClass, sub, right }: {
+function MarketRow({
+  label,
+  value,
+  valueClass,
+  sub,
+  right,
+}: {
   label: string;
   value: React.ReactNode;
   valueClass?: string;
@@ -81,35 +83,46 @@ function MarketRow({ label, value, valueClass, sub, right }: {
 }) {
   return (
     <div className="grid items-baseline gap-3" style={{ gridTemplateColumns: "90px 1fr auto" }}>
-      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</div>
-      <div className="flex items-baseline gap-2.5 min-w-0">
-        <span className={`text-[20px] font-bold tabular-nums tracking-[-0.01em] ${valueClass ?? "text-foreground"}`}>{value}</span>
+      <div className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">{label}</div>
+      <div className="flex min-w-0 items-baseline gap-2.5">
+        <span className={`text-[20px] font-bold tracking-[-0.01em] tabular-nums ${valueClass ?? "text-foreground"}`}>
+          {value}
+        </span>
         {sub != null && <span className="text-xs leading-snug">{sub}</span>}
       </div>
-      {right != null && <div className="text-xs text-right shrink-0">{right}</div>}
+      {right != null && <div className="shrink-0 text-right text-xs">{right}</div>}
     </div>
   );
 }
 
 function OverviewFixtureCard({ f }: { f: TeamFixture }) {
   return (
-    <div className="flex items-center justify-between border border-border rounded-xl px-4 py-3 bg-muted/30">
-      <div className="flex flex-col min-w-0">
-        <span className="text-sm font-semibold text-foreground leading-snug">
+    <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+      <div className="flex min-w-0 flex-col">
+        <span className="text-sm leading-snug font-semibold text-foreground">
           GW{f.event}: {f.home ? "Home vs" : "Away at"} {f.opp}
         </span>
-        <span className="text-xs text-muted-foreground mt-0.5">
+        <span className="mt-0.5 text-xs text-muted-foreground">
           <KickoffLabel kickoff={f.kickoff} />
         </span>
       </div>
-      <span className={`text-xs px-2.5 py-1 rounded-lg font-bold tracking-[0.04em] ml-3 shrink-0 ${fdrClass(f.difficulty)}`}>
+      <span
+        className={`ml-3 shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold tracking-[0.04em] ${fdrClass(f.difficulty)}`}
+      >
         FDR {f.difficulty}
       </span>
     </div>
   );
 }
 
-export default function OverviewTab({ player, hideStartProbability, posLabel, pointsGw, history, next }: {
+export default function OverviewTab({
+  player,
+  hideStartProbability,
+  posLabel,
+  pointsGw,
+  history,
+  next,
+}: {
   player: Player;
   pointsGw?: number;
   hideStartProbability?: boolean;
@@ -161,7 +174,9 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
   const transferSub = [
     player.transfers_in_event != null && `▲ ${fmtCompact(player.transfers_in_event)} in`,
     player.transfers_out_event != null && `▼ ${fmtCompact(player.transfers_out_event)} out`,
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="space-y-4">
@@ -172,9 +187,9 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
         <section>
           <SectionHeader
             label="Gameweeks"
-            right={tiles.length > 0 && (
-              <span className="text-[10px] text-muted-foreground">Pick a week for its points</span>
-            )}
+            right={
+              tiles.length > 0 && <span className="text-[10px] text-muted-foreground">Pick a week for its points</span>
+            }
           />
           {history.loading && <div className="text-sm text-muted-foreground">Loading…</div>}
           {season && season.length === 0 && (
@@ -183,7 +198,7 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
           {tiles.length > 0 && (
             <div className="flex items-stretch gap-1.5">
               <StepArrow dir="prev" onClick={stepBack} />
-              <div className="flex-1 min-w-0 grid grid-cols-5 gap-1.5">
+              <div className="grid min-w-0 flex-1 grid-cols-5 gap-1.5">
                 {shownTiles.map((r) => {
                   const on = r.gw === shownGw;
                   return (
@@ -194,13 +209,17 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
                       aria-label={`GW${r.gw}: ${r.pts} points — show breakdown`}
                       // Picking the shown week again goes back to the squad's GW
                       onClick={() => (on && pickedGw != null ? select(null) : setPickedGw(r.gw))}
-                      className={`min-w-0 flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl border cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                      className={`flex min-w-0 cursor-pointer flex-col items-center gap-1 rounded-xl border px-1 py-2.5 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none ${
                         on ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:border-foreground/30"
                       }`}
                     >
-                      <span className={`text-[10px] tracking-wide font-mono ${on ? "text-primary-strong" : "text-muted-foreground"}`}>GW{r.gw}</span>
-                      <span className="text-lg font-bold tabular-nums leading-none text-foreground">{r.pts}</span>
-                      <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+                      <span
+                        className={`font-mono text-[10px] tracking-wide ${on ? "text-primary-strong" : "text-muted-foreground"}`}
+                      >
+                        GW{r.gw}
+                      </span>
+                      <span className="text-lg leading-none font-bold text-foreground tabular-nums">{r.pts}</span>
+                      <span className="text-[10px] whitespace-nowrap text-muted-foreground tabular-nums">
                         {r.mins > 0 ? `${r.mins} min` : "DNP"}
                       </span>
                     </button>
@@ -215,14 +234,16 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
 
       {fromSquad ? (
         <PointsBreakdown breakdown={player.gw_breakdown ?? null} points={player.gw_points} gw={pointsGw} />
-      ) : shownGw != null && (
-        <PointsBreakdown
-          breakdown={picked.data?.breakdown ?? null}
-          points={picked.data?.points}
-          gw={shownGw}
-          loading={picked.loading}
-          error={picked.error}
-        />
+      ) : (
+        shownGw != null && (
+          <PointsBreakdown
+            breakdown={picked.data?.breakdown ?? null}
+            points={picked.data?.points}
+            gw={shownGw}
+            loading={picked.loading}
+            error={picked.error}
+          />
+        )
       )}
 
       {/* Market */}
@@ -234,15 +255,21 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
               <MarketRow
                 label="Transfers"
                 value={netStr}
-                valueClass={netTransfers > 0 ? "text-success" : netTransfers < 0 ? "text-destructive" : "text-muted-foreground"}
+                valueClass={
+                  netTransfers > 0 ? "text-success" : netTransfers < 0 ? "text-destructive" : "text-muted-foreground"
+                }
                 sub={<span className="text-muted-foreground">{transferSub}</span>}
                 right={
                   soldRank != null ? (
-                    <span className={`flex items-center gap-1 ${soldRank <= 5 ? "text-destructive" : "text-muted-foreground"}`}>
+                    <span
+                      className={`flex items-center gap-1 ${soldRank <= 5 ? "text-destructive" : "text-muted-foreground"}`}
+                    >
                       {soldRank <= 5 && "❄️"}#{soldRank} most-sold {posLabel}
                     </span>
                   ) : tr != null ? (
-                    <span className={`flex items-center gap-1 ${tr.rank <= 5 ? "text-primary" : "text-muted-foreground"}`}>
+                    <span
+                      className={`flex items-center gap-1 ${tr.rank <= 5 ? "text-primary" : "text-muted-foreground"}`}
+                    >
                       {tr.rank <= 5 && "🔥"}#{tr.rank} most-bought {posLabel}
                     </span>
                   ) : undefined
@@ -255,18 +282,24 @@ export default function OverviewTab({ player, hideStartProbability, posLabel, po
             label="Price"
             value={fmtPrice(player.price)}
             sub={
-              player.cost_change_start != null && player.cost_change_start !== 0
-                ? <span className={player.cost_change_start > 0 ? "text-success" : "text-destructive"}>
-                    {player.cost_change_start > 0 ? "↑" : "↓"} £{(Math.abs(player.cost_change_start) / 10).toFixed(1)} since start
-                  </span>
-                : <span className="text-muted-foreground">no change since start</span>
+              player.cost_change_start != null && player.cost_change_start !== 0 ? (
+                <span className={player.cost_change_start > 0 ? "text-success" : "text-destructive"}>
+                  {player.cost_change_start > 0 ? "↑" : "↓"} £{(Math.abs(player.cost_change_start) / 10).toFixed(1)}{" "}
+                  since start
+                </span>
+              ) : (
+                <span className="text-muted-foreground">no change since start</span>
+              )
             }
             right={
-              player.cost_change_event != null && player.cost_change_event !== 0
-                ? <span className={player.cost_change_event > 0 ? "text-success" : "text-destructive"}>
-                    {player.cost_change_event > 0 ? "↑" : "↓"} £{(Math.abs(player.cost_change_event) / 10).toFixed(1)} this GW
-                  </span>
-                : <span className="text-muted-foreground">No change this GW</span>
+              player.cost_change_event != null && player.cost_change_event !== 0 ? (
+                <span className={player.cost_change_event > 0 ? "text-success" : "text-destructive"}>
+                  {player.cost_change_event > 0 ? "↑" : "↓"} £{(Math.abs(player.cost_change_event) / 10).toFixed(1)}{" "}
+                  this GW
+                </span>
+              ) : (
+                <span className="text-muted-foreground">No change this GW</span>
+              )
             }
           />
         </div>
