@@ -28,7 +28,7 @@ export default function HealthCard({
     (p) =>
       (p.status && p.status !== "a") ||
       (p.start_probability ?? 0) < 0.6 ||
-      (p.news || "").toLowerCase().match(/injur|doubt|knock|hamstring|illness|setback/)
+      (p.news || "").toLowerCase().match(/injur|doubt|knock|hamstring|illness|setback/),
   );
 
   const lowStart = (players ?? [])
@@ -41,7 +41,7 @@ export default function HealthCard({
       title="Team Health"
       loading={!unavailable && loading && !players}
       loadingContent={
-        <div className="space-y-2 mt-1">
+        <div className="mt-1 space-y-2">
           <Skeleton className="h-3 w-1/2" />
           <Skeleton className="h-8 w-full rounded-lg" />
           <Skeleton className="h-8 w-full rounded-lg" />
@@ -52,7 +52,7 @@ export default function HealthCard({
       empty={!!unavailable || !players || players.length === 0}
       emptyMessage={unavailable ?? "Team health appears once your squad is loaded."}
     >
-      <div className="text-sm text-foreground mb-3">
+      <div className="mb-3 text-sm text-foreground">
         <span className="font-semibold">{flagged.length}</span>
         <span className="text-muted-foreground"> at risk • under 60% start or flagged</span>
       </div>
@@ -62,15 +62,14 @@ export default function HealthCard({
             <li key={p.element}>
               <PlayerOpen
                 id={p.element}
-                className="w-full text-sm flex items-center justify-between rounded-md border border-border bg-card px-2 py-1"
+                className="flex w-full items-center justify-between rounded-md border border-border bg-card px-2 py-1 text-sm"
               >
-              <span className="truncate text-foreground">
-                {p.name}{" "}
-                <span className="text-xs text-muted-foreground">({p.team})</span>
-              </span>
-              <span className="text-xs text-destructive font-medium">
-                {Math.round((p.start_probability ?? 0) * 100)}%
-              </span>
+                <span className="truncate text-foreground">
+                  {p.name} <span className="text-xs text-muted-foreground">({p.team})</span>
+                </span>
+                <span className="text-xs font-medium text-destructive">
+                  {Math.round((p.start_probability ?? 0) * 100)}%
+                </span>
               </PlayerOpen>
             </li>
           ))}

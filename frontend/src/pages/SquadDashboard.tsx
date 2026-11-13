@@ -31,7 +31,7 @@ type Mode = "live" | "squad";
 function StatText({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[10px] tracking-wide text-muted-foreground uppercase">{label}</div>
       <div className="text-sm font-semibold text-foreground">{value}</div>
     </div>
   );
@@ -41,9 +41,17 @@ export default function SquadDashboard() {
   const { entry } = useEntryId();
   const { prefs } = usePreferences();
   const {
-    data, cache, seasonStatus, isSwitching,
-    squadLoading, squadError, liveLoading, liveError,
-    loadSquad, loadLive, clearData,
+    data,
+    cache,
+    seasonStatus,
+    isSwitching,
+    squadLoading,
+    squadError,
+    liveLoading,
+    liveError,
+    loadSquad,
+    loadLive,
+    clearData,
   } = useSquad(entry);
 
   const [mode, setMode] = useState<Mode>(prefs.defaultView);
@@ -106,10 +114,7 @@ export default function SquadDashboard() {
 
   // create GW options up to whichever GW we’ve seen
   const cap = data?.current_gw ?? 1;
-  const gwOptions = useMemo(
-    () => Array.from({ length: cap }, (_, i) => i + 1),
-    [cap]
-  );
+  const gwOptions = useMemo(() => Array.from({ length: cap }, (_, i) => i + 1), [cap]);
 
   const isHistorical = data?.used_label === "explicit" && (data?.used_gw ?? 0) < (data?.current_gw ?? 0);
   const isPreSeason = data?.season_status === "pre_season" && (data?.players?.length ?? 0) === 0;
@@ -119,7 +124,7 @@ export default function SquadDashboard() {
   // lineup and captain are locked, so advice on them can't be acted on.
   const deadlinePassed = useMemo(
     () => !!data?.deadline && new Date(data.deadline).getTime() <= Date.now(),
-    [data?.deadline]
+    [data?.deadline],
   );
   const lockedGw = !isHistorical && deadlinePassed ? (data?.fixture_gw ?? data?.used_gw) : undefined;
 
@@ -127,13 +132,13 @@ export default function SquadDashboard() {
   // GW change or mode switch drops back to the real lineup on its own.
   const lineup = useMemo(
     () => (data?.players && !isHistorical && lockedGw == null ? suggestLineup(data.players) : null),
-    [data?.players, isHistorical, lockedGw]
+    [data?.players, isHistorical, lockedGw],
   );
   const [previewFor, setPreviewFor] = useState<Player[] | null>(null);
   const previewing = !!lineup && !!data?.players && previewFor === data.players;
   const shownPlayers = useMemo(
     () => (previewing && data?.players && lineup ? previewLineup(data.players, lineup) : data?.players),
-    [previewing, data?.players, lineup]
+    [previewing, data?.players, lineup],
   );
   const squadView = (viewError: string | null) => (
     <>
@@ -143,7 +148,13 @@ export default function SquadDashboard() {
         onTogglePreview={() => setPreviewFor(previewing ? null : (data?.players ?? null))}
       />
       {prefs.squadLayout === "pitch" ? (
-        <PitchView players={shownPlayers} brand="FPL Helper" onPlayerClick={openPlayer} loading={loading} error={viewError} />
+        <PitchView
+          players={shownPlayers}
+          brand="FPL Helper"
+          onPlayerClick={openPlayer}
+          loading={loading}
+          error={viewError}
+        />
       ) : (
         <XIList
           players={shownPlayers}
@@ -193,15 +204,10 @@ export default function SquadDashboard() {
           { label: "Live", value: "live" },
         ]}
       />
-      <GwSelect
-        value={gw ?? data?.used_gw}
-        options={gwOptions}
-        onChange={setGw}
-        disabled={mode === "live"}
-      />
+      <GwSelect value={gw ?? data?.used_gw} options={gwOptions} onChange={setGw} disabled={mode === "live"} />
       <button
         className="btn"
-        onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
+        onClick={() => (mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true }))}
         title="Force fresh fetch"
         aria-label="Refresh"
       >
@@ -229,7 +235,7 @@ export default function SquadDashboard() {
       active ? "font-semibold text-primary-strong" : "text-muted-foreground",
     ].join(" ");
   const mobileModeControls = (
-    <div className="flex items-center gap-3 shrink-0">
+    <div className="flex shrink-0 items-center gap-3">
       <div role="radiogroup" aria-label="View" className="flex items-center" onKeyDown={onModeToggleKeyDown}>
         <button
           type="button"
@@ -260,8 +266,8 @@ export default function SquadDashboard() {
       />
       <button
         type="button"
-        onClick={() => mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true })}
-        className="min-h-11 min-w-11 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        onClick={() => (mode === "live" ? loadLive(true) : loadSquad({ gw, forceRefresh: true }))}
+        className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         title="Force fresh fetch"
         aria-label="Refresh"
       >
@@ -275,10 +281,7 @@ export default function SquadDashboard() {
       <StatText label="Value" value={money(data?.team_value)} />
       <StatText label="Bank" value={money(data?.team_bank)} />
       {data?.active_chip && (
-        <StatText
-          label="Chip"
-          value={<span className="uppercase">{data.active_chip.replace(/_/g, " ")}</span>}
-        />
+        <StatText label="Chip" value={<span className="uppercase">{data.active_chip.replace(/_/g, " ")}</span>} />
       )}
     </div>
   );
@@ -305,7 +308,7 @@ export default function SquadDashboard() {
     >
       <div className="mx-auto px-4 py-2.5" style={{ maxWidth: 1400 }}>
         {/* Desktop/tablet: everything in one row */}
-        <div className="hidden lg:flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="hidden flex-wrap items-center justify-between gap-x-4 gap-y-2 lg:flex">
           <SquadStatusBar {...statusBarProps} />
           <div className="shrink-0">{modeControls}</div>
         </div>
@@ -320,7 +323,7 @@ export default function SquadDashboard() {
             mobileModeControls above) — items-end so the two-line stat
             blocks and the single-line controls share a bottom edge instead
             of centering against each other. */}
-        <div className="lg:hidden space-y-2">
+        <div className="space-y-2 lg:hidden">
           <SquadStatusBar {...statusBarProps} compact />
           <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 text-sm">
             {mobileStats}
@@ -334,11 +337,7 @@ export default function SquadDashboard() {
   return (
     <PlayerDetailContext.Provider value={playerDetail.open}>
       {contentHeader}
-      <DashboardLayout
-        left={left}
-        right={right}
-        stickyOffsetPx={headerH}
-      >
+      <DashboardLayout left={left} right={right} stickyOffsetPx={headerH}>
         {mode === "live" ? (
           <LiveAuthGate key={error === "AUTH_EXPIRED" ? "expired" : "authed"} onAuthenticated={loadLive}>
             {isPreSeason ? (

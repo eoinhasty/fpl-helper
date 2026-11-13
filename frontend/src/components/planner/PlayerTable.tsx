@@ -64,15 +64,11 @@ export default function PlayerTable({
     if (position !== "ALL") rows = rows.filter((p) => p.position === position);
     if (teamId !== "ALL") rows = rows.filter((p) => String(p.team) === teamId);
     if (q) {
-      rows = rows.filter(
-        (p) =>
-          p.web_name.toLowerCase().includes(q) ||
-          (p.full_name ?? "").toLowerCase().includes(q)
-      );
+      rows = rows.filter((p) => p.web_name.toLowerCase().includes(q) || (p.full_name ?? "").toLowerCase().includes(q));
     }
     const sorted = [...rows].sort((a, b) => {
-      const av = sortKey === "now_cost" ? a.now_cost ?? 0 : num(a[sortKey] as string | undefined);
-      const bv = sortKey === "now_cost" ? b.now_cost ?? 0 : num(b[sortKey] as string | undefined);
+      const av = sortKey === "now_cost" ? (a.now_cost ?? 0) : num(a[sortKey] as string | undefined);
+      const bv = sortKey === "now_cost" ? (b.now_cost ?? 0) : num(b[sortKey] as string | undefined);
       return sortDesc ? bv - av : av - bv;
     });
     return sorted;
@@ -92,7 +88,7 @@ export default function PlayerTable({
     <button
       type="button"
       onClick={clearFilters}
-      className="-my-3.5 py-3.5 text-primary-strong font-medium cursor-pointer hover:underline"
+      className="-my-3.5 cursor-pointer py-3.5 font-medium text-primary-strong hover:underline"
     >
       Clear filters
     </button>
@@ -100,12 +96,8 @@ export default function PlayerTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 sticky top-0 z-10 bg-card py-2 -mx-1 px-1 rounded-xl shadow-sm">
-        <Segmented<PoolPosition | "ALL">
-          value={position}
-          onChange={setPosition}
-          options={POSITION_OPTIONS}
-        />
+      <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl bg-card px-1 py-2 shadow-sm">
+        <Segmented<PoolPosition | "ALL"> value={position} onChange={setPosition} options={POSITION_OPTIONS} />
         <SelectMenu
           value={teamId}
           onChange={setTeamId}
@@ -120,7 +112,7 @@ export default function PlayerTable({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search player…"
-          className="h-10 px-3 rounded-xl border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground flex-1 min-w-40"
+          className="h-10 min-w-40 flex-1 rounded-xl border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground"
           aria-label="Search players"
         />
         <SelectMenu
@@ -133,7 +125,7 @@ export default function PlayerTable({
         <button
           type="button"
           onClick={() => setSortDesc((v) => !v)}
-          className="h-10 px-3 rounded-xl border border-border bg-card text-sm text-foreground cursor-pointer transition hover:bg-muted/60"
+          className="h-10 cursor-pointer rounded-xl border border-border bg-card px-3 text-sm text-foreground transition hover:bg-muted/60"
           title="Toggle sort direction"
         >
           {sortDesc ? "↓" : "↑"}
@@ -152,47 +144,56 @@ export default function PlayerTable({
           return (
             <div
               key={p.id}
-              className={`flex items-center gap-3 border rounded-xl px-3 py-2.5 ${
+              className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${
                 alreadyAdded ? "border-primary/30 bg-primary/5" : "border-border bg-card"
               }`}
             >
               <button
                 type="button"
                 onClick={() => onSelect?.(p)}
-                className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer transition hover:opacity-80"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left transition hover:opacity-80"
               >
                 {p.shirt_url ? (
-                  <img src={p.shirt_url} alt="" className="w-8 h-8 object-contain shrink-0" loading="lazy" />
+                  <img src={p.shirt_url} alt="" className="h-8 w-8 shrink-0 object-contain" loading="lazy" />
                 ) : (
-                  <div className="w-8 h-8 shrink-0" />
+                  <div className="h-8 w-8 shrink-0" />
                 )}
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-sm font-semibold text-foreground truncate">{p.web_name}</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold text-foreground">{p.web_name}</span>
                     <span className="text-xs text-muted-foreground">{p.team_short}</span>
-                    <span className="text-[10px] font-semibold text-muted-foreground border border-border/60 rounded-full px-1.5 py-0.5">
+                    <span className="rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                       {p.position}
                     </span>
                     {statusBadgeClass(p.status) && (
                       <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-full border ${statusBadgeClass(p.status)}`}
+                        className={`rounded-full border px-1.5 py-0.5 text-[10px] ${statusBadgeClass(p.status)}`}
                         title={p.news || statusToText(p.status)}
                       >
                         {statusToText(p.status)}
                       </span>
                     )}
                     {(p.penalties_order ?? 99) <= 2 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/30" title="Penalty taker">
+                      <span
+                        className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary"
+                        title="Penalty taker"
+                      >
                         PK{p.penalties_order}
                       </span>
                     )}
                     {(p.corners_order ?? 99) <= 2 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border" title="Corners taker">
+                      <span
+                        className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                        title="Corners taker"
+                      >
                         CK{p.corners_order}
                       </span>
                     )}
                     {(p.freekicks_order ?? 99) <= 2 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border" title="Free-kick taker">
+                      <span
+                        className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                        title="Free-kick taker"
+                      >
                         FK{p.freekicks_order}
                       </span>
                     )}
@@ -202,26 +203,24 @@ export default function PlayerTable({
                       xgi={p.expected_goal_involvements}
                     />
                   </div>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
                     {(p.fixtures ?? []).slice(0, 3).map((f, i) => (
-                      <span
-                        key={i}
-                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${fdrClass(f.difficulty)}`}
-                      >
-                        {f.home ? "v" : "@"}{f.opp}
+                      <span key={i} className={`rounded-full px-1.5 py-0.5 text-[10px] ${fdrClass(f.difficulty)}`}>
+                        {f.home ? "v" : "@"}
+                        {f.opp}
                       </span>
                     ))}
                   </div>
                 </div>
               </button>
 
-              <div className="text-right shrink-0 w-16">
+              <div className="w-16 shrink-0 text-right">
                 <div className="text-sm font-semibold text-foreground tabular-nums">{fmtPrice(p.now_cost)}</div>
                 <div className="text-[10px] text-muted-foreground tabular-nums">
                   {p.selected_by_percent != null ? `${p.selected_by_percent}%` : "—"}
                 </div>
               </div>
-              <div className="text-right shrink-0 w-12">
+              <div className="w-12 shrink-0 text-right">
                 <div className="text-sm font-semibold text-primary tabular-nums">
                   {p.ep_next ? Number(p.ep_next).toFixed(1) : "—"}
                 </div>
@@ -234,14 +233,14 @@ export default function PlayerTable({
                 disabled={!ok}
                 title={!ok ? reason : warning}
                 aria-label={warning ? `Add ${p.web_name} (${warning})` : undefined}
-                className={`shrink-0 h-10 px-3 rounded-lg text-xs font-semibold transition ${
+                className={`h-10 shrink-0 rounded-lg px-3 text-xs font-semibold transition ${
                   ok && warning
-                    ? `border ${TONE_CLASS.warning.soft} text-foreground cursor-pointer hover:opacity-90`
+                    ? `border ${TONE_CLASS.warning.soft} cursor-pointer text-foreground hover:opacity-90`
                     : ok
-                    ? "bg-primary text-primary-foreground cursor-pointer hover:opacity-90"
-                    : alreadyAdded
-                      ? "bg-primary/15 text-primary cursor-default"
-                      : "bg-muted text-muted-foreground/50 cursor-not-allowed"
+                      ? "cursor-pointer bg-primary text-primary-foreground hover:opacity-90"
+                      : alreadyAdded
+                        ? "cursor-default bg-primary/15 text-primary"
+                        : "cursor-not-allowed bg-muted text-muted-foreground/50"
                 }`}
               >
                 {alreadyAdded ? "✓ Added" : warning ? "Add ⚠" : "Add"}
@@ -250,7 +249,7 @@ export default function PlayerTable({
           );
         })}
         {rows.length === 0 && (
-          <div className="text-sm text-muted-foreground text-center py-8 space-y-2">
+          <div className="space-y-2 py-8 text-center text-sm text-muted-foreground">
             <div>No players match these filters.</div>
             {filtersActive && <div>{clearFiltersButton}</div>}
           </div>
@@ -261,7 +260,7 @@ export default function PlayerTable({
         <button
           type="button"
           onClick={() => setVisible((v) => v + PAGE_SIZE)}
-          className="w-full h-9 rounded-xl border border-border bg-card text-sm text-foreground cursor-pointer transition hover:bg-muted/60"
+          className="h-9 w-full cursor-pointer rounded-xl border border-border bg-card text-sm text-foreground transition hover:bg-muted/60"
         >
           Show more ({filtered.length - visible} remaining)
         </button>

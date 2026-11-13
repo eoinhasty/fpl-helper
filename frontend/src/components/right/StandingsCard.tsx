@@ -3,7 +3,16 @@
 import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 
-type Row = { pos: number; team: string; crest?: string | null; played: number; w: number; d: number; l: number; pts: number; };
+type Row = {
+  pos: number;
+  team: string;
+  crest?: string | null;
+  played: number;
+  w: number;
+  d: number;
+  l: number;
+  pts: number;
+};
 type Resp = {
   source: string;
   rows: Row[];
@@ -19,7 +28,7 @@ export default function StandingsCard() {
       {data && (
         <div className="overflow-hidden rounded-xl border border-border">
           {data.is_previous_season_table && (
-            <div className="text-xs text-muted-foreground px-3 py-2 border-b border-border">
+            <div className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
               New season hasn't started — showing last season's final table.
             </div>
           )}
@@ -27,18 +36,24 @@ export default function StandingsCard() {
             <table className="w-full text-sm text-foreground">
               <thead className="bg-muted text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 text-left">#</th><th className="px-2 text-left">Team</th>
-                  <th className="px-2 text-center">P</th><th className="px-2 text-center lg:hidden xl:table-cell">W</th><th className="px-2 text-center lg:hidden xl:table-cell">D</th>
-                  <th className="px-2 text-center lg:hidden xl:table-cell">L</th><th className="px-2 text-center">Pts</th>
+                  <th className="px-3 py-2 text-left">#</th>
+                  <th className="px-2 text-left">Team</th>
+                  <th className="px-2 text-center">P</th>
+                  <th className="px-2 text-center lg:hidden xl:table-cell">W</th>
+                  <th className="px-2 text-center lg:hidden xl:table-cell">D</th>
+                  <th className="px-2 text-center lg:hidden xl:table-cell">L</th>
+                  <th className="px-2 text-center">Pts</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.pos} className="odd:bg-card even:bg-muted/60">
                     <td className="px-3 py-2">{r.pos}</td>
-                    <td className="px-2 max-w-28 sm:max-w-none lg:max-w-22 xl:max-w-26">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        {r.crest && <img src={r.crest} alt="" className="w-4 h-4 object-contain shrink-0" loading="lazy" />}
+                    <td className="max-w-28 px-2 sm:max-w-none lg:max-w-22 xl:max-w-26">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        {r.crest && (
+                          <img src={r.crest} alt="" className="h-4 w-4 shrink-0 object-contain" loading="lazy" />
+                        )}
                         <span className="truncate">{r.team}</span>
                       </div>
                     </td>
@@ -52,7 +67,7 @@ export default function StandingsCard() {
               </tbody>
             </table>
           </div>
-          <div className="text-[11px] text-muted-foreground px-3 py-1">Source: {data.source}</div>
+          <div className="px-3 py-1 text-[11px] text-muted-foreground">Source: {data.source}</div>
         </div>
       )}
     </DataCard>

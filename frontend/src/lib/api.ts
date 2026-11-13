@@ -45,7 +45,7 @@ export async function apiError(r: Response): Promise<ApiError> {
       ? "Too many requests — try again in a minute."
       : s >= 500
         ? (s === 502 && detail) || `FPL Helper's server couldn't load this — try again shortly (${s}).`
-        : detail ?? `Couldn't load this (${s}).`;
+        : (detail ?? `Couldn't load this (${s}).`);
   return new ApiError(s, message);
 }
 
@@ -88,15 +88,12 @@ export function clearAuth(): void {
 }
 
 export async function fplLogin(email: string, password: string): Promise<void> {
-  const { json } = await fetchJSON<{ access_token: string }>(
-    new URL("/api/auth/login", ORIGIN).toString(),
-    {
-      method: "POST",
-      headers: { ...baseHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-      credentials: "include",
-    }
-  );
+  const { json } = await fetchJSON<{ access_token: string }>(new URL("/api/auth/login", ORIGIN).toString(), {
+    method: "POST",
+    headers: { ...baseHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+    credentials: "include",
+  });
   localStorage.setItem(TOKEN_KEY, `Bearer ${json.access_token}`);
 }
 
@@ -116,14 +113,11 @@ export function tryRefresh(): Promise<boolean> {
 async function doRefresh(): Promise<boolean> {
   try {
     // Refresh token is an HttpOnly cookie — browser sends it automatically with credentials: "include"
-    const { json } = await fetchJSON<{ access_token: string }>(
-      new URL("/api/auth/refresh", ORIGIN).toString(),
-      {
-        method: "POST",
-        headers: baseHeaders(),
-        credentials: "include",
-      }
-    );
+    const { json } = await fetchJSON<{ access_token: string }>(new URL("/api/auth/refresh", ORIGIN).toString(), {
+      method: "POST",
+      headers: baseHeaders(),
+      credentials: "include",
+    });
     localStorage.setItem(TOKEN_KEY, `Bearer ${json.access_token}`);
     return true;
   } catch {
@@ -164,7 +158,10 @@ export async function getLive(entry: number, opts?: { forceRefresh?: boolean }):
   }
 }
 
-export async function getSquad(entry: number, opts?: { gw?: number; forceRefresh?: boolean }): Promise<ApiResult<SquadResponse>> {
+export async function getSquad(
+  entry: number,
+  opts?: { gw?: number; forceRefresh?: boolean },
+): Promise<ApiResult<SquadResponse>> {
   const u = new URL(`/api/squad/${entry}`, ORIGIN);
   if (opts?.gw != null) u.searchParams.set("gw", String(opts.gw));
   if (opts?.forceRefresh) u.searchParams.set("noCache", "1");

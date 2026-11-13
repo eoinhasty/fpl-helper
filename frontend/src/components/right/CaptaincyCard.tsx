@@ -8,54 +8,42 @@ import PlayerOpen from "../squad/PlayerOpen";
 
 const RANK_ICON = ["⭐", "🥈", "🥉"];
 
-function PlayerRow({
-  p,
-  pts,
-  projected,
-  rank,
-}: {
-  p: Player;
-  pts: number;
-  projected: boolean;
-  rank?: number;
-}) {
+function PlayerRow({ p, pts, projected, rank }: { p: Player; pts: number; projected: boolean; rank?: number }) {
   const fxs = p.fixtures ?? (p.fixture ? [p.fixture] : []);
   return (
     <li>
-    <PlayerOpen id={p.element} className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5">
-      <div className="flex items-center gap-2 min-w-0">
-        <img
-          src={p.shirt_url || ""}
-          alt=""
-          className="w-6 h-6 rounded border border-border bg-card object-contain"
-        />
-        <div className="truncate">
-          <div className="text-sm font-medium text-foreground truncate">
-            {rank !== undefined ? `${RANK_ICON[rank]} ` : "💡 "}{p.name}
-          </div>
-          <div className="text-[11px] text-muted-foreground truncate">
-            {p.team} •{" "}
-            {p.has_dgw && fxs.length > 0
-              ? fxs.map((f) => `${f.home ? "vs" : "@"} ${f.opp}`).join(", ") + " • DGW"
-              : p.fixture
-                ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp} • FDR ${p.fixture.difficulty}`
-                : "BGW"}
+      <PlayerOpen
+        id={p.element}
+        className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <img src={p.shirt_url || ""} alt="" className="h-6 w-6 rounded border border-border bg-card object-contain" />
+          <div className="truncate">
+            <div className="truncate text-sm font-medium text-foreground">
+              {rank !== undefined ? `${RANK_ICON[rank]} ` : "💡 "}
+              {p.name}
+            </div>
+            <div className="truncate text-[11px] text-muted-foreground">
+              {p.team} •{" "}
+              {p.has_dgw && fxs.length > 0
+                ? fxs.map((f) => `${f.home ? "vs" : "@"} ${f.opp}`).join(", ") + " • DGW"
+                : p.fixture
+                  ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp} • FDR ${p.fixture.difficulty}`
+                  : "BGW"}
+            </div>
           </div>
         </div>
-      </div>
-      <div className="text-xs text-muted-foreground text-right shrink-0">
-        {typeof p.selected_by_percent !== "undefined" && (
-          <div>{Number(p.selected_by_percent).toFixed(1)}% own</div>
-        )}
-        <div className="font-semibold text-foreground">
-          {projected
-            ? `${pts.toFixed(1)} proj pts`
-            : pts > 0
-              ? `${pts.toFixed(1)} xPts`
-              : `${parseFloat(p.form ?? "0").toFixed(1)} form`}
+        <div className="shrink-0 text-right text-xs text-muted-foreground">
+          {typeof p.selected_by_percent !== "undefined" && <div>{Number(p.selected_by_percent).toFixed(1)}% own</div>}
+          <div className="font-semibold text-foreground">
+            {projected
+              ? `${pts.toFixed(1)} proj pts`
+              : pts > 0
+                ? `${pts.toFixed(1)} xPts`
+                : `${parseFloat(p.form ?? "0").toFixed(1)} form`}
+          </div>
         </div>
-      </div>
-    </PlayerOpen>
+      </PlayerOpen>
     </li>
   );
 }
@@ -65,7 +53,7 @@ function CaptaincySkeleton() {
     <div className="space-y-2">
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5">
-          <Skeleton className="w-6 h-6 rounded shrink-0" />
+          <Skeleton className="h-6 w-6 shrink-0 rounded" />
           <div className="flex-1 space-y-1.5">
             <Skeleton className="h-3 w-2/3" />
             <Skeleton className="h-2.5 w-1/2" />
@@ -123,15 +111,17 @@ export default function CaptaincyCard({
       {/* Measured on the model's projections only (CAPTAIN_CLOSE_GAP in lib/confidence.ts) */}
       {projected && picks.length > 1 && picks[0].pts - picks[1].pts < CAPTAIN_CLOSE_GAP && (
         <p className="mt-2 text-[11px] text-muted-foreground">
-          Close call: in past seasons, top captain picks within {CAPTAIN_CLOSE_GAP} pts of each other went the
-          model's way only about half the time. Weigh news, fixtures and ownership.
+          Close call: in past seasons, top captain picks within {CAPTAIN_CLOSE_GAP} pts of each other went the model's
+          way only about half the time. Weigh news, fixtures and ownership.
         </p>
       )}
 
       {differential && (
         <>
           <div className="mt-3 mb-2 border-t border-border" />
-          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Differential</div>
+          <div className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            Differential
+          </div>
           <ul>
             <PlayerRow p={differential.p} pts={differential.pts} projected={projected} />
           </ul>

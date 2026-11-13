@@ -17,10 +17,7 @@ function readAll(): Record<string, PlanOptions> {
 export function usePlanOptions(entry: number | "") {
   const [all, setAll] = React.useState(readAll);
   // Spread over the defaults: options saved before a field existed lack it
-  const options = React.useMemo(
-    () => ({ ...DEFAULT_PLAN_OPTIONS, ...((entry && all[entry]) || {}) }),
-    [entry, all],
-  );
+  const options = React.useMemo(() => ({ ...DEFAULT_PLAN_OPTIONS, ...((entry && all[entry]) || {}) }), [entry, all]);
 
   const setOptions = React.useCallback(
     (next: PlanOptions) => {

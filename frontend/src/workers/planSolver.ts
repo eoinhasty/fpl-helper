@@ -7,9 +7,7 @@ import highsLoader, { type Highs } from "highs";
 import wasmUrl from "highs/runtime?url";
 
 export type SolveRequest = { model: string; options: Record<string, number | string | boolean> };
-export type SolveResponse =
-  | { ok: true; status: string; values: Record<string, number> }
-  | { ok: false; error: string };
+export type SolveResponse = { ok: true; status: string; values: Record<string, number> } | { ok: false; error: string };
 
 let highs: Promise<Highs> | null = null;
 

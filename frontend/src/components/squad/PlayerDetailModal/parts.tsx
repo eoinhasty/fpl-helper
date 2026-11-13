@@ -18,8 +18,8 @@ export type NextFixtures = {
 
 export function SectionHeader({ label, right }: { label: string; right?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between mb-2.5">
-      <div className="text-xs font-bold text-foreground/80 tracking-[-0.005em]">{label}</div>
+    <div className="mb-2.5 flex items-center justify-between">
+      <div className="text-xs font-bold tracking-[-0.005em] text-foreground/80">{label}</div>
       {right}
     </div>
   );
@@ -28,7 +28,7 @@ export function SectionHeader({ label, right }: { label: string; right?: React.R
 export function PositionTag({ posLabel }: { posLabel: string | null }) {
   if (!posLabel) return null;
   return (
-    <span className="text-[10px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 tracking-widest">
+    <span className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] tracking-widest text-muted-foreground">
       vs {posLabel}
     </span>
   );
@@ -46,7 +46,12 @@ export function KickoffLabel({ kickoff }: { kickoff: string | null | undefined }
 }
 
 /** Loading / error / not-available / empty states for the next-fixtures list */
-export function NextFixturesStatus({ next, hasTeam, isEmpty, emptyText }: {
+export function NextFixturesStatus({
+  next,
+  hasTeam,
+  isEmpty,
+  emptyText,
+}: {
   next: NextFixtures;
   hasTeam: boolean;
   isEmpty: boolean;

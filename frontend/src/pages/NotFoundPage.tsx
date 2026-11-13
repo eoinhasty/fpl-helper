@@ -11,7 +11,7 @@ export default function NotFoundPage() {
         <p className="mt-2 text-sm text-muted-foreground">There's nothing at this address.</p>
         <Link
           to="/"
-          className="btn-primary mt-6 inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="btn-primary mt-6 inline-flex min-h-11 cursor-pointer items-center rounded-lg px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
         >
           Go to the dashboard
         </Link>

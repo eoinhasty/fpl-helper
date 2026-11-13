@@ -17,14 +17,16 @@ type Props = {
  */
 export default function AppShell({ children }: Props) {
   return (
-    <div className="min-h-screen page-bg flex flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+    <div className="page-bg flex min-h-screen flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">
       <TopNav />
 
       {children}
 
-      <footer className="mt-auto pt-2 pb-2 lg:py-4 text-center text-[10px] lg:text-xs text-muted-foreground/70 lg:text-muted-foreground/60">
+      <footer className="mt-auto pt-2 pb-2 text-center text-[10px] text-muted-foreground/70 lg:py-4 lg:text-xs lg:text-muted-foreground/60">
         Not affiliated with or endorsed by Fantasy Premier League or the Premier League.{" "}
-        <Link to="/privacy" className="underline hover:text-muted-foreground">Privacy policy</Link>
+        <Link to="/privacy" className="underline hover:text-muted-foreground">
+          Privacy policy
+        </Link>
       </footer>
 
       <MobileTabBar />

@@ -18,8 +18,6 @@ export function useCountdown(deadlineISO?: string | null) {
   const s = Math.floor((abs % 60000) / 1000);
   const text = ended
     ? "Deadline passed"
-    : `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m ${String(
-        s
-      ).padStart(2, "0")}s`;
+    : `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
   return { text, ended };
 }

@@ -39,8 +39,7 @@ export type LineupSuggestion = {
   benchChanged: boolean;
 };
 
-const formationOf = (xi: Player[]) =>
-  [2, 3, 4].map((pos) => xi.filter((p) => p.position === pos).length).join("-");
+const formationOf = (xi: Player[]) => [2, 3, 4].map((pos) => xi.filter((p) => p.position === pos).length).join("-");
 
 const total = (ps: Player[]) => ps.reduce((s, p) => s + lineupValue(p), 0);
 
@@ -77,9 +76,7 @@ export function suggestLineup(players: Player[]): LineupSuggestion | null {
     ...benched.filter((p) => p.position === 1),
     ...benched.filter((p) => p.position !== 1).sort((a, b) => lineupValue(b) - lineupValue(a)),
   ];
-  const currentBench = players
-    .filter((p) => !isStarting(p))
-    .sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));
+  const currentBench = players.filter((p) => !isStarting(p)).sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));
 
   return {
     projected: players.some((p) => p.projected_pts != null),

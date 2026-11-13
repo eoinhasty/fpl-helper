@@ -1,5 +1,5 @@
 // src/hooks/useAgeTicker.ts
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 /** Start at initialAge (seconds) and tick up every second; null stays null. */
 export function useAgeTicker(initialAge: number | null) {

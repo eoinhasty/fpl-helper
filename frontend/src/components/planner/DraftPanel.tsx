@@ -30,50 +30,56 @@ export default function DraftPanel({
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center justify-between mb-1">
+        <div className="mb-1 flex items-center justify-between">
           <span className="text-xs font-semibold text-foreground/80">Budget</span>
-          <span className={`text-xs font-semibold tabular-nums ${hasViolations ? "text-destructive" : "text-foreground"}`}>
+          <span
+            className={`text-xs font-semibold tabular-nums ${hasViolations ? "text-destructive" : "text-foreground"}`}
+          >
             {fmtPrice(budget.spent)} / £{(BUDGET / 10).toFixed(1)}m
           </span>
         </div>
-        <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div className="h-2 overflow-hidden rounded-full bg-muted">
           <div
             className={`h-full rounded-full ${budget.bank < 0 ? "bg-destructive" : "bg-primary"}`}
             style={{ width: `${Math.min(100, (budget.spent / BUDGET) * 100)}%` }}
           />
         </div>
-        <div className={`text-xs mt-1 tabular-nums ${budget.bank < 0 ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+        <div
+          className={`mt-1 text-xs tabular-nums ${budget.bank < 0 ? "font-semibold text-destructive" : "text-muted-foreground"}`}
+        >
           Bank: £{(budget.bank / 10).toFixed(1)}m
         </div>
       </div>
 
       {hasViolations && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2 space-y-1">
+        <div className="space-y-1 rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2">
           {violations.map((v) => (
-            <div key={v} className="text-xs text-destructive">{v}</div>
+            <div key={v} className="text-xs text-destructive">
+              {v}
+            </div>
           ))}
         </div>
       )}
 
       {warnings.length > 0 && (
-        <div className={`rounded-lg border px-3 py-2 space-y-1 ${TONE_CLASS.warning.soft}`}>
+        <div className={`space-y-1 rounded-lg border px-3 py-2 ${TONE_CLASS.warning.soft}`}>
           {warnings.map((w) => (
-            <div key={w} className="text-xs text-foreground">{w}</div>
+            <div key={w} className="text-xs text-foreground">
+              {w}
+            </div>
           ))}
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-foreground/80">
-          Squad ({picks.length}/15)
-        </span>
+        <span className="text-xs font-semibold text-foreground/80">Squad ({picks.length}/15)</span>
         {picks.length > 0 && (
           <button
             type="button"
             onClick={() => {
               if (window.confirm("Clear your entire draft? This can't be undone.")) onClear();
             }}
-            className="text-xs text-muted-foreground hover:text-destructive cursor-pointer transition px-2 py-1.5 -mx-2 -my-1.5 rounded-md hover:bg-destructive/5"
+            className="-mx-2 -my-1.5 cursor-pointer rounded-md px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-destructive/5 hover:text-destructive"
           >
             Clear draft
           </button>
@@ -86,7 +92,7 @@ export default function DraftPanel({
           const posPicks = picks.filter((p) => p.position === pos);
           return (
             <div key={pos}>
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+              <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                 {pos} ({posPicks.length}/{slots})
               </div>
               <div className="flex flex-col gap-1.5">
@@ -95,27 +101,29 @@ export default function DraftPanel({
                   return (
                     <div
                       key={p.id}
-                      className={`flex items-center gap-2 border rounded-lg px-2.5 py-1.5 bg-card ${
+                      className={`flex items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 ${
                         clubOverLimit ? "border-destructive/40" : "border-border"
                       }`}
                     >
                       <button
                         type="button"
                         onClick={() => onSelect?.(p)}
-                        className="flex-1 min-w-0 text-left flex items-center gap-2 cursor-pointer transition hover:opacity-80"
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left transition hover:opacity-80"
                       >
-                        <span className="text-sm text-foreground truncate">{p.web_name}</span>
+                        <span className="truncate text-sm text-foreground">{p.web_name}</span>
                         <span
-                          className={`text-[10px] ${clubOverLimit ? "text-destructive font-semibold" : "text-muted-foreground"}`}
+                          className={`text-[10px] ${clubOverLimit ? "font-semibold text-destructive" : "text-muted-foreground"}`}
                         >
                           {p.team_short}
                         </span>
                       </button>
-                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">{fmtPrice(p.now_cost)}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                        {fmtPrice(p.now_cost)}
+                      </span>
                       <button
                         type="button"
                         onClick={() => onRemove(p.code)}
-                        className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition"
+                        className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-xs text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
                         aria-label={`Remove ${p.web_name}`}
                         title="Remove"
                       >
@@ -127,7 +135,7 @@ export default function DraftPanel({
                 {Array.from({ length: Math.max(0, slots - posPicks.length) }).map((_, i) => (
                   <div
                     key={`empty-${pos}-${i}`}
-                    className="border border-dashed border-border rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground/60"
+                    className="rounded-lg border border-dashed border-border px-2.5 py-1.5 text-xs text-muted-foreground/60"
                   >
                     Empty slot
                   </div>

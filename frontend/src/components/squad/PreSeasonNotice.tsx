@@ -7,18 +7,17 @@ export default function PreSeasonNotice({ deadlineISO }: { deadlineISO?: string 
 
   return (
     <Card className="p-8 text-center">
-      <div className="text-4xl mb-3">🌱</div>
-      <h2 className="text-lg font-semibold text-foreground mb-1">The new season hasn't started yet</h2>
-      <p className="text-sm text-muted-foreground mb-4">
-        Your squad will appear here once you've confirmed your picks and the first
-        deadline passes.
+      <div className="mb-3 text-4xl">🌱</div>
+      <h2 className="mb-1 text-lg font-semibold text-foreground">The new season hasn't started yet</h2>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Your squad will appear here once you've confirmed your picks and the first deadline passes.
       </p>
       {deadlineISO && !ended && (
         <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+          <div className="mb-1 text-xs tracking-wide text-muted-foreground uppercase">
             GW1 deadline · {fmtKickoff(deadlineISO)}
           </div>
-          <div className="text-2xl font-bold tabular-nums text-foreground">{text}</div>
+          <div className="text-2xl font-bold text-foreground tabular-nums">{text}</div>
         </div>
       )}
     </Card>

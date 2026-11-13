@@ -32,7 +32,7 @@ export default function SquadStatusBar({
 
   return (
     <div
-      className="flex items-center gap-2.5 text-sm overflow-x-auto whitespace-nowrap max-w-full [&::-webkit-scrollbar]:hidden"
+      className="flex max-w-full items-center gap-2.5 overflow-x-auto text-sm whitespace-nowrap [&::-webkit-scrollbar]:hidden"
       style={{ scrollbarWidth: "none" }}
       // Scrollbar is hidden for visual cleanliness, so tabIndex is the only
       // remaining affordance that a keyboard user can reach and scroll this
@@ -41,41 +41,35 @@ export default function SquadStatusBar({
       tabIndex={0}
     >
       {isLive ? (
-        <span className="badge flex items-center gap-1.5 bg-success/15 text-success border border-success/30 shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+        <span className="badge flex shrink-0 items-center gap-1.5 border border-success/30 bg-success/15 text-success">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
           LIVE
         </span>
       ) : (
-        <span className="badge bg-primary text-primary-foreground border-0 shrink-0">
-          GW {gw ?? "—"}
-        </span>
+        <span className="badge shrink-0 border-0 bg-primary text-primary-foreground">GW {gw ?? "—"}</span>
       )}
-      <span className={ended ? "text-destructive font-medium" : "text-muted-foreground"}>
-        {text}
-      </span>
+      <span className={ended ? "font-medium text-destructive" : "text-muted-foreground"}>{text}</span>
       {!compact && (
         <>
-          <span className="w-px h-4 bg-border shrink-0" />
+          <span className="h-4 w-px shrink-0 bg-border" />
           <span className="text-muted-foreground">
             Value <span className="font-semibold text-foreground">{money(teamValue)}</span>
           </span>
-          <span className="w-px h-4 bg-border shrink-0" />
+          <span className="h-4 w-px shrink-0 bg-border" />
           <span className="text-muted-foreground">
             Bank <span className="font-semibold text-foreground">{money(teamBank)}</span>
           </span>
           {activeChip && (
             <>
-              <span className="w-px h-4 bg-border shrink-0" />
-              <span className="badge pill-warn uppercase font-semibold shrink-0">
-                {activeChip.replace(/_/g, " ")}
-              </span>
+              <span className="h-4 w-px shrink-0 bg-border" />
+              <span className="badge pill-warn shrink-0 font-semibold uppercase">{activeChip.replace(/_/g, " ")}</span>
             </>
           )}
         </>
       )}
       {cache?.status !== null && (
         <div className="flex items-center gap-2.5">
-          <span className="w-px h-4 bg-border shrink-0" />
+          <span className="h-4 w-px shrink-0 bg-border" />
           <CacheIndicators status={cache.status} ageSeconds={cache.ageSeconds} isSwitching={isSwitching} />
         </div>
       )}

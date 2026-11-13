@@ -91,18 +91,8 @@ export function poolToSquadPlayers(picks: PoolPlayer[], gw?: number | null): Pla
     }
   }
 
-  const xi = [
-    ...gk.slice(0, startGk),
-    ...def.slice(0, startDef),
-    ...mid.slice(0, startMid),
-    ...fwd.slice(0, startFwd),
-  ];
-  const bench = [
-    ...gk.slice(startGk),
-    ...def.slice(startDef),
-    ...mid.slice(startMid),
-    ...fwd.slice(startFwd),
-  ];
+  const xi = [...gk.slice(0, startGk), ...def.slice(0, startDef), ...mid.slice(0, startMid), ...fwd.slice(0, startFwd)];
+  const bench = [...gk.slice(startGk), ...def.slice(startDef), ...mid.slice(startMid), ...fwd.slice(startFwd)];
 
   return [
     ...xi.map((p, i) => poolPlayerToPlayer(p, i + 1, gw)),

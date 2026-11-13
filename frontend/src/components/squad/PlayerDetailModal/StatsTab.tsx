@@ -3,7 +3,10 @@ import type { Player, PlayerRank } from "../../../lib/types";
 import { TONE_CLASS, XGI_COPY, XGI_MIN_MINUTES, xgiSummary } from "../../../lib/utils";
 import { SectionHeader, PositionTag } from "./parts";
 
-const POS_STATS: Record<number, Array<{ key: keyof Player; unit: string; rankKey: keyof NonNullable<Player["ranks"]>; primary?: boolean }>> = {
+const POS_STATS: Record<
+  number,
+  Array<{ key: keyof Player; unit: string; rankKey: keyof NonNullable<Player["ranks"]>; primary?: boolean }>
+> = {
   1: [
     { key: "saves", unit: "SV", rankKey: "saves", primary: true },
     { key: "clean_sheets", unit: "CS", rankKey: "clean_sheets" },
@@ -26,19 +29,31 @@ const POS_STATS: Record<number, Array<{ key: keyof Player; unit: string; rankKey
   ],
 };
 
-function TightRank({ val, unit, rank, primary }: { val: React.ReactNode; unit: string; rank?: PlayerRank; primary?: boolean }) {
+function TightRank({
+  val,
+  unit,
+  rank,
+  primary,
+}: {
+  val: React.ReactNode;
+  unit: string;
+  rank?: PlayerRank;
+  primary?: boolean;
+}) {
   return (
-    <div className={`p-3 rounded-xl border bg-muted/30 ${primary ? "border-border/60" : "border-border/40"}`}>
+    <div className={`rounded-xl border bg-muted/30 p-3 ${primary ? "border-border/60" : "border-border/40"}`}>
       <div className="flex items-baseline gap-1.5">
-        <span className="text-[22px] font-bold text-foreground tabular-nums leading-none tracking-tight">{val ?? "—"}</span>
-        <span className="text-[10px] font-semibold text-muted-foreground tracking-widest uppercase">{unit}</span>
+        <span className="text-[22px] leading-none font-bold tracking-tight text-foreground tabular-nums">
+          {val ?? "—"}
+        </span>
+        <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">{unit}</span>
       </div>
       {rank != null && (
         <>
-          <div className="mt-1.5 text-xs text-foreground/80 leading-none">
+          <div className="mt-1.5 text-xs leading-none text-foreground/80">
             #{rank.rank} <span className="text-muted-foreground">of {rank.of}</span>
           </div>
-          <div className="mt-1.5 h-0.75 rounded-full bg-border overflow-hidden">
+          <div className="mt-1.5 h-0.75 overflow-hidden rounded-full bg-border">
             <div
               className={`h-full rounded-full transition-none ${primary ? "bg-primary" : "bg-muted-foreground/60"}`}
               style={{ width: `${rank.pct}%` }}
@@ -50,7 +65,11 @@ function TightRank({ val, unit, rank, primary }: { val: React.ReactNode; unit: s
   );
 }
 
-export default function StatsTab({ player, season, posLabel }: {
+export default function StatsTab({
+  player,
+  season,
+  posLabel,
+}: {
   player: Player;
   season?: string | null;
   posLabel: string | null;
@@ -70,15 +89,7 @@ export default function StatsTab({ player, season, posLabel }: {
           {(POS_STATS[player.position] ?? POS_STATS[3]).map(({ key, unit, rankKey, primary }) => {
             const raw = player[key] as string | number | null | undefined;
             const val = raw != null ? (key === "points_per_game" ? Number(raw).toFixed(1) : raw) : null;
-            return (
-              <TightRank
-                key={unit}
-                val={val}
-                unit={unit}
-                rank={player.ranks?.[rankKey]}
-                primary={primary}
-              />
-            );
+            return <TightRank key={unit} val={val} unit={unit} rank={player.ranks?.[rankKey]} primary={primary} />;
           })}
         </div>
         <div className="mt-2 text-xs text-muted-foreground">
@@ -87,7 +98,9 @@ export default function StatsTab({ player, season, posLabel }: {
             player.position === 2 && player.goals_scored ? `${player.goals_scored} G` : null,
             player.bonus != null && `${player.bonus} bonus`,
             player.minutes != null && `${player.minutes} mins`,
-          ].filter(Boolean).join(" · ")}
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
       </section>
 
@@ -101,21 +114,28 @@ export default function StatsTab({ player, season, posLabel }: {
               { unit: "A", actual: player.assists ?? 0, expected: player.expected_assists, xUnit: "xA" },
               { unit: "G+A", actual: ga, expected: player.expected_goal_involvements, xUnit: "xGI" },
             ].map(({ unit, actual, expected, xUnit }) => (
-              <div key={unit} className="p-3 rounded-xl border border-border/40 bg-muted/30">
+              <div key={unit} className="rounded-xl border border-border/40 bg-muted/30 p-3">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-[22px] font-bold text-foreground tabular-nums leading-none tracking-tight">{actual}</span>
-                  <span className="text-[10px] font-semibold text-muted-foreground tracking-widest uppercase">{unit}</span>
+                  <span className="text-[22px] leading-none font-bold tracking-tight text-foreground tabular-nums">
+                    {actual}
+                  </span>
+                  <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                    {unit}
+                  </span>
                 </div>
-                <div className="mt-1.5 text-xs text-foreground/80 leading-none tabular-nums">
+                <div className="mt-1.5 text-xs leading-none text-foreground/80 tabular-nums">
                   {Number(expected ?? 0).toFixed(1)} <span className="text-muted-foreground">{xUnit}</span>
                 </div>
               </div>
             ))}
           </div>
           {player.xgi_signal && xgiCopy ? (
-            <div className={`mt-2 px-3 py-2.5 rounded-lg border text-xs leading-snug ${TONE_CLASS[xgiCopy.tone].soft}`}>
+            <div className={`mt-2 rounded-lg border px-3 py-2.5 text-xs leading-snug ${TONE_CLASS[xgiCopy.tone].soft}`}>
               <span className={`font-semibold ${TONE_CLASS[xgiCopy.tone].text}`}>{xgiCopy.label}</span>
-              <span className="text-muted-foreground"> · {xgiSummary(player.xgi_signal, ga, player.expected_goal_involvements)}</span>
+              <span className="text-muted-foreground">
+                {" "}
+                · {xgiSummary(player.xgi_signal, ga, player.expected_goal_involvements)}
+              </span>
             </div>
           ) : (
             <div className="mt-2 text-xs text-muted-foreground">
@@ -130,7 +150,7 @@ export default function StatsTab({ player, season, posLabel }: {
       {/* Per 90 */}
       <section>
         <SectionHeader label={`Per 90 · vs ${posLabel ?? "pos"}`} />
-        <div className="px-4 py-4 rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">
           Per-90 data not yet available.
         </div>
       </section>

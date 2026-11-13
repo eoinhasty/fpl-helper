@@ -11,18 +11,13 @@ export function Toggle({ checked, onChange, label }: Props) {
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`w-12 h-7 shrink-0 rounded-full border border-border relative transition
-          ${checked ? "bg-primary border-transparent" : "bg-muted border-border"}
-          cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
-        `}
+        className={`relative h-7 w-12 shrink-0 rounded-full border border-border transition ${checked ? "border-transparent bg-primary" : "border-border bg-muted"} cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
         role="switch"
         aria-checked={checked}
         aria-label={label}
       >
         <span
-          className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-card border border-border transition-transform
-            ${checked ? "translate-x-5" : ""}
-          `}
+          className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full border border-border bg-card transition-transform ${checked ? "translate-x-5" : ""} `}
         />
       </button>
     </label>

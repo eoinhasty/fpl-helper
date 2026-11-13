@@ -4,24 +4,38 @@ import * as React from "react";
 import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 
-type Fx = { home: string; away: string; home_badge: string | null; away_badge: string | null; home_difficulty: number | null; away_difficulty: number | null; kickoff: string | null; };
+type Fx = {
+  home: string;
+  away: string;
+  home_badge: string | null;
+  away_badge: string | null;
+  home_difficulty: number | null;
+  away_difficulty: number | null;
+  kickoff: string | null;
+};
 type Payload = { gw: number; first: Fx | null; fixtures: Fx[] };
 
 function Row({ f }: { f: Fx }) {
   return (
     <div className="flex items-center justify-between gap-2 py-1">
-      <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
-        {f.home_badge && <img src={f.home_badge} alt="" className="w-5 h-5 object-contain shrink-0" loading="lazy" />}
+      <div className="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
+        {f.home_badge && <img src={f.home_badge} alt="" className="h-5 w-5 shrink-0 object-contain" loading="lazy" />}
         <span className="truncate">{f.home}</span>
       </div>
-      <span className="text-muted-foreground shrink-0">vs</span>
-      <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
-        {f.away_badge && <img src={f.away_badge} alt="" className="w-5 h-5 object-contain shrink-0" loading="lazy" />}
+      <span className="shrink-0 text-muted-foreground">vs</span>
+      <div className="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
+        {f.away_badge && <img src={f.away_badge} alt="" className="h-5 w-5 shrink-0 object-contain" loading="lazy" />}
         <span className="truncate">{f.away}</span>
       </div>
-      <div className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+      <div className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
         {f.kickoff
-          ? new Date(f.kickoff).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+          ? new Date(f.kickoff).toLocaleString(undefined, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
           : "TBD"}
       </div>
     </div>
@@ -42,17 +56,19 @@ export default function NextMatchCard() {
     >
       {data?.first && (
         <>
-          <div className="mt-2 rounded-lg border border-border p-3 bg-card">
+          <div className="mt-2 rounded-lg border border-border bg-card p-3">
             <Row f={data.first} />
           </div>
 
-          <button onClick={() => setOpen(v => !v)} className="btn-primary mt-3 w-full" aria-expanded={open}>
+          <button onClick={() => setOpen((v) => !v)} className="btn-primary mt-3 w-full" aria-expanded={open}>
             {open ? "Hide fixtures" : "All fixtures this GW"}
           </button>
 
           {open && (
-            <div className="mt-3 max-h-64 overflow-auto space-y-1">
-              {data.fixtures.map((f, i) => <Row key={i} f={f} />)}
+            <div className="mt-3 max-h-64 space-y-1 overflow-auto">
+              {data.fixtures.map((f, i) => (
+                <Row key={i} f={f} />
+              ))}
             </div>
           )}
         </>

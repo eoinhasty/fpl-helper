@@ -12,25 +12,49 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* tiny base tweaks */
-:root { color-scheme: light; }
+:root {
+  color-scheme: light;
+}
 /* Theme is a manual .dark class toggle (usePreferences), not just OS
    preference — native form controls/scrollbars need to follow it too, or
    they stay light-styled even when the user has explicitly picked dark. */
-:root.dark { color-scheme: dark; }
-html, body { height: 100%; }
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+:root.dark {
+  color-scheme: dark;
+}
+html,
+body {
+  height: 100%;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 /* clip, not hidden: overflow-x: hidden makes body its own scroll container
    whenever <html> gets overflow: hidden — which Headless UI's menus do while
    open — so the page jumped back toward the top and the options opened
    off-screen. clip trims horizontal overflow without ever scrolling. */
-body { margin: 0; overflow-x: clip; }
+body {
+  margin: 0;
+  overflow-x: clip;
+}
 /* Safety net: text with no explicit text-* class follows the theme instead of
    falling back to the browser's black (invisible on the dark background). */
-body { color: var(--color-foreground); }
-* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body {
+  color: var(--color-foreground);
+}
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
 /* Mobile: avoid double-tap zoom / 300ms tap delay on interactive elements */
-a, button, [role="button"], [role="radio"], input, select, textarea {
+a,
+button,
+[role="button"],
+[role="radio"],
+input,
+select,
+textarea {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
@@ -38,7 +62,9 @@ a, button, [role="button"], [role="radio"], input, select, textarea {
 
 /* Mobile: scrollable panels (horizontal strips, sheet bodies) shouldn't
    rubber-band the page behind them once they hit their own scroll limit */
-.overflow-x-auto, .overflow-y-auto, .overflow-auto {
+.overflow-x-auto,
+.overflow-y-auto,
+.overflow-auto {
   overscroll-behavior: contain;
 }
 
@@ -47,13 +73,17 @@ a, button, [role="button"], [role="radio"], input, select, textarea {
    a 640px cutoff missed landscape phones (e.g. 844px-wide) and iPads,
    which still got the zoom despite genuinely being touch/mobile Safari. */
 @media (max-width: 1023px) {
-  input, select, textarea {
+  input,
+  select,
+  textarea {
     font-size: 16px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

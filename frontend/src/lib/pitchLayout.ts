@@ -20,13 +20,13 @@ export function spreadXsSymmetric(
   n: number,
   id: RowId,
   vbWidth: number,
-  opts: { chipGapVB?: number; gutterVB?: number } = {}
+  opts: { chipGapVB?: number; gutterVB?: number } = {},
 ): number[] {
   if (n <= 0) return [];
   const center = vbWidth / 2;
 
   const span = (X_MAX - X_MIN) * ROW_CFG[id].widthFactor;
-  const leftBound  = center - span / 2 + (opts.gutterVB ?? 0);
+  const leftBound = center - span / 2 + (opts.gutterVB ?? 0);
   const rightBound = center + span / 2 - (opts.gutterVB ?? 0);
 
   if (n === 1) return [center];

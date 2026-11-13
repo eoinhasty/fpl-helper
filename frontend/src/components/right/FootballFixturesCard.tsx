@@ -46,37 +46,54 @@ const COMPETITIONS: { value: string; label: string }[] = [
 
 function PlayerRow({ p }: { p: LineupPlayer }) {
   const cards = [
-    Number(p.yellow_cards) > 0 && <span key="y" className="inline-block w-2 h-2.5 bg-yellow-400 rounded-[1px]" title="Yellow card" />,
-    Number(p.red_cards) > 0 && <span key="r" className="inline-block w-2 h-2.5 bg-red-500 rounded-[1px]" title="Red card" />,
+    Number(p.yellow_cards) > 0 && (
+      <span key="y" className="inline-block h-2.5 w-2 rounded-[1px] bg-yellow-400" title="Yellow card" />
+    ),
+    Number(p.red_cards) > 0 && (
+      <span key="r" className="inline-block h-2.5 w-2 rounded-[1px] bg-red-500" title="Red card" />
+    ),
   ].filter(Boolean);
   return (
     <div className="flex items-center gap-1.5 py-0.5 text-xs">
-      <span className="text-muted-foreground w-6 shrink-0 text-right">{p.jersey ?? ""}</span>
-      <span className={`truncate ${p.subbed_out ? "text-muted-foreground line-through" : "text-foreground"}`}>{p.name}</span>
-      {p.subbed_out && <span className="text-muted-foreground shrink-0">↓</span>}
+      <span className="w-6 shrink-0 text-right text-muted-foreground">{p.jersey ?? ""}</span>
+      <span className={`truncate ${p.subbed_out ? "text-muted-foreground line-through" : "text-foreground"}`}>
+        {p.name}
+      </span>
+      {p.subbed_out && <span className="shrink-0 text-muted-foreground">↓</span>}
       {cards}
     </div>
   );
 }
 
 function LineupPanel({ competition, eventId }: { competition: string; eventId: string }) {
-  const { data, loading, error } = useFetch<LineupsPayload>(`/api/football/lineups?competition=${competition}&event=${eventId}`);
+  const { data, loading, error } = useFetch<LineupsPayload>(
+    `/api/football/lineups?competition=${competition}&event=${eventId}`,
+  );
 
   if (loading) return <div className="py-2 text-xs text-muted-foreground">Loading lineups…</div>;
   if (error) return <div className="py-2 text-xs text-muted-foreground">Couldn't load lineups.</div>;
-  if (!data || !data.available) return <div className="py-2 text-xs text-muted-foreground">Lineups not announced yet.</div>;
+  if (!data || !data.available)
+    return <div className="py-2 text-xs text-muted-foreground">Lineups not announced yet.</div>;
 
   return (
     <div className="grid grid-cols-2 gap-3 py-2">
       {data.teams.map((t) => (
         <div key={t.home_away ?? t.team}>
-          <div className="text-xs font-semibold text-foreground mb-1">
-            {t.team} {t.formation && <span className="text-muted-foreground font-normal">({t.formation})</span>}
+          <div className="mb-1 text-xs font-semibold text-foreground">
+            {t.team} {t.formation && <span className="font-normal text-muted-foreground">({t.formation})</span>}
           </div>
-          {t.players.filter((p) => p.starter).map((p) => <PlayerRow key={p.id ?? p.name} p={p} />)}
+          {t.players
+            .filter((p) => p.starter)
+            .map((p) => (
+              <PlayerRow key={p.id ?? p.name} p={p} />
+            ))}
           {t.players.some((p) => p.subbed_in) && (
-            <div className="mt-1 pt-1 border-t border-border">
-              {t.players.filter((p) => p.subbed_in).map((p) => <PlayerRow key={p.id ?? p.name} p={p} />)}
+            <div className="mt-1 border-t border-border pt-1">
+              {t.players
+                .filter((p) => p.subbed_in)
+                .map((p) => (
+                  <PlayerRow key={p.id ?? p.name} p={p} />
+                ))}
             </div>
           )}
         </div>
@@ -86,29 +103,45 @@ function LineupPanel({ competition, eventId }: { competition: string; eventId: s
 }
 
 function TeamSide({ team, align }: { team: Team; align: "home" | "away" }) {
-  const logo = team.logo && <img src={team.logo} alt="" className="w-4 h-4 object-contain shrink-0" loading="lazy" />;
+  const logo = team.logo && <img src={team.logo} alt="" className="h-4 w-4 shrink-0 object-contain" loading="lazy" />;
   return (
-    <div className={`flex flex-1 basis-0 items-center gap-1.5 font-medium text-foreground min-w-0 ${align === "away" ? "justify-end" : ""}`}>
+    <div
+      className={`flex min-w-0 flex-1 basis-0 items-center gap-1.5 font-medium text-foreground ${align === "away" ? "justify-end" : ""}`}
+    >
       {align === "home" && logo}
-      <span className="truncate" title={team.name}>{team.short_name ?? team.name}</span>
+      <span className="truncate" title={team.name}>
+        {team.short_name ?? team.name}
+      </span>
       {align === "away" && logo}
     </div>
   );
 }
 
-function FixtureRow({ f, competition, expanded, onToggle }: { f: Fixture; competition: string; expanded: boolean; onToggle: () => void }) {
+function FixtureRow({
+  f,
+  competition,
+  expanded,
+  onToggle,
+}: {
+  f: Fixture;
+  competition: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   return (
     <div className="border-b border-border last:border-0">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="w-full cursor-pointer flex items-center gap-2 py-1.5 text-left hover:bg-muted/50 rounded-sm -mx-1 px-1"
+        className="-mx-1 flex w-full cursor-pointer items-center gap-2 rounded-sm px-1 py-1.5 text-left hover:bg-muted/50"
       >
         <TeamSide team={f.home} align="home" />
-        <div className="w-12 text-xs text-muted-foreground shrink-0 text-center tabular-nums">
+        <div className="w-12 shrink-0 text-center text-xs text-muted-foreground tabular-nums">
           {f.completed ? (
-            <span className="font-semibold text-foreground">{f.home_goals} – {f.away_goals}</span>
+            <span className="font-semibold text-foreground">
+              {f.home_goals} – {f.away_goals}
+            </span>
           ) : (
             new Date(f.date).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
           )}
@@ -149,7 +182,10 @@ export default function FootballFixturesCard() {
         <SelectMenu<string>
           value={competition}
           options={COMPETITIONS}
-          onChange={(v) => { setCompetition(v); setExpandedId(null); }}
+          onChange={(v) => {
+            setCompetition(v);
+            setExpandedId(null);
+          }}
           ariaLabel="Competition"
           anchor="bottom end"
           className="w-44 shrink-0"
@@ -160,7 +196,7 @@ export default function FootballFixturesCard() {
         <div className="mt-1 max-h-64 overflow-auto">
           {groupByDay(data.fixtures).map((g) => (
             <div key={g.label}>
-              <div className="sticky top-0 z-10 bg-card pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="sticky top-0 z-10 bg-card pt-2 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 {g.label}
               </div>
               {g.fixtures.map((f) => (

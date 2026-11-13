@@ -26,14 +26,12 @@ export function Segmented<T extends string>({
 }) {
   const idx = Math.max(
     0,
-    options.findIndex((o) => o.value === value)
+    options.findIndex((o) => o.value === value),
   );
 
   // Keyboard navigation: ← → Home End
   const onKeyDown = (e: React.KeyboardEvent) => {
-    const dir =
-      e.key === "ArrowRight" ? 1 :
-      e.key === "ArrowLeft"  ? -1 : 0;
+    const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
 
     if (dir !== 0) {
       e.preventDefault();
@@ -67,10 +65,12 @@ export function Segmented<T extends string>({
         // min-h-11, SelectMenu's h-11) instead of sitting ~6px taller —
         // three visibly different control heights side by side (46/40/44px)
         // was flagged as inconsistent in the SquadDashboard header row.
-        "inline-flex rounded-2xl border border-border p-0.5 bg-card",
+        "inline-flex rounded-2xl border border-border bg-card p-0.5",
         className,
         fullWidth && "w-full",
-      ].filter(Boolean).join(" ")}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       onKeyDown={onKeyDown}
     >
       {options.map((opt) => {
@@ -89,12 +89,12 @@ export function Segmented<T extends string>({
             onClick={() => !opt.disabled && onChange(opt.value)}
             className={[
               common,
-              active
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted/60",
+              active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted/60",
               fullWidth && "flex-1",
-              opt.disabled && "opacity-50 cursor-not-allowed",
-            ].filter(Boolean).join(" ")}
+              opt.disabled && "cursor-not-allowed opacity-50",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {opt.label}
           </button>

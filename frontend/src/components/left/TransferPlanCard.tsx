@@ -75,12 +75,12 @@ function MoveRow({
   const canKeep = resp.squad.includes(out);
   return (
     <li className="rounded-lg border border-border bg-card px-1 py-1">
-      <PlayerOpen id={into} className="w-full flex items-center justify-between gap-2 rounded-md px-1 py-0.5">
-        <div className="flex items-center gap-2 min-w-0">
-          {shirt && <img src={shirt} alt="" className="w-6 h-6 object-contain shrink-0" />}
+      <PlayerOpen id={into} className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-0.5">
+        <div className="flex min-w-0 items-center gap-2">
+          {shirt && <img src={shirt} alt="" className="h-6 w-6 shrink-0 object-contain" />}
           <div className="min-w-0">
-            <div className="text-sm font-medium text-foreground truncate">{i.name}</div>
-            <div className="text-[11px] text-muted-foreground truncate" title={`Sell ${o.name} (${fmtPrice(o.cost)})`}>
+            <div className="truncate text-sm font-medium text-foreground">{i.name}</div>
+            <div className="truncate text-[11px] text-muted-foreground" title={`Sell ${o.name} (${fmtPrice(o.cost)})`}>
               {i.team} · for {o.name}
             </div>
             {gain > 0 && (
@@ -91,14 +91,14 @@ function MoveRow({
             )}
           </div>
         </div>
-        <div className="text-right shrink-0 text-xs text-muted-foreground space-y-0.5">
+        <div className="shrink-0 space-y-0.5 text-right text-xs text-muted-foreground">
           <div className="font-semibold text-foreground">{i.pts[gwIndex].toFixed(1)} pts</div>
           <div>{fmtPrice(i.cost)}</div>
           <div className={bank > 0 ? TONE_CLASS.success.text : undefined}>{fmtBank(bank)}</div>
         </div>
       </PlayerOpen>
       {constrain && (
-        <div className="flex flex-wrap gap-x-4 text-[11px] mt-1 px-1">
+        <div className="mt-1 flex flex-wrap gap-x-4 px-1 text-[11px]">
           {canKeep && (
             <button type="button" onClick={() => constrain.keep(out)} className={ROW_ACTION}>
               Keep {o.name}
@@ -142,17 +142,15 @@ function WeekBlock({
   const captain = resp.players[week.captain];
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-2 mb-1">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <div className="text-xs tracking-wide text-muted-foreground uppercase">
           GW{week.gw}
           {g === 0 && " · this week"}
           {wildcard && " · wildcard"}
-          {chip && <span className="text-primary-strong font-semibold"> · {chip}</span>}
+          {chip && <span className="font-semibold text-primary-strong"> · {chip}</span>}
         </div>
         <div className="text-xs text-muted-foreground">
-          {week.hits > 0 && (
-            <span className={TONE_CLASS.destructive.text}>−{week.hits * resp.hit_cost} hit · </span>
-          )}
+          {week.hits > 0 && <span className={TONE_CLASS.destructive.text}>−{week.hits * resp.hit_cost} hit · </span>}
           {week.into.length > 0 && <>bank {fmtPrice(bank)} · </>}
           <span className="font-semibold text-foreground">{week.points.toFixed(1)} pts</span>
         </div>
@@ -166,8 +164,11 @@ function WeekBlock({
       ) : (
         <div className="text-sm text-muted-foreground">No transfer — roll it over</div>
       )}
-      <div className="text-[11px] text-muted-foreground mt-1">
-        Captain <PlayerOpen id={week.captain} inline>{captain.name}</PlayerOpen>
+      <div className="mt-1 text-[11px] text-muted-foreground">
+        Captain{" "}
+        <PlayerOpen id={week.captain} inline>
+          {captain.name}
+        </PlayerOpen>
         {week.chip === "3xc" && " ×3"}
         {week.chip === "bboost" && " · all 15 score"}
         {week.chip && (
@@ -227,7 +228,7 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
         type="button"
         onClick={onRemove}
         aria-label={`Remove: ${label}`}
-        className="-my-2 h-11 w-8 rounded-full text-muted-foreground cursor-pointer hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="-my-2 h-11 w-8 cursor-pointer rounded-full text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         ×
       </button>
@@ -269,7 +270,10 @@ function PlanControls({
         <OptionSelect<number | null>
           label="Wildcard"
           value={options.wildcard}
-          options={[{ label: "Not planned", value: null }, ...wildcardGws.map((gw) => ({ label: `GW${gw}`, value: gw }))]}
+          options={[
+            { label: "Not planned", value: null },
+            ...wildcardGws.map((gw) => ({ label: `GW${gw}`, value: gw })),
+          ]}
           onChange={(wildcard) => setOptions({ ...options, wildcard })}
         />
       )}
@@ -305,20 +309,20 @@ function PlanControls({
             <Chip
               key={`k${id}`}
               label={`Keep ${resp.players[id]?.name ?? "player"}`}
-                onRemove={() => setOptions({ ...options, keep: options.keep.filter((k) => k !== id) })}
+              onRemove={() => setOptions({ ...options, keep: options.keep.filter((k) => k !== id) })}
             />
           ))}
           {options.exclude.map((p) => (
             <Chip
               key={`x${p.id}`}
               label={`Don't buy ${p.name}`}
-                onRemove={() => setOptions({ ...options, exclude: options.exclude.filter((x) => x.id !== p.id) })}
+              onRemove={() => setOptions({ ...options, exclude: options.exclude.filter((x) => x.id !== p.id) })}
             />
           ))}
           <button
             type="button"
             onClick={() => setOptions({ ...options, keep: [], exclude: [] })}
-            className={`${LINK_BUTTON} text-xs ml-1`}
+            className={`${LINK_BUTTON} ml-1 text-xs`}
           >
             Clear
           </button>
@@ -399,7 +403,7 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
       <TransferSuggestionsCard
         entry={entry}
         notice={
-          <div className="text-xs text-muted-foreground mb-2">
+          <div className="mb-2 text-xs text-muted-foreground">
             {plan ? (
               <>
                 Your {gws}-GW plan is ready ·{" "}
@@ -437,7 +441,7 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
       right={span && <span className="text-xs text-muted-foreground">{span}</span>}
     >
       {failed && (
-        <div className="text-xs text-muted-foreground mb-2" role="status">
+        <div className="mb-2 text-xs text-muted-foreground" role="status">
           Couldn't plan with these options ·{" "}
           <button type="button" onClick={() => setOptions(DEFAULT_PLAN_OPTIONS)} className={LINK_BUTTON}>
             Reset
@@ -446,7 +450,7 @@ export default function TransferPlanCard({ entry }: { entry: number | "" }) {
       )}
       {solving && !display && (
         // ~3 s on a desktop, longer on a phone — say what's happening
-        <div className="space-y-2 mt-1">
+        <div className="mt-1 space-y-2">
           <div className="text-xs text-muted-foreground">Planning transfers for the next {resp?.gws.length} GWs…</div>
           <Skeleton className="h-3 w-3/4" />
           <Skeleton className="h-3 w-full" />

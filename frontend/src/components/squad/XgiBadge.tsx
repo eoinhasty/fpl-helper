@@ -15,7 +15,7 @@ export default function XgiBadge({
   const t = TONE_CLASS[copy.tone];
   return (
     <span
-      className={`text-[10px] px-1.5 py-0.5 rounded-full border whitespace-nowrap ${t.soft} ${t.text}`}
+      className={`rounded-full border px-1.5 py-0.5 text-[10px] whitespace-nowrap ${t.soft} ${t.text}`}
       title={xgiSummary(signal, ga, xgi)}
     >
       {copy.label}

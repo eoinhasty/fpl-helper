@@ -43,28 +43,18 @@ export default function LeaguesCard({ entry, preSeason }: { entry: number | ""; 
       {data && (
         <>
           {ranksPending && (
-            <div className="text-xs text-muted-foreground mb-3">
-              Ranks appear once the season begins.
-            </div>
+            <div className="mb-3 text-xs text-muted-foreground">Ranks appear once the season begins.</div>
           )}
 
           {/* Summary tiles */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="mb-3 grid grid-cols-2 gap-2">
             <Tile label="Overall Rank" value={num(rank(data.overall_rank))} />
             <Tile label="GW Rank" value={num(rank(data.event_rank))} />
           </div>
 
-          <Section
-            title="My Leagues"
-            rows={myClassic}
-            emptyText="No private leagues joined."
-          />
+          <Section title="My Leagues" rows={myClassic} emptyText="No private leagues joined." />
           <Section title="Head-to-Head" rows={data.h2h} />
-          <Section
-            title="Global"
-            rows={globalClassic}
-            emptyText="No global leagues."
-          />
+          <Section title="Global" rows={globalClassic} emptyText="No global leagues." />
         </>
       )}
     </DataCard>
@@ -75,35 +65,23 @@ export default function LeaguesCard({ entry, preSeason }: { entry: number | ""; 
 
 function Tile({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-border px-3 py-2 bg-card">
+    <div className="rounded-lg border border-border bg-card px-3 py-2">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="font-semibold text-foreground">{value}</div>
     </div>
   );
 }
 
-function Section({
-  title,
-  rows,
-  emptyText,
-}: {
-  title: string;
-  rows: LeagueRow[];
-  emptyText?: string;
-}) {
+function Section({ title, rows, emptyText }: { title: string; rows: LeagueRow[]; emptyText?: string }) {
   const items = React.useMemo(() => rows ?? [], [rows]);
   const empty = emptyText ?? `No ${title.toLowerCase()} leagues.`;
 
   return (
     <>
-      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-        {title}
-      </div>
+      <div className="mb-1 text-xs tracking-wide text-muted-foreground uppercase">{title}</div>
 
-      <ul role="list" aria-label={title} className="space-y-1 mb-3">
-        {items.length === 0 && (
-          <li className="text-sm text-muted-foreground">{empty}</li>
-        )}
+      <ul role="list" aria-label={title} className="mb-3 space-y-1">
+        {items.length === 0 && <li className="text-sm text-muted-foreground">{empty}</li>}
         {items.map((l) => (
           <LeagueItem key={l.id} row={l} />
         ))}
@@ -120,17 +98,11 @@ function LeagueItem({ row }: { row: LeagueRow }) {
 
   return (
     <li className="flex items-center justify-between rounded-md border border-border bg-card px-2 py-1.5">
-      <span className="text-sm text-foreground truncate">{row.name}</span>
+      <span className="truncate text-sm text-foreground">{row.name}</span>
 
       <span className="inline-flex items-center gap-2">
-        {d && (
-          <span className={`text-[11px] ${improved ? "text-success" : "text-destructive"}`}>
-            {d}
-          </span>
-        )}
-        <span className="text-xs rounded-full border border-border px-2 py-0.5 bg-card text-foreground">
-          {num(r)}
-        </span>
+        {d && <span className={`text-[11px] ${improved ? "text-success" : "text-destructive"}`}>{d}</span>}
+        <span className="rounded-full border border-border bg-card px-2 py-0.5 text-xs text-foreground">{num(r)}</span>
       </span>
     </li>
   );

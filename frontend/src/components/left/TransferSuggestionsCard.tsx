@@ -9,21 +9,21 @@ import PlayerOpen from "../squad/PlayerOpen";
 const POS_LABEL: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
 function FdrDot({ d }: { d: number }) {
-  return <span className={`inline-block w-2 h-2 rounded-full ${fdrDotClass(d)}`} title={`FDR ${d}`} />;
+  return <span className={`inline-block h-2 w-2 rounded-full ${fdrDotClass(d)}`} title={`FDR ${d}`} />;
 }
 
 function SuggestionRow({ p }: { p: TransferSuggestion }) {
-  const fxLabel = p.has_dgw && p.fixture
-    ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp} • DGW`
-    : p.fixture
-    ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp}`
-    : "BGW";
+  const fxLabel =
+    p.has_dgw && p.fixture
+      ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp} • DGW`
+      : p.fixture
+        ? `${p.fixture.home ? "vs" : "@"} ${p.fixture.opp}`
+        : "BGW";
 
   // ep_next is already a whole-GW total, so a DGW needs no scaling
   const xPts = p.ep_next ? parseFloat(p.ep_next) : null;
-  const statLabel = xPts != null && xPts > 0
-    ? `${xPts.toFixed(1)} xPts`
-    : `${parseFloat(p.form ?? "0").toFixed(1)} form`;
+  const statLabel =
+    xPts != null && xPts > 0 ? `${xPts.toFixed(1)} xPts` : `${parseFloat(p.form ?? "0").toFixed(1)} form`;
   const own = p.selected_by_percent != null ? `${Number(p.selected_by_percent).toFixed(1)}% own` : null;
 
   // Why this beats the player it replaces, from the factor the backend found
@@ -53,47 +53,48 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
   // so show the money side and leave that trade-off to the user.
   const bankDelta = out.sell_price - p.price;
   const bankLabel =
-    bankDelta === 0
-      ? "bank ±£0.0"
-      : `bank ${bankDelta > 0 ? "+" : "−"}£${Math.abs(bankDelta / 10).toFixed(1)}`;
+    bankDelta === 0 ? "bank ±£0.0" : `bank ${bankDelta > 0 ? "+" : "−"}£${Math.abs(bankDelta / 10).toFixed(1)}`;
 
   return (
     <li>
-    <PlayerOpen id={p.element} className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-2 py-1.5 gap-2">
-      <div className="flex items-center gap-2 min-w-0">
-        {p.shirt_url && (
-          <img
-            src={p.shirt_url}
-            alt=""
-            className="w-6 h-6 object-contain shrink-0"
-          />
-        )}
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-foreground truncate">{p.name}</div>
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span>{p.team}</span>
-            <span>·</span>
-            {p.fixture && <FdrDot d={p.fixture.difficulty} />}
-            <span className="truncate">{fxLabel}</span>
-          </div>
-          <div className="text-[11px] text-muted-foreground truncate" title={`Sell ${out.name} (${fmtPrice(out.sell_price)})`}>
-            for {out.name}
-            {reason && <> · <span className={reason.cls}>{reason.text}</span></>}
+      <PlayerOpen
+        id={p.element}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-card px-2 py-1.5"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          {p.shirt_url && <img src={p.shirt_url} alt="" className="h-6 w-6 shrink-0 object-contain" />}
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium text-foreground">{p.name}</div>
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span>{p.team}</span>
+              <span>·</span>
+              {p.fixture && <FdrDot d={p.fixture.difficulty} />}
+              <span className="truncate">{fxLabel}</span>
+            </div>
+            <div
+              className="truncate text-[11px] text-muted-foreground"
+              title={`Sell ${out.name} (${fmtPrice(out.sell_price)})`}
+            >
+              for {out.name}
+              {reason && (
+                <>
+                  {" "}
+                  · <span className={reason.cls}>{reason.text}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-      <div className="text-right shrink-0 text-xs text-muted-foreground space-y-0.5">
-        <div className="font-semibold text-foreground">{statLabel}</div>
-        <div>
-          {fmtPrice(p.price)}
-          {own && <> · {own}</>}
+        <div className="shrink-0 space-y-0.5 text-right text-xs text-muted-foreground">
+          <div className="font-semibold text-foreground">{statLabel}</div>
+          <div>
+            {fmtPrice(p.price)}
+            {own && <> · {own}</>}
+          </div>
+          <div className={bankDelta > 0 ? TONE_CLASS.success.text : undefined}>{bankLabel}</div>
+          {p.start_probability < 0.75 && <div className="text-[10px]">{pct(p.start_probability)} start</div>}
         </div>
-        <div className={bankDelta > 0 ? TONE_CLASS.success.text : undefined}>{bankLabel}</div>
-        {p.start_probability < 0.75 && (
-          <div className="text-[10px]">{pct(p.start_probability)} start</div>
-        )}
-      </div>
-    </PlayerOpen>
+      </PlayerOpen>
     </li>
   );
 }
@@ -124,18 +125,19 @@ export default function TransferSuggestionsCard({ entry, notice }: { entry: numb
       {data && data.season_status !== "pre_season" && data.suggestions.length === 0 && (
         <div className="text-sm text-muted-foreground">No affordable upgrades on your current squad.</div>
       )}
-      {data && data.suggestions.map((group) => (
-        <div key={group.position} className="mb-3 last:mb-0">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-            {POS_LABEL[group.position]}
+      {data &&
+        data.suggestions.map((group) => (
+          <div key={group.position} className="mb-3 last:mb-0">
+            <div className="mb-1 text-xs tracking-wide text-muted-foreground uppercase">
+              {POS_LABEL[group.position]}
+            </div>
+            <ul className="space-y-1.5">
+              {group.players.map((p) => (
+                <SuggestionRow key={p.element} p={p} />
+              ))}
+            </ul>
           </div>
-          <ul className="space-y-1.5">
-            {group.players.map((p) => (
-              <SuggestionRow key={p.element} p={p} />
-            ))}
-          </ul>
-        </div>
-      ))}
+        ))}
     </DataCard>
   );
 }

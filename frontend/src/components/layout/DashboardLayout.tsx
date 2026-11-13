@@ -40,21 +40,30 @@ export default function DashboardLayout({
   // anything but the `lg` default. Re-add if a future page needs it.)
 
   const GAP: Record<number, string> = {
-    0: "gap-0", 1: "gap-1", 2: "gap-2", 3: "gap-3", 4: "gap-4",
-    5: "gap-5", 6: "gap-6", 7: "gap-7", 8: "gap-8", 9: "gap-9", 10: "gap-10",
+    0: "gap-0",
+    1: "gap-1",
+    2: "gap-2",
+    3: "gap-3",
+    4: "gap-4",
+    5: "gap-5",
+    6: "gap-6",
+    7: "gap-7",
+    8: "gap-8",
+    9: "gap-9",
+    10: "gap-10",
   };
 
   const gapClass = GAP[gap] ?? "gap-5";
 
   return (
     <div
-      className={`w-full mx-auto px-4 py-4 grid grid-cols-12 ${gapClass} ${containerClassName}`}
+      className={`mx-auto grid w-full grid-cols-12 px-4 py-4 ${gapClass} ${containerClassName}`}
       style={{ maxWidth: `${maxWidthPx}px` }}
     >
       {top && <div className="col-span-12">{top}</div>}
 
       <aside
-        className="col-span-12 lg:col-span-3 order-3 lg:order-none space-y-4 self-start lg:sticky"
+        className="order-3 col-span-12 space-y-4 self-start lg:sticky lg:order-none lg:col-span-3"
         style={{ top: stickyOffsetPx }}
         aria-label="Left sidebar"
       >
@@ -64,20 +73,20 @@ export default function DashboardLayout({
       <main
         id="main-content"
         role="main"
-        className={`col-span-12 lg:col-span-6 order-1 lg:order-none space-y-4 ${contentClassName}`}
+        className={`order-1 col-span-12 space-y-4 lg:order-none lg:col-span-6 ${contentClassName}`}
       >
         {children}
       </main>
 
       <aside
-        className="col-span-12 lg:col-span-3 order-2 lg:order-none space-y-4 self-start lg:sticky"
+        className="order-2 col-span-12 space-y-4 self-start lg:sticky lg:order-none lg:col-span-3"
         style={{ top: stickyOffsetPx }}
         aria-label="Right sidebar"
       >
         {right}
       </aside>
 
-      {footer && <div className="col-span-12 order-4">{footer}</div>}
+      {footer && <div className="order-4 col-span-12">{footer}</div>}
     </div>
   );
 }

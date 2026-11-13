@@ -30,9 +30,14 @@ export default function BestXiBanner({
         )}
         <span className="text-muted-foreground">
           {" — "}
-          {s.bringIn.length > 0
-            ? <>start {names(s.bringIn)} for {names(s.drop)}{s.formation !== s.currentFormation && <> ({s.formation})</>}</>
-            : <>reorder your bench: {names(s.bench.slice(1))}</>}
+          {s.bringIn.length > 0 ? (
+            <>
+              start {names(s.bringIn)} for {names(s.drop)}
+              {s.formation !== s.currentFormation && <> ({s.formation})</>}
+            </>
+          ) : (
+            <>reorder your bench: {names(s.bench.slice(1))}</>
+          )}
         </span>
       </div>
       <button

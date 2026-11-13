@@ -9,6 +9,8 @@
     "dev:api": "nodemon --cwd ../backend --watch app --ext py --exec \".venv/Scripts/python.exe -m uvicorn app.main:app --port 8000\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
     "preview": "vite preview"
   },
   "dependencies": {
