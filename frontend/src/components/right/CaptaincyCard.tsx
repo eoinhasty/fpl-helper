@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "@tanstack/react-router";
 import DataCard from "../ui/DataCard";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
@@ -97,6 +98,16 @@ export default function CaptaincyCard({
   return (
     <DataCard
       title="Captaincy Picks"
+      right={
+        projected && picks.length > 0 ? (
+          <Link
+            to="/model"
+            className="rounded text-[11px] text-muted-foreground hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            Track record
+          </Link>
+        ) : undefined
+      }
       loading={!unavailable && loading && !players}
       loadingContent={<CaptaincySkeleton />}
       error={unavailable ? null : error}
