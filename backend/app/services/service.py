@@ -1158,7 +1158,8 @@ class FPLService:
                     [(boot_status, boot_age)],
                     TTL_PICKS,
                 )
-            picks_data, _, _, reading_status, reading_age = picks_result
+            picks_data, used_gw, _, reading_status, reading_age = picks_result
+            picks_data = await self.reverted_picks(entry_id, picks_data, used_gw)
             picks_list = picks_data.get("picks", [])
             bank = (picks_data.get("entry_history") or {}).get("bank", 0)
 
@@ -1314,6 +1315,18 @@ class FPLService:
             [(reading_status, reading_age)],
             ttl_used,
         )
+
+    async def reverted_picks(self, entry_id: int, picks_data: dict, gw: int) -> dict:
+        """The picks to plan transfers from: a free hit squad reverts after
+        its GW, so that GW's picks give way to the GW before's (squad and
+        bank). Unchanged otherwise, or if the earlier picks can't be had."""
+        if picks_data.get("active_chip") != "freehit" or gw <= 1:
+            return picks_data
+        try:
+            prev, _, _ = await self.picks(entry_id, gw - 1)
+        except httpx.HTTPStatusError:
+            return picks_data
+        return prev
 
     async def picks_with_fallback(
         self, entry_id: int, next_gw: int, current_gw: int

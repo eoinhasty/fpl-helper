@@ -135,7 +135,8 @@ async def build_transfer_plan(
         )
         if picks_result is None:
             return unavailable("no_squad", [(boot_status, boot_age)])
-        picks_data, _, _, p_status, p_age = picks_result
+        picks_data, used_gw, _, p_status, p_age = picks_result
+        picks_data = await svc.reverted_picks(entry_id, picks_data, used_gw)
         picks_list = picks_data.get("picks", [])
         history, _, _ = await svc.entry_history(entry_id)
         log, _, _ = await svc.entry_transfers(entry_id)
