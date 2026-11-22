@@ -145,3 +145,12 @@ export function gwPointsDisplay(p: Player): { points: number; counted: boolean; 
     tooltip: mult > 1 ? `Captain: ${p.gw_points} × ${mult} = ${points}` : `GW points: ${points}`,
   };
 }
+
+/** FPL's chip ids → [short label, full name] */
+export const CHIP_NAMES: Record<string, [string, string]> = {
+  bboost: ["BB", "Bench Boost"],
+  "3xc": ["TC", "Triple Captain"],
+  freehit: ["FH", "Free Hit"],
+  wildcard: ["WC", "Wildcard"],
+  manager: ["AM", "Assistant Manager"],
+};

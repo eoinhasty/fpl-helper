@@ -4,7 +4,7 @@ import { apiBase, apiError, baseHeaders, tokenHeaders, tryRefresh } from "../lib
 
 type Settled<T> = { key: string; data: T | null; error: string | null };
 
-export function useFetch<T>(url?: string | null, opts?: { auth?: boolean }) {
+export function useFetch<T>(url?: string | null, opts?: { auth?: boolean; refreshMs?: number }) {
   const prefixedUrl = url ? `${apiBase}${url}` : null;
   const auth = opts?.auth ?? false;
   const key = prefixedUrl ? `${auth ? "auth" : "anon"}:${prefixedUrl}` : null;
@@ -15,6 +15,19 @@ export function useFetch<T>(url?: string | null, opts?: { auth?: boolean }) {
   // (before the effect ran) and an aborted request's cleanup both report
   // "not loading, no data", which flashed every card's empty state.
   const [settled, setSettled] = React.useState<Settled<T> | null>(null);
+
+  // `refreshMs` refetches the same request in the background while the tab is
+  // visible. The key doesn't change, so the shown data stays put (no loading
+  // state), and a failed refresh keeps it rather than swapping in the error.
+  const refreshMs = opts?.refreshMs;
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    if (!key || !refreshMs) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") setTick((t) => t + 1);
+    }, refreshMs);
+    return () => window.clearInterval(id);
+  }, [key, refreshMs]);
 
   React.useEffect(() => {
     if (!prefixedUrl || !key) return;
@@ -31,11 +44,12 @@ export function useFetch<T>(url?: string | null, opts?: { auth?: boolean }) {
         setSettled({ key, data, error: null });
       } catch (e: unknown) {
         if ((e as Error)?.name === "AbortError") return;
-        setSettled({ key, data: null, error: (e as Error)?.message ?? "Failed" });
+        const error = (e as Error)?.message ?? "Failed";
+        setSettled((prev) => (prev?.key === key && prev.data != null ? prev : { key, data: null, error }));
       }
     })();
     return () => ac.abort();
-  }, [prefixedUrl, key, auth]);
+  }, [prefixedUrl, key, auth, tick]);
 
   const current = key !== null && settled?.key === key ? settled : null;
   return {

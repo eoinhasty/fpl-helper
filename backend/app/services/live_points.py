@@ -135,6 +135,21 @@ def points_breakdown(
     return rows
 
 
+def provisional_bonus(fixtures: List[dict]) -> Dict[int, int]:
+    """element → bonus that FPL hasn't awarded yet, from the BPS of every
+    started fixture whose bonus isn't confirmed (summed over a double GW)."""
+    out: Dict[int, int] = {}
+    for fx in fixtures:
+        if not fx.get("started") or bonus_confirmed(fx):
+            continue
+        table = fixture_bps(fx)
+        for element, bps in table.items():
+            bonus = bonus_for_rank(bps_rank(bps, table))
+            if bonus:
+                out[element] = out.get(element, 0) + bonus
+    return out
+
+
 def _bps_fields(table: Dict[int, int], element: int) -> dict:
     # Players on 0 BPS aren't listed in the fixture's stats
     bps = table.get(element, 0)

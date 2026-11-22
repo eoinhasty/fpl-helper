@@ -38,5 +38,18 @@ const trackRecordRoute = createRoute({
   component: lazyRouteComponent(() => import("./pages/TrackRecordPage")),
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, privacyRoute, fixturesRoute, plannerRoute, trackRecordRoute]);
+const leagueLiveRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/league/$leagueId",
+  component: lazyRouteComponent(() => import("./pages/LeagueLivePage")),
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  privacyRoute,
+  fixturesRoute,
+  plannerRoute,
+  trackRecordRoute,
+  leagueLiveRoute,
+]);
 export const router = createRouter({ routeTree, defaultPreload: "intent", defaultNotFoundComponent: NotFoundPage });

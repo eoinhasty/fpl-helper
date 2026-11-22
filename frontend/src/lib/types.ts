@@ -308,3 +308,62 @@ export type TrackRecordGw = {
 };
 
 export type TrackRecordResponse = { season: string | null; gws: TrackRecordGw[] };
+
+/** /api/leagues/{id}/live — a classic league's table with this GW scored live */
+export type LeagueLiveCaptain = {
+  element: number;
+  name: string | null;
+  multiplier: number;
+  points: number;
+  state: "playing" | "to_play" | "done";
+};
+
+export type LeagueLiveEntry = {
+  entry: number;
+  entry_name: string | null;
+  player_name: string | null;
+  rank: number;
+  pre_rank: number;
+  /** This GW's points so far, hits taken off, provisional bonus in */
+  gw_points: number;
+  hits: number | null;
+  pre_total: number;
+  total: number;
+  chip: string | null;
+  captain: LeagueLiveCaptain | null;
+  /** Every pick with its multiplier (0 = bench); null when unscored */
+  picks: { element: number; multiplier: number }[] | null;
+  /** XI players (all 15 on a bench boost) done / in a match now / still to play */
+  played: number | null;
+  playing: number | null;
+  to_play: number | null;
+  /** FPL wouldn't serve this entry's picks: FPL's own figures, not live */
+  unscored?: boolean;
+};
+
+export type LeagueLiveResponse = {
+  league: { id: number; name: string | null; start_event: number | null; truncated: boolean };
+  available: boolean;
+  reason?: "pre_season" | "not_started";
+  gw?: number;
+  finished?: boolean;
+  bonus_provisional?: boolean;
+  /** The GW's matches: done, in play, and in all */
+  matches?: { done: number; playing: number; total: number };
+  entries?: LeagueLiveEntry[];
+  /** Every picked player, by element id */
+  players?: Record<string, LeagueLivePlayer>;
+};
+
+export type LeagueLivePlayer = {
+  name: string | null;
+  team: string | null;
+  /** FPL element_type: 1 GK, 2 DEF, 3 MID, 4 FWD */
+  position: number | null;
+  /** This GW's points, provisional bonus in */
+  points: number;
+  state: "playing" | "to_play" | "done";
+  /** e.g. "ARS (H)"; two on a double, none on a blank */
+  fixtures: string[];
+  shirt_url: string | null;
+};

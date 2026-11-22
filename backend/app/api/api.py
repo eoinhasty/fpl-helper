@@ -496,6 +496,25 @@ async def leagues(request: Request, response: Response, entry_id: int):
     }
 
 
+@router.get("/leagues/{league_id}/live")
+@limiter.limit("20/minute")
+async def league_live(request: Request, response: Response, league_id: int):
+    """A classic league's table with this GW scored live. Public data only —
+    every rival's picks are public once the deadline passes."""
+    svc: FPLService = request.app.state.svc
+    try:
+        body, readings = await svc.league_live(league_id)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(
+                404, detail=f"League {league_id} not found. Only classic leagues work."
+            )
+        raise
+    status, age = combine_cache(*readings)
+    set_cache_headers(response, status, age, TTL_MYTEAM)
+    return body
+
+
 @router.get("/pl/next-match")
 @limiter.limit("30/minute")
 async def pl_next_match(request: Request, response: Response):
