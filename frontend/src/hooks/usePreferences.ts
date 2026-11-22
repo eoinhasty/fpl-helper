@@ -51,7 +51,11 @@ export function usePreferences() {
   // save, apply theme (only when it actually changed), tell other instances on this tab
   const prevTheme = useRef<Theme | undefined>(undefined);
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(prefs));
+    try {
+      localStorage.setItem(KEY, JSON.stringify(prefs));
+    } catch {
+      // storage blocked or full: the preference still applies for this visit
+    }
     if (prefs.theme !== prevTheme.current) {
       applyTheme(prefs.theme);
       prevTheme.current = prefs.theme;
