@@ -16,7 +16,9 @@ function Captain({ row, players }: { row: LeagueLiveEntry; players: PlayerMap })
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <Shirt url={players[c.element]?.shirt_url} size="h-6 w-6" />
-      <span className="shrink-0 text-[10px] font-bold text-muted-foreground">{c.multiplier === 3 ? "TC" : "C"}</span>
+      <span className="shrink-0 text-[10px] font-bold text-muted-foreground">
+        {c.vice ? "VC" : c.multiplier === 3 ? "TC" : "C"}
+      </span>
       <span className="truncate text-foreground">{c.name}</span>
       <span className="shrink-0 text-muted-foreground tabular-nums">{c.points}</span>
       {c.state === "playing" && <LiveDot />}
@@ -51,9 +53,15 @@ function Row({
         </span>
         <span className="block truncate text-xs text-muted-foreground">
           {row.player_name}
+          {!!row.auto_subs?.length && (
+            <span title={`Projected auto-subs: ${row.auto_subs.map((s) => `${s.in} for ${s.out}`).join(", ")}`}>
+              {" · Auto-sub: "}
+              {row.auto_subs.map((s) => `${s.in} for ${s.out}`).join(", ")}
+            </span>
+          )}
           {/* Captain and players left fold in here below md */}
           <span className="md:hidden">
-            {row.captain && ` · C ${row.captain.name} ${row.captain.points}`}
+            {row.captain && ` · ${row.captain.vice ? "VC" : "C"} ${row.captain.name} ${row.captain.points}`}
             {left && ` · ${left}`}
           </span>
         </span>

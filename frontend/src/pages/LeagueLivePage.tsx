@@ -137,7 +137,11 @@ export default function LeagueLivePage() {
               {data?.bonus_provisional && (
                 <p>Bonus is included from the current BPS, before FPL confirms it after each match.</p>
               )}
-              <p>Auto-subs aren't counted until FPL makes them once the gameweek is over.</p>
+              <p>
+                Auto-subs are made once it's certain a starter didn't play (their match is over and they got no
+                minutes), walking the bench in order as FPL does. A sub waiting on a bench player whose match is still
+                to come isn't counted yet. If a captain doesn't play, the vice takes the armband.
+              </p>
               {data?.league.truncated && <p>Only the top 50 are shown, and ranked among themselves.</p>}
             </div>
           )}
