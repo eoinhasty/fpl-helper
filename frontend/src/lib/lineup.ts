@@ -1,4 +1,5 @@
 import type { Player } from "./types";
+import { bestBenchOrder } from "./autoSubs";
 import { isStarting } from "./utils";
 
 // Best starting XI + bench order from a squad of 15. Mirrors the season
@@ -21,6 +22,13 @@ const MIN_GAIN = 0.05;
 export function lineupValue(p: Player): number {
   return p.projected_pts ?? parseFloat(p.ep_next ?? "0");
 }
+
+/** Chance a player gets on the pitch: the start probability heuristic (which
+ * already folds in FPL's chance of playing), kept off 0 and 1 */
+const playChance = (p: Player) => Math.min(0.99, Math.max(0.01, p.start_probability ?? 0.9));
+
+/** Points if they do play: lineupValue is an expectation over playing or not */
+const pointsIfPlaying = (p: Player) => lineupValue(p) / Math.max(playChance(p), 0.05);
 
 export type LineupSuggestion = {
   /** Values come from the points model rather than ep_next */
@@ -69,14 +77,22 @@ export function suggestLineup(players: Player[]): LineupSuggestion | null {
   const inXi = new Set(xi.map((p) => p.element));
   const wasIn = new Set(current.map((p) => p.element));
 
-  // FPL's auto-subs swap GK for GK and walk the outfield bench in order,
-  // so the likeliest-to-score bench player goes first.
+  // FPL's auto-subs swap GK for GK and walk the outfield bench in order. The
+  // order is the one with the most expected auto-sub points (lib/autoSubs.ts):
+  // raw value first would put a reliable low scorer ahead of a doubtful high
+  // one, though FPL skips a sub who didn't play and moves on to the next.
+  const currentBench = players.filter((p) => !isStarting(p)).sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));
   const benched = players.filter((p) => !inXi.has(p.element));
+  const sameBench = benched.every((p) => !isStarting(p));
+  // Start from the user's own order when the same four sit out, so a near-tie
+  // never asks for a reshuffle; otherwise from value order
+  const startOrder = sameBench
+    ? currentBench.filter((p) => p.position !== 1)
+    : benched.filter((p) => p.position !== 1).sort((a, b) => lineupValue(b) - lineupValue(a));
   const bench = [
     ...benched.filter((p) => p.position === 1),
-    ...benched.filter((p) => p.position !== 1).sort((a, b) => lineupValue(b) - lineupValue(a)),
+    ...bestBenchOrder(xi, startOrder, playChance, pointsIfPlaying),
   ];
-  const currentBench = players.filter((p) => !isStarting(p)).sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));
 
   return {
     projected: players.some((p) => p.projected_pts != null),

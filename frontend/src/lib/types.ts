@@ -316,6 +316,8 @@ export type LeagueLiveCaptain = {
   multiplier: number;
   points: number;
   state: "playing" | "to_play" | "done";
+  /** The captain didn't play and the vice has taken the armband */
+  vice?: boolean;
 };
 
 export type LeagueLiveEntry = {
@@ -333,6 +335,8 @@ export type LeagueLiveEntry = {
   captain: LeagueLiveCaptain | null;
   /** Every pick with its multiplier (0 = bench); null when unscored */
   picks: { element: number; multiplier: number }[] | null;
+  /** Auto-subs projected from what's certain so far (web names) */
+  auto_subs?: { out: string | null; in: string | null }[];
   /** XI players (all 15 on a bench boost) done / in a match now / still to play */
   played: number | null;
   playing: number | null;

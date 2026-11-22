@@ -913,9 +913,14 @@ class FPLService:
             e["id"]: (e.get("stats") or {}).get("total_points", 0)
             for e in live.get("elements") or []
         }
+        minutes = {
+            e["id"]: (e.get("stats") or {}).get("minutes", 0)
+            for e in live.get("elements") or []
+        }
         bonus = provisional_bonus(fixtures)
         elements = boot["elements"]
         teams = {p["id"]: p["team"] for p in elements}
+        positions = {p["id"]: p["element_type"] for p in elements}
         names = {p["id"]: p["web_name"] for p in elements}
         states = mini_league.fixture_states(fixtures)
         table = [
@@ -926,7 +931,9 @@ class FPLService:
                 start_event=start_event,
                 live_points=live_points,
                 bonus=bonus,
+                minutes=minutes,
                 teams=teams,
+                positions=positions,
                 names=names,
                 states=states,
             )

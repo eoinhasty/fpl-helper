@@ -5,11 +5,13 @@ FPL's own standings and each entry's picks summary only catch up with the
 scores every so often, so the GW points here come from the picks themselves:
 each pick's live points × its multiplier (captain, triple captain and bench
 boost are all in the multiplier), plus the bonus FPL hasn't awarded yet,
-minus the entry's hits. No auto-subs: FPL applies them once the GW is over.
+minus the entry's hits. Auto-subs and the vice-captain taking over are
+projected from what's already certain (see `auto_subs`); FPL itself only
+applies them once the GW is over.
 """
 
 from __future__ import annotations
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 # A fixture reads as over once FPL marks it provisionally finished; the
 # `finished` flag waits for bonus to be confirmed about an hour later.
@@ -59,6 +61,79 @@ def player_state(states: List[str]) -> str:
     return "done"
 
 
+# FPL's minimum outfield formation: 3 DEF, 2 MID, 1 FWD (element_type 2/3/4)
+_MIN_OUTFIELD = {2: 3, 3: 2, 4: 1}
+
+
+def auto_subs(
+    picks: List[dict],
+    *,
+    chip: Optional[str],
+    positions: Dict[int, int],
+    minutes: Dict[int, int],
+    states: Dict[int, str],
+) -> Tuple[Dict[int, int], List[dict], bool]:
+    """FPL's auto-subs and vice-captaincy, projected live.
+
+    A starter is subbed only once it's certain they didn't play: every
+    fixture of their club done (or a blank) and 0 minutes. The bench is
+    walked in order — GK for GK, outfield keeping 3 DEF / 2 MID / 1 FWD —
+    and a bench player comes on once they've played; one who's finished on
+    0 is skipped, and one whose match is still to come stops the walk, since
+    FPL's choice waits on them. If the captain didn't play, the vice takes
+    their multiplier. Starters still to play are assumed to play.
+
+    Returns element → multiplier after all that, the subs made
+    ([{"out", "in"}]) and whether the vice took the armband. Picks FPL has
+    already processed (`automatic_subs` on the picks) need none of this:
+    their multipliers are final.
+    """
+    mult = {p["element"]: p.get("multiplier") or 0 for p in picks}
+    ordered = sorted(picks, key=lambda p: p.get("position") or 0)
+    xi = [p["element"] for p in ordered if (p.get("position") or 0) <= 11]
+    bench = [p["element"] for p in ordered if (p.get("position") or 0) > 11]
+
+    def blanked(el: int) -> bool:
+        return states.get(el) == "done" and not minutes.get(el)
+
+    subs: List[dict] = []
+    if chip != "bboost":
+        for out in [el for el in xi if blanked(el)]:
+            gk = positions.get(out) == 1
+            for b in bench:
+                if (positions.get(b) == 1) != gk:
+                    continue
+                if not minutes.get(b):
+                    if states.get(b) == "done":
+                        continue  # didn't play: FPL skips them
+                    break  # still to play: the sub waits on them
+                if not gk:
+                    after = [el for el in xi if el != out] + [b]
+                    counts = {k: 0 for k in _MIN_OUTFIELD}
+                    for el in after:
+                        if positions.get(el) in counts:
+                            counts[positions[el]] += 1
+                    if any(counts[k] < n for k, n in _MIN_OUTFIELD.items()):
+                        continue
+                xi = [b if el == out else el for el in xi]
+                bench.remove(b)
+                mult[b] = 1
+                mult[out] = 0
+                subs.append({"out": out, "in": b})
+                break
+
+    captain = next((p for p in picks if p.get("is_captain")), None)
+    vice = next((p for p in picks if p.get("is_vice_captain")), None)
+    vice_took = False
+    if captain and vice and blanked(captain["element"]):
+        c_mult = captain.get("multiplier") or 0
+        if c_mult > 1 and vice["element"] in xi + ([] if chip != "bboost" else bench):
+            mult[vice["element"]] = c_mult
+            mult[captain["element"]] = 0 if captain["element"] not in xi else 1
+            vice_took = True
+    return mult, subs, vice_took
+
+
 def pre_gw_total(row: dict, picks: dict, start_event: Optional[int], gw: int) -> int:
     """The entry's league total before this GW.
 
@@ -93,33 +168,63 @@ def live_entry(
     start_event: Optional[int],
     live_points: Dict[int, int],
     bonus: Dict[int, int],
+    minutes: Dict[int, int],
     teams: Dict[int, int],
+    positions: Dict[int, int],
     names: Dict[int, str],
     states: Dict[int, List[str]],
 ) -> dict:
-    """One entry's live row, before ranking. `live_points` and `bonus` are
-    element → this GW's awarded points / not-yet-awarded bonus; `teams` and
-    `names` element → club id / web name."""
+    """One entry's live row, before ranking. `live_points`, `bonus` and
+    `minutes` are element → this GW's awarded points / not-yet-awarded bonus
+    / minutes; `teams`, `positions` and `names` element → club id / FPL
+    element type / web name."""
     eh = picks.get("entry_history") or {}
     hits = eh.get("event_transfers_cost", 0) or 0
+    chip = picks.get("active_chip")
+    rows = picks.get("picks") or []
+    el_state = {
+        p["element"]: player_state(states.get(teams.get(p["element"]), []))
+        for p in rows
+    }
+    if picks.get("automatic_subs"):
+        # FPL has made its subs: the multipliers are already final
+        mult = {p["element"]: p.get("multiplier") or 0 for p in rows}
+        # FPL lists subs on a bench boost too, though nobody's swapped
+        subs: List[dict] = [
+            {"out": s["element_out"], "in": s["element_in"]}
+            for s in picks["automatic_subs"]
+            if chip != "bboost"
+        ]
+    else:
+        mult, subs, _ = auto_subs(
+            rows, chip=chip, positions=positions, minutes=minutes, states=el_state
+        )
+    # The vice has the armband when they're on the captain's multiplier and
+    # the captain isn't — projected above, or already done by FPL
+    cap = next((p for p in rows if p.get("is_captain")), None)
+    vc = next((p for p in rows if p.get("is_vice_captain")), None)
+    vice_took = bool(cap and vc and mult[vc["element"]] > 1 >= mult[cap["element"]])
     gw_points = 0
     counts = {"done": 0, "playing": 0, "to_play": 0}
-    captain = None
-    for p in picks.get("picks") or []:
-        mult = p.get("multiplier") or 0
+    for p in rows:
         el = p["element"]
-        pts = live_points.get(el, 0) + bonus.get(el, 0)
-        gw_points += mult * pts
-        if mult:
-            counts[player_state(states.get(teams.get(el), []))] += 1
-        if p.get("is_captain"):
-            captain = {
-                "element": el,
-                "name": names.get(el),
-                "multiplier": mult,
-                "points": mult * pts,
-                "state": player_state(states.get(teams.get(el), [])),
-            }
+        gw_points += mult[el] * (live_points.get(el, 0) + bonus.get(el, 0))
+        if mult[el]:
+            counts[el_state[el]] += 1
+    # The armband: the captain's, or the vice's once they've taken it over
+    flag = "is_vice_captain" if vice_took else "is_captain"
+    armband = next((p for p in rows if p.get(flag)), None)
+    captain = None
+    if armband:
+        el = armband["element"]
+        captain = {
+            "element": el,
+            "name": names.get(el),
+            "multiplier": mult[el],
+            "points": mult[el] * (live_points.get(el, 0) + bonus.get(el, 0)),
+            "state": el_state[el],
+            "vice": vice_took,
+        }
     pre = pre_gw_total(row, picks, start_event, gw)
     return {
         "entry": row["entry"],
@@ -129,13 +234,15 @@ def live_entry(
         "hits": hits,
         "pre_total": pre,
         "total": pre + gw_points - hits,
-        "chip": picks.get("active_chip"),
+        "chip": chip,
         "captain": captain,
-        # Every pick with its multiplier (0 on the bench), for league
-        # ownership and head-to-head comparisons on the page
+        # Every pick with its multiplier after projected auto-subs (0 on the
+        # bench), for league ownership and head-to-heads on the page
         "picks": [
-            {"element": p["element"], "multiplier": p.get("multiplier") or 0}
-            for p in picks.get("picks") or []
+            {"element": p["element"], "multiplier": mult[p["element"]]} for p in rows
+        ],
+        "auto_subs": [
+            {"out": names.get(s["out"]), "in": names.get(s["in"])} for s in subs
         ],
         "played": counts["done"],
         "playing": counts["playing"],
@@ -196,6 +303,7 @@ def unscored_entry(row: dict) -> dict:
         "chip": None,
         "captain": None,
         "picks": None,
+        "auto_subs": [],
         "played": None,
         "playing": None,
         "to_play": None,
