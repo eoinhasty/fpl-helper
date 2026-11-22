@@ -58,6 +58,13 @@ export default function SquadDashboard() {
   const [mode, setMode] = useState<Mode>(prefs.defaultView);
   const [gw, setGw] = useState<number | undefined>(undefined); // undefined => server fallback
   const prevMode = useRef(mode);
+  // A past GW picked for one entry shouldn't carry over to the next: reset
+  // during render (not in an effect) so the new entry loads once, unpinned
+  const [gwEntry, setGwEntry] = useState(entry);
+  if (gwEntry !== entry) {
+    setGwEntry(entry);
+    setGw(undefined);
+  }
 
   const loading = mode === "live" ? liveLoading : squadLoading;
   const error = mode === "live" ? liveError : squadError;
