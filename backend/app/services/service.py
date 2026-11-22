@@ -11,7 +11,8 @@ from datetime import datetime, timezone
 from math import prod
 from app.simple_cache import AsyncCache
 from app.services.espn import EspnService
-from app.services.live_points import points_breakdown
+from app.services.live_points import points_breakdown, provisional_bonus
+from app.services import mini_league
 from app.services.gameweeks import (
     current_and_next_gw,
     finished_gw_count,
@@ -78,6 +79,16 @@ SWR_PROJECTIONS = 12 * 60 * 60  # +12h stale
 TTL_TRACK_UNCHECKED = 60 * 60  # 1h fresh
 TTL_TRACK = 24 * 60 * 60  # 24h fresh once checked
 SWR_TRACK = 7 * 24 * 60 * 60  # +7d stale
+# Live mini-league: standings move only when FPL re-totals them; a rival's
+# picks for a GW are fixed at its deadline (auto-subs land once it's over)
+TTL_LEAGUE = 5 * 60  # 5m fresh
+SWR_LEAGUE = 30 * 60  # +30m stale
+TTL_LEAGUE_PICKS = 15 * 60  # 15m fresh
+SWR_LEAGUE_PICKS = 2 * 60 * 60  # +2h stale
+# The live table covers the first page of a league's standings: one picks
+# fetch per entry, so a 10,000-entry league can't fan out into 10,000
+LEAGUE_PAGE = 50
+LEAGUE_PICKS_CONCURRENCY = 6
 
 # One honest User-Agent for FPL, its auth server and football-data.org. The
 # "Mozilla/5.0 (compatible; ...)" prefix is what the auth flow has always sent
@@ -824,6 +835,127 @@ class FPLService:
             lambda: self._get_json(f"/event/{gw}/live/"),
             ttl,
             stale_ttl,
+        )
+
+    async def league_standings(self, league_id: int) -> Tuple[dict, str, float]:
+        key = f"league:{league_id}"
+        fetch = lambda: self._get_json(f"/leagues-classic/{league_id}/standings/")
+        return await self.cache.get_or_set(key, fetch, TTL_LEAGUE, SWR_LEAGUE)
+
+    async def league_picks(self, entry_id: int, gw: int) -> Optional[dict]:
+        """A league rival's picks for a GW whose deadline has passed, or None
+        if FPL has none (an entry created after the deadline)."""
+        key = f"lpicks:{entry_id}:{gw}"
+        fetch = lambda: self._get_json(f"/entry/{entry_id}/event/{gw}/picks/")
+        try:
+            data, _, _ = await self.cache.get_or_set(
+                key, fetch, TTL_LEAGUE_PICKS, SWR_LEAGUE_PICKS
+            )
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            raise
+        return data
+
+    async def league_live(self, league_id: int) -> Tuple[dict, List[Tuple[str, float]]]:
+        """A classic league's table with the current GW scored live (see
+        mini_league.py), plus the (status, age) cache readings behind it for
+        combine_cache — the standings and scoring data, not the rivals' picks,
+        which don't change mid-GW."""
+        boot, _, _ = await self.bootstrap()
+        events = boot["events"]
+        current = next((e for e in events if e.get("is_current")), None)
+        standings, st_status, st_age = await self.league_standings(league_id)
+        league = standings.get("league") or {}
+        page = standings.get("standings") or {}
+        rows = (page.get("results") or [])[:LEAGUE_PAGE]
+        base = {
+            "league": {
+                "id": league.get("id", league_id),
+                "name": league.get("name"),
+                "start_event": league.get("start_event"),
+                "truncated": bool(page.get("has_next")) or len(rows) >= LEAGUE_PAGE,
+            },
+        }
+        if current is None:
+            return (
+                {**base, "available": False, "reason": "pre_season"},
+                [(st_status, st_age)],
+            )
+        gw = current["id"]
+        start_event = league.get("start_event")
+        if start_event and start_event > gw:
+            return (
+                {**base, "available": False, "reason": "not_started"},
+                [(st_status, st_age)],
+            )
+
+        live, lv_status, lv_age = await self.live_event(
+            gw, ttl=TTL_MYTEAM, stale_ttl=SWR_MYTEAM
+        )
+        fixtures, fx_status, fx_age = await self.event_fixtures(
+            gw, ttl=TTL_MYTEAM, stale_ttl=SWR_MYTEAM
+        )
+        sem = asyncio.Semaphore(LEAGUE_PICKS_CONCURRENCY)
+
+        async def picks_for(entry_id: int) -> Optional[dict]:
+            async with sem:
+                try:
+                    return await self.league_picks(entry_id, gw)
+                except httpx.HTTPError:
+                    # One rival FPL won't serve shouldn't sink the table
+                    logger.warning("league picks failed for entry %s", entry_id)
+                    return None
+
+        all_picks = await asyncio.gather(*(picks_for(r["entry"]) for r in rows))
+
+        live_points = {
+            e["id"]: (e.get("stats") or {}).get("total_points", 0)
+            for e in live.get("elements") or []
+        }
+        bonus = provisional_bonus(fixtures)
+        elements = boot["elements"]
+        teams = {p["id"]: p["team"] for p in elements}
+        names = {p["id"]: p["web_name"] for p in elements}
+        states = mini_league.fixture_states(fixtures)
+        table = [
+            mini_league.live_entry(
+                row,
+                picks,
+                gw=gw,
+                start_event=start_event,
+                live_points=live_points,
+                bonus=bonus,
+                teams=teams,
+                names=names,
+                states=states,
+            )
+            if picks
+            else mini_league.unscored_entry(row)
+            for row, picks in zip(rows, all_picks)
+        ]
+        picked = {p["element"] for pk in all_picks if pk for p in pk.get("picks") or []}
+        players = mini_league.player_summaries(
+            picked,
+            players={p["id"]: p for p in elements},
+            live_points=live_points,
+            bonus=bonus,
+            short_names={t["id"]: t["short_name"] for t in boot["teams"]},
+            team_codes={t["id"]: t["code"] for t in boot["teams"]},
+            fixtures=fixtures,
+        )
+        return (
+            {
+                **base,
+                "available": True,
+                "gw": gw,
+                "finished": bool(current.get("finished")),
+                "bonus_provisional": bool(bonus),
+                "matches": mini_league.match_progress(fixtures),
+                "entries": mini_league.rank_table(table),
+                "players": players,
+            },
+            [(st_status, st_age), (lv_status, lv_age), (fx_status, fx_age)],
         )
 
     def _cached_ranks(self, boot: dict) -> Tuple[dict, dict]:
