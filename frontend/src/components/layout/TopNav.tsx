@@ -16,7 +16,7 @@ const NAV_LINKS = [
   { to: "/planner", label: "Planner", exact: false },
 ] as const;
 
-export default function TopNav({ title = "FF Helper", maxWidthPx = 1400, className = "" }: Props) {
+export default function TopNav({ title = "FPL Helper", maxWidthPx = 1400, className = "" }: Props) {
   const { entry, setEntry } = useEntryId();
   const [open, setOpen] = React.useState(false);
 
