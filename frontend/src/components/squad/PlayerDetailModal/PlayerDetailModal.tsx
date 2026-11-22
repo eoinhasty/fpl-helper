@@ -130,12 +130,7 @@ export default function PlayerDetailModal({
         </div>
 
         {/* close button */}
-        <button
-          ref={closeBtnRef}
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute top-3 right-3 z-10 min-h-9 rounded-lg border border-border/60 px-3 py-2 text-[12px] font-medium text-foreground/70"
-        >
+        <button ref={closeBtnRef} onClick={onClose} aria-label="Close" className="btn absolute top-3 right-3 z-10">
           Close
         </button>
 
