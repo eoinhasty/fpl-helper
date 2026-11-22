@@ -332,7 +332,9 @@ class FPLService:
         by_team: Dict[int, List[dict]] = defaultdict(list)
         for fx in fixtures:
             ev = fx.get("event")
-            if ev is None or ev < base_gw:
+            # finished: after GW38 there's no next GW, so the base is the
+            # played-out last one, whose games aren't "upcoming"
+            if ev is None or ev < base_gw or fx.get("finished"):
                 continue
             h, a = fx["team_h"], fx["team_a"]
             if h in teams:
