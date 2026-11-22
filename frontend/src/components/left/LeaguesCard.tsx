@@ -1,5 +1,6 @@
 // left/LeaguesCard.tsx
 import * as React from "react";
+import { Link } from "@tanstack/react-router";
 import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import { num, delta } from "../../lib/format";
@@ -52,7 +53,7 @@ export default function LeaguesCard({ entry, preSeason }: { entry: number | ""; 
             <Tile label="GW Rank" value={num(rank(data.event_rank))} />
           </div>
 
-          <Section title="My Leagues" rows={myClassic} emptyText="No private leagues joined." />
+          <Section title="My Leagues" rows={myClassic} emptyText="No private leagues joined." live />
           <Section title="Head-to-Head" rows={data.h2h} />
           <Section title="Global" rows={globalClassic} emptyText="No global leagues." />
         </>
@@ -72,7 +73,19 @@ function Tile({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function Section({ title, rows, emptyText }: { title: string; rows: LeagueRow[]; emptyText?: string }) {
+function Section({
+  title,
+  rows,
+  emptyText,
+  live = false,
+}: {
+  title: string;
+  rows: LeagueRow[];
+  emptyText?: string;
+  /** Rows link to the league's live table (classic private leagues only — a
+   * global league's top 50 says nothing about the user) */
+  live?: boolean;
+}) {
   const items = React.useMemo(() => rows ?? [], [rows]);
   const empty = emptyText ?? `No ${title.toLowerCase()} leagues.`;
 
@@ -83,27 +96,50 @@ function Section({ title, rows, emptyText }: { title: string; rows: LeagueRow[];
       <ul role="list" aria-label={title} className="mb-3 space-y-1">
         {items.length === 0 && <li className="text-sm text-muted-foreground">{empty}</li>}
         {items.map((l) => (
-          <LeagueItem key={l.id} row={l} />
+          <LeagueItem key={l.id} row={l} live={live} />
         ))}
       </ul>
     </>
   );
 }
 
-function LeagueItem({ row }: { row: LeagueRow }) {
+function LeagueItem({ row, live }: { row: LeagueRow; live: boolean }) {
   const r = rank(row.rank);
   const lr = rank(row.last_rank);
   const d = delta(r, lr);
   const improved = r != null && lr != null && lr - r > 0;
+  const box = "flex items-center justify-between gap-2 rounded-md border border-border bg-card px-2 py-1.5";
 
-  return (
-    <li className="flex items-center justify-between rounded-md border border-border bg-card px-2 py-1.5">
+  const content = (
+    <>
       <span className="truncate text-sm text-foreground">{row.name}</span>
 
-      <span className="inline-flex items-center gap-2">
+      <span className="inline-flex shrink-0 items-center gap-2">
         {d && <span className={`text-[11px] ${improved ? "text-success" : "text-destructive"}`}>{d}</span>}
         <span className="rounded-full border border-border bg-card px-2 py-0.5 text-xs text-foreground">{num(r)}</span>
+        {live && (
+          <span aria-hidden className="text-muted-foreground">
+            ›
+          </span>
+        )}
       </span>
+    </>
+  );
+
+  return (
+    <li>
+      {live ? (
+        <Link
+          to="/league/$leagueId"
+          params={{ leagueId: String(row.id) }}
+          title="Live table"
+          className={`${box} cursor-pointer transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none`}
+        >
+          {content}
+        </Link>
+      ) : (
+        <div className={box}>{content}</div>
+      )}
     </li>
   );
 }
