@@ -3,6 +3,7 @@ import { fmtPrice } from "../../lib/format";
 import StartMeter from "./StartMeter";
 import FixturePill from "./FixturePill";
 import XgiBadge from "./XgiBadge";
+import PriceBadge from "./PriceBadge";
 import { gwPointsDisplay } from "../../lib/utils";
 
 export default function PlayerCard({
@@ -71,6 +72,7 @@ export default function PlayerCard({
                 ga={(p.goals_scored ?? 0) + (p.assists ?? 0)}
                 xgi={p.expected_goal_involvements}
               />
+              <PriceBadge outlook={p.price_outlook} />
             </div>
           </div>
         </div>

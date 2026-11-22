@@ -1,6 +1,6 @@
 import * as React from "react";
-import type { FixturePoints, Player, PlayerSummaryResponse } from "../../../lib/types";
-import { statusToText, fdrClass, TONE_CLASS, statusTone } from "../../../lib/utils";
+import type { FixturePoints, Player, PlayerSummaryResponse, PriceOutlook } from "../../../lib/types";
+import { statusToText, fdrClass, TONE_CLASS, statusTone, PRICE_COPY, priceOutlookSummary } from "../../../lib/utils";
 import { fmtPrice, pct, fmtCompact } from "../../../lib/format";
 import { useFetch } from "../../../hooks/useFetch";
 import { SectionHeader, PositionTag, KickoffLabel, NextFixturesStatus } from "./parts";
@@ -91,6 +91,42 @@ function MarketRow({
         {sub != null && <span className="text-xs leading-snug">{sub}</span>}
       </div>
       {right != null && <div className="shrink-0 text-right text-xs">{right}</div>}
+    </div>
+  );
+}
+
+/** FPL's progress towards a price change at the next update, as a bar that
+ * grows left (fall) or right (rise) from the middle; full width = a change. */
+function PriceOutlookRow({ outlook }: { outlook: PriceOutlook }) {
+  const width = `${Math.min(Math.abs(outlook.progress), 100) / 2}%`;
+  const rising = outlook.progress > 0;
+  const fill = outlook.locked_until
+    ? "bg-muted-foreground/40"
+    : outlook.likely
+      ? TONE_CLASS[PRICE_COPY[outlook.likely].tone].bg
+      : rising
+        ? "bg-success/50"
+        : "bg-destructive/50";
+  const textClass = outlook.likely ? TONE_CLASS[PRICE_COPY[outlook.likely].tone].text : "text-muted-foreground";
+  return (
+    <div className="grid items-start gap-3" style={{ gridTemplateColumns: "90px 1fr" }}>
+      <div className="pt-0.5 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+        Next update
+      </div>
+      <div className="min-w-0">
+        <div className="relative h-1.5 rounded-full bg-muted" aria-hidden="true">
+          <div
+            className={`absolute inset-y-0 ${rising ? "rounded-r-full" : "rounded-l-full"} ${fill}`}
+            style={rising ? { left: "50%", width } : { right: "50%", width }}
+          />
+          <div className="absolute -inset-y-0.5 left-1/2 w-px bg-muted-foreground/60" />
+        </div>
+        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground" aria-hidden="true">
+          <span>Fall</span>
+          <span>Rise</span>
+        </div>
+        <div className={`mt-0.5 text-xs ${textClass}`}>{priceOutlookSummary(outlook)}</div>
+      </div>
     </div>
   );
 }
@@ -302,6 +338,12 @@ export default function OverviewTab({
               )
             }
           />
+          {player.price_outlook && (
+            <>
+              <div className="h-px bg-border" />
+              <PriceOutlookRow outlook={player.price_outlook} />
+            </>
+          )}
         </div>
       </section>
 
