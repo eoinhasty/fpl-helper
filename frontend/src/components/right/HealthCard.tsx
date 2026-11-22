@@ -2,6 +2,7 @@ import DataCard from "../ui/DataCard";
 import { Skeleton } from "../ui/Skeleton";
 import type { Player } from "../../lib/types";
 import PlayerOpen from "../squad/PlayerOpen";
+import { TONE_CLASS, startProbTone, statusTone, statusToText } from "../../lib/utils";
 
 export default function HealthCard({
   entry,
@@ -24,17 +25,17 @@ export default function HealthCard({
       ? "Set your entry id to see team health."
       : null;
 
-  const flagged = (players ?? []).filter(
-    (p) =>
-      (p.status && p.status !== "a") ||
-      (p.start_probability ?? 0) < 0.6 ||
-      (p.news || "").toLowerCase().match(/injur|doubt|knock|hamstring|illness|setback/),
-  );
-
-  const lowStart = (players ?? [])
-    .filter((p) => (p.start_probability ?? 0) < 0.6)
-    .sort((a, b) => (a.start_probability ?? 0) - (b.start_probability ?? 0))
-    .slice(0, 4);
+  // One rule for the count and the list: flagged by FPL, or short of a
+  // likely start by startProbTone's own threshold. A missing start chance
+  // isn't treated as 0% — that's no evidence of risk.
+  const atRisk = (players ?? [])
+    .filter(
+      (p) =>
+        statusTone(p.status) !== "success" ||
+        (p.start_probability != null && startProbTone(p.start_probability) !== "success"),
+    )
+    .sort((a, b) => (a.start_probability ?? 1) - (b.start_probability ?? 1));
+  const shown = atRisk.slice(0, 4);
 
   return (
     <DataCard
@@ -53,12 +54,12 @@ export default function HealthCard({
       emptyMessage={unavailable ?? "Team health appears once your squad is loaded."}
     >
       <div className="mb-3 text-sm text-foreground">
-        <span className="font-semibold">{flagged.length}</span>
-        <span className="text-muted-foreground"> at risk • under 60% start or flagged</span>
+        <span className="font-semibold">{atRisk.length}</span>
+        <span className="text-muted-foreground"> at risk • flagged or under 70% to start</span>
       </div>
-      {lowStart.length > 0 && (
+      {shown.length > 0 && (
         <ul className="space-y-1">
-          {lowStart.map((p) => (
+          {shown.map((p) => (
             <li key={p.element}>
               <PlayerOpen
                 id={p.element}
@@ -67,12 +68,21 @@ export default function HealthCard({
                 <span className="truncate text-foreground">
                   {p.name} <span className="text-xs text-muted-foreground">({p.team})</span>
                 </span>
-                <span className="text-xs font-medium text-destructive">
-                  {Math.round((p.start_probability ?? 0) * 100)}%
-                </span>
+                {p.start_probability != null ? (
+                  <span className={`text-xs font-medium ${TONE_CLASS[startProbTone(p.start_probability)].text}`}>
+                    {Math.round(p.start_probability * 100)}%
+                  </span>
+                ) : (
+                  <span className={`text-xs font-medium ${TONE_CLASS[statusTone(p.status)].text}`}>
+                    {statusToText(p.status)}
+                  </span>
+                )}
               </PlayerOpen>
             </li>
           ))}
+          {atRisk.length > shown.length && (
+            <li className="px-2 text-xs text-muted-foreground">+{atRisk.length - shown.length} more</li>
+          )}
         </ul>
       )}
     </DataCard>
