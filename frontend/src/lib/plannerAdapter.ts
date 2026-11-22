@@ -51,6 +51,7 @@ export function poolPlayerToPlayer(p: PoolPlayer, slot: number, gw?: number | nu
     transfers_out_event: p.transfers_out_event,
     cost_change_start: p.cost_change_start,
     cost_change_event: p.cost_change_event,
+    price_outlook: p.price_outlook,
   };
 }
 

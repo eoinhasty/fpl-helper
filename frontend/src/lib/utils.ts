@@ -1,5 +1,5 @@
 // lib/utils.ts
-import type { Player, XgiSignal } from "./types";
+import type { Player, PriceOutlook, XgiSignal } from "./types";
 
 export const isStarting = (p: Player): boolean => (p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11;
 
@@ -84,6 +84,31 @@ export const XGI_COPY: Record<XgiSignal["direction"], { label: string; tone: Ton
 
 export function xgiSummary(s: XgiSignal, ga: number, xgi: string | undefined): string {
   return `${ga} G+A from ${Number(xgi ?? 0).toFixed(1)} xGI — ${XGI_COPY[s.direction].outlook}`;
+}
+
+/** Copy for FPL's top price-change band (PriceOutlook.likely) — the only
+ * band treated as a "tonight" signal; see price_outlook in backend prices.py. */
+export const PRICE_COPY: Record<"rise" | "fall", { label: string; tone: Tone; outlook: string }> = {
+  rise: { label: "Likely rise", tone: "success", outlook: "Likely to rise at the next price update" },
+  fall: { label: "Likely fall", tone: "destructive", outlook: "Likely to fall at the next price update" },
+};
+
+/** One line on where FPL has the player's price heading at the next update. */
+export function priceOutlookSummary(o: PriceOutlook): string {
+  if (o.likely) return PRICE_COPY[o.likely].outlook;
+  if (o.locked_until) {
+    const when = new Date(o.locked_until).toLocaleString(undefined, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return `Price locked until ${when}`;
+  }
+  const pct = Math.round(Math.abs(o.progress));
+  if (pct < 1) return "No change expected";
+  return `${pct}% of the way to a ${o.progress > 0 ? "rise" : "fall"}`;
 }
 
 export function statusToText(s: string | undefined) {

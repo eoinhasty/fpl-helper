@@ -25,6 +25,17 @@ export type FixtureLite = {
  * players finishing roughly in line with their chances. */
 export type XgiSignal = { gap: number; direction: "over" | "under" };
 
+/** FPL's own forecast for the next nightly price update — see price_outlook in
+ * backend prices.py. `progress` is FPL's projected progress towards a change
+ * (±100 ≈ a change, sign = direction); `likely` is set only in FPL's top band
+ * (55/56 changed that night when checked); `locked_until` while FPL holds the
+ * price, for reasons it doesn't give. */
+export type PriceOutlook = {
+  progress: number;
+  likely: "rise" | "fall" | null;
+  locked_until: string | null;
+};
+
 /** One of FPL's scoring lines for a fixture (`explain` on /event/{gw}/live/) */
 export type PointsLine = { identifier: string; value: number; points: number };
 
@@ -80,6 +91,7 @@ export type Player = {
   expected_goal_involvements?: string;
   xgi_signal?: XgiSignal | null;
   cost_change_event?: number;
+  price_outlook?: PriceOutlook | null;
   transfer_rank?: { rank: number; of: number };
   transfers_in_event?: number;
   transfers_out_event?: number;
@@ -232,6 +244,7 @@ export type PoolPlayer = {
   transfers_out_event?: number;
   cost_change_start?: number;
   cost_change_event?: number;
+  price_outlook?: PriceOutlook | null;
 };
 
 export type PoolTeam = { id: number; name: string; short_name: string };
