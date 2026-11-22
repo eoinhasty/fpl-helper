@@ -61,7 +61,8 @@ function Row({
           )}
           {/* Captain and players left fold in here below md */}
           <span className="md:hidden">
-            {row.captain && ` · ${row.captain.vice ? "VC" : "C"} ${row.captain.name} ${row.captain.points}`}
+            {row.captain &&
+              ` · ${row.captain.vice ? "VC" : row.captain.multiplier === 3 ? "TC" : "C"} ${row.captain.name} ${row.captain.points}`}
             {left && ` · ${left}`}
           </span>
         </span>

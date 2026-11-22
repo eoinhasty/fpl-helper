@@ -14,6 +14,7 @@ import { usePreferences } from "../hooks/usePreferences";
 import { Segmented } from "../components/controls/Segmented";
 import { GwSelect } from "../components/controls/GwSelect";
 import { money } from "../lib/format";
+import { CHIP_NAMES } from "../lib/utils";
 
 import type { Player } from "../lib/types";
 import { previewLineup, suggestLineup } from "../lib/lineup";
@@ -280,9 +281,7 @@ export default function SquadDashboard() {
     <div className="flex items-end gap-4">
       <StatText label="Value" value={money(data?.team_value)} />
       <StatText label="Bank" value={money(data?.team_bank)} />
-      {data?.active_chip && (
-        <StatText label="Chip" value={<span className="uppercase">{data.active_chip.replace(/_/g, " ")}</span>} />
-      )}
+      {data?.active_chip && <StatText label="Chip" value={CHIP_NAMES[data.active_chip]?.[0] ?? data.active_chip} />}
     </div>
   );
 

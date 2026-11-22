@@ -17,7 +17,7 @@ export default function PlayerCard({
 }) {
   const cap = p.is_captain ? (
     <span className="rounded-full bg-fpl-purple px-2 py-0.5 text-[11px] text-fpl-purple-foreground ring-1 ring-black/15">
-      C
+      {p.multiplier === 3 ? "TC" : "C"}
     </span>
   ) : p.is_vice_captain ? (
     <span className="rounded-full border border-primary/30 bg-primary/15 px-2 py-0.5 text-[11px] text-primary">VC</span>
