@@ -578,10 +578,13 @@ class FPLService:
                 return None
             return {"backfilled": bool(proj.get("backfilled")), "rows": rows}
 
+        key = f"trackgw:{season}:{gw}"
         ttl = TTL_TRACK if checked else TTL_TRACK_UNCHECKED
-        kept, _, _ = await self.cache.get_or_set(
-            f"trackgw:{season}:{gw}", _fetch, ttl, SWR_TRACK
-        )
+        kept, status, _ = await self.cache.get_or_set(key, _fetch, ttl, SWR_TRACK)
+        if kept is None and status == "miss":
+            # A missing file may just be late (or backfilled later): don't
+            # keep "no file" for a day plus a week of stale-serving
+            self.cache.set(key, None, TTL_TRACK_UNCHECKED, TTL_TRACK_UNCHECKED * 2)
         return kept
 
     async def finished_picks(self, entry_id: int, gw: int) -> List[dict]:
