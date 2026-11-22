@@ -725,7 +725,7 @@ class FPLService:
                     "start_probability": start_prob_from(p, played_gws),
                 }
             )
-        # simple relevance: newest first, then “injury/transfer” hints first
+        # simple relevance: injury/transfer news first, newest first within each
         pri = lambda n: (
             ("injury" in n["news"].lower()) or ("transfer" in n["news"].lower())
         )
