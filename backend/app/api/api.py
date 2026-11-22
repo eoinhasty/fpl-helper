@@ -279,6 +279,7 @@ async def squad(
         "overall_rank": overall_rank,
         "favourite_team": fav_team,
         "season_status": season_status,
+        "season": season,
         "requested_gw": gw or next_gw_id,
         "used_gw": used_gw,
         "current_gw": current_gw_id,
@@ -379,7 +380,15 @@ async def live(
         "current_gw": current_gw_id,
         "used_label": "live",
         "deadline": used_event["deadline_time"],
-        "active_chip": None,
+        # Played for the next deadline ("active"), as FPL's own web app reads it
+        "active_chip": next(
+            (
+                c.get("name")
+                for c in live_data.get("chips") or []
+                if c.get("status_for_entry") == "active"
+            ),
+            None,
+        ),
         "team_value": team_value,
         "team_bank": team_bank,
         "players": enriched,
