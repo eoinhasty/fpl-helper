@@ -125,9 +125,12 @@ export function decodePlan(values: Record<string, number>, resp: Available, stat
   const weeks = resp.gws.map((gw, g) => {
     const squad = pool.filter((p) => on("x", p, g));
     const xi = pool.filter((p) => on("y", p, g));
-    const captain = pool.find((p) => on("c", p, g));
     const chip: PlanChip | null =
       (values[`bb_${g}`] ?? 0) > 0.5 ? "bboost" : (values[`tc_${g}`] ?? 0) > 0.5 ? "3xc" : null;
+    // In FPL the tripled player is the captain; triple_ isn't tied to c, so
+    // short of the optimum they can differ (mirrors read_plan)
+    const captain =
+      (chip === "3xc" ? pool.find((p) => on("triple", p, g)) : undefined) ?? pool.find((p) => on("c", p, g));
     if (squad.length !== 15 || xi.length !== (chip === "bboost" ? 15 : 11) || captain == null) {
       throw new Error(`Incomplete plan for GW${gw}`);
     }

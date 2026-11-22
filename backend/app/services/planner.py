@@ -264,6 +264,11 @@ def read_plan(
             if values.get(f"tc_{g}", 0) > 0.5
             else None
         )
+        if chip == "3xc":
+            # triple_ isn't tied to c (that solved ~4x slower), so short of
+            # the optimum they can differ; in FPL the tripled player is the
+            # captain, so report that one
+            cap = next((p for p in pool if on("triple", p, g)), cap)
         captain_x = 2 if chip == "3xc" else 1
         plan.append(
             dict(
