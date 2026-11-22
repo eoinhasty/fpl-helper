@@ -112,16 +112,26 @@ export function suggestLineup(players: Player[]): LineupSuggestion | null {
 export function previewLineup(players: Player[], s: LineupSuggestion): Player[] {
   const wasIn = new Set(players.filter(isStarting).map((p) => p.element));
   const xi = [...s.xi].sort((a, b) => a.position - b.position);
+  // FPL won't save a benched captain: the armband passes to the vice, as
+  // FPL's own team screen does, so the preview is a lineup FPL would accept
+  const captain = players.find((p) => p.is_captain);
+  const captainBenched = !!captain && !xi.some((p) => p.element === captain.element);
+  const capMult = Math.max(captain?.multiplier ?? 2, 2);
+  const armband = (p: Player) =>
+    captainBenched ? p.is_vice_captain && xi.some((x) => x.element === p.element) : !!p.is_captain;
   return [
     ...xi.map((p, i) => ({
       ...p,
       slot: i + 1,
-      multiplier: p.is_captain ? Math.max(p.multiplier ?? 2, 2) : 1,
+      is_captain: armband(p),
+      is_vice_captain: armband(p) ? false : p.is_vice_captain,
+      multiplier: armband(p) ? capMult : 1,
       lineup_change: wasIn.has(p.element) ? undefined : ("start" as const),
     })),
     ...s.bench.map((p, i) => ({
       ...p,
       slot: 12 + i,
+      is_captain: false,
       multiplier: 0,
       lineup_change: wasIn.has(p.element) ? ("bench" as const) : undefined,
     })),
