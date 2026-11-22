@@ -74,14 +74,16 @@ export default function PlayerTable({
   // The xPts column follows the last xPts sort chosen (one GW until then)
   const [xptsGws, setXptsGws] = React.useState(1);
   const shownGws = model ? xptsGws : 1;
+  // The model's number is "proj", FPL's ep_next "xPts" — as on Captaincy/Best XI
+  const unit = model ? "Proj" : "xPts";
   const sortOptions: { label: string; value: SortKey }[] = [
     { label: "Price", value: "now_cost" },
     { label: "Ownership", value: "selected_by_percent" },
-    { label: `xPts ${gwRange(gw, 1)}`, value: "xpts1" },
+    { label: `${unit} ${gwRange(gw, 1)}`, value: "xpts1" },
     ...(model
       ? [
-          { label: `xPts ${gwRange(gw, 3)}`, value: "xpts3" as const },
-          { label: `xPts ${gwRange(gw, 5)}`, value: "xpts5" as const },
+          { label: `${unit} ${gwRange(gw, 3)}`, value: "xpts3" as const },
+          { label: `${unit} ${gwRange(gw, 5)}`, value: "xpts5" as const },
         ]
       : []),
     { label: "Form", value: "form" },
@@ -258,12 +260,15 @@ export default function PlayerTable({
                   {p.selected_by_percent != null ? `${p.selected_by_percent}%` : "—"}
                 </div>
               </div>
-              <div className="w-14 shrink-0 text-right" title={`Projected points, ${gwRange(gw, shownGws)}`}>
+              <div
+                className="w-14 shrink-0 text-right"
+                title={`${model ? "Projected points" : "FPL expected points"}, ${gwRange(gw, shownGws)}`}
+              >
                 <div className="text-sm font-semibold text-primary-strong tabular-nums">
                   {xpts(p, shownGws, model)?.toFixed(1) ?? "—"}
                 </div>
                 <div className="text-[10px] text-muted-foreground">
-                  {shownGws === 1 ? "xPts" : `xPts ${shownGws}GW`}
+                  {shownGws === 1 ? unit : `${unit} ${shownGws}GW`}
                 </div>
               </div>
 

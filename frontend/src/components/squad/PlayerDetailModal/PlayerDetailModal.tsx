@@ -94,7 +94,7 @@ export default function PlayerDetailModal({
   // it; it's for fixtureGw, while ep_next is always FPL's next GW.
   const proj = player.projected_pts;
   const xPts = proj != null ? proj.toFixed(1) : player.ep_next ? Number(player.ep_next).toFixed(1) : "—";
-  const xPtsLabel = proj != null && fixtureGw ? `GW${fixtureGw} xPTS` : "xPTS NEXT";
+  const xPtsLabel = proj != null ? (fixtureGw ? `GW${fixtureGw} PROJ` : "PROJ NEXT") : "xPTS NEXT";
   const ppg = player.points_per_game ? Number(player.points_per_game).toFixed(1) : "—";
   const form = player.form ? Number(player.form).toFixed(1) : "—";
   const nextFixt = next.fixtures;
