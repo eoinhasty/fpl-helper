@@ -253,7 +253,9 @@ class EspnService:
         url = f"{ESPN_SOCCER_BASE}/{slug}/scoreboard"
         r = await self._get(url)
         if r is None:
-            return {"source": "espn", "competition": competition, "fixtures": []}
+            # Raised, not returned empty, so the cache never stores a 403 as
+            # "no fixtures" for the next 15m–3h
+            raise _EspnUnavailable(slug)
         js = r.json()
         events = {e["id"]: e for e in js.get("events", []) if e.get("id")}
 
@@ -330,13 +332,7 @@ class EspnService:
             f"{ESPN_SOCCER_BASE}/{slug}/summary", params={"event": event_id}
         )
         if r is None:
-            return {
-                "source": "espn",
-                "competition": competition,
-                "event": event_id,
-                "teams": [],
-                "available": False,
-            }
+            raise _EspnUnavailable(slug)
         js = r.json()
 
         def _shape_team(roster: dict) -> dict:
@@ -433,7 +429,9 @@ class EspnService:
                     ).days
                     if age_days > _SQUAD_NEWS_MAX_AGE_DAYS:
                         continue
-                except ValueError:
+                except (ValueError, TypeError):
+                    # TypeError: a timestamp without an offset is naive and
+                    # can't be compared with an aware `now`
                     continue
                 athletes = [
                     _norm_name(c.get("description"))
@@ -516,7 +514,8 @@ class EspnService:
             return None
 
         def _parse(d: str) -> datetime:
-            return datetime.fromisoformat(d.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(d.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(days=_RECENT_MATCH_MAX_AGE_DAYS)
