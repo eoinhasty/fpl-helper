@@ -304,7 +304,7 @@ export default function OverviewTab({
                     </span>
                   ) : tr != null ? (
                     <span
-                      className={`flex items-center gap-1 ${tr.rank <= 5 ? "text-primary" : "text-muted-foreground"}`}
+                      className={`flex items-center gap-1 ${tr.rank <= 5 ? "text-primary-strong" : "text-muted-foreground"}`}
                     >
                       {tr.rank <= 5 && "🔥"}#{tr.rank} most-bought {posLabel}
                     </span>

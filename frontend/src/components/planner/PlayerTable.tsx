@@ -284,7 +284,7 @@ export default function PlayerTable({
                     : ok
                       ? "cursor-pointer bg-primary text-primary-foreground hover:opacity-90"
                       : alreadyAdded
-                        ? "cursor-default bg-primary/15 text-primary"
+                        ? "cursor-default bg-primary/15 text-primary-strong"
                         : "cursor-not-allowed bg-muted text-muted-foreground/50"
                 }`}
               >
