@@ -94,6 +94,10 @@ function FixtureTile({ f, view, leagueXg }: { f: FixtureLite; view: TickerView; 
   );
 }
 
+/** Sortable column header: a real button so the sort works from the keyboard */
+const SORT_BTN =
+  "cursor-pointer rounded font-semibold hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 export default function FdrGrid({ data, view = "fdr" }: { data: FdrGridResponse; view?: TickerView }) {
   const [sortKey, setSortKey] = React.useState<SortKey>("summary");
   const leagueXg = data.league_xg ?? 1;
@@ -153,20 +157,32 @@ export default function FdrGrid({ data, view = "fdr" }: { data: FdrGridResponse;
                 Team
               </th>
               <th
-                className="cursor-pointer px-2 py-2 text-center font-semibold whitespace-nowrap text-muted-foreground hover:text-foreground"
-                onClick={() => setSortKey("summary")}
-                title={VIEW_COPY[view].summaryTitle}
+                className="px-2 py-2 text-center font-semibold whitespace-nowrap text-muted-foreground"
+                aria-sort={sortKey === "summary" ? "ascending" : undefined}
               >
-                {VIEW_COPY[view].summary} {sortKey === "summary" && "▾"}
+                <button
+                  type="button"
+                  className={SORT_BTN}
+                  onClick={() => setSortKey("summary")}
+                  title={VIEW_COPY[view].summaryTitle}
+                >
+                  {VIEW_COPY[view].summary} {sortKey === "summary" && "▾"}
+                </button>
               </th>
               {data.gws.map((g) => (
                 <th
                   key={g.id}
-                  className="cursor-pointer px-1 py-2 text-center font-semibold whitespace-nowrap text-muted-foreground hover:text-foreground"
-                  onClick={() => setSortKey(g.id)}
-                  title={`Sort by GW${g.id}`}
+                  className="px-1 py-2 text-center font-semibold whitespace-nowrap text-muted-foreground"
+                  aria-sort={sortKey === g.id ? "ascending" : undefined}
                 >
-                  GW{g.id} {sortKey === g.id && "▾"}
+                  <button
+                    type="button"
+                    className={SORT_BTN}
+                    onClick={() => setSortKey(g.id)}
+                    title={`Sort by GW${g.id}`}
+                  >
+                    GW{g.id} {sortKey === g.id && "▾"}
+                  </button>
                 </th>
               ))}
             </tr>
