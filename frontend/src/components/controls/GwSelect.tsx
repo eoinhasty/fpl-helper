@@ -28,7 +28,7 @@ export function GwSelect({
       variant={variant}
       anchor="bottom end"
       placeholder="GW —"
-      options={options.map((g) => ({ label: `GW ${g}`, value: g }))}
+      options={options.map((g) => ({ label: `GW${g}`, value: g }))}
     />
   );
 }

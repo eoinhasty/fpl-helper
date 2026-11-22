@@ -52,7 +52,7 @@ export default function NextMatchCard() {
       loading={loading}
       error={error}
       empty={!data || !data.first}
-      right={data && <div className="text-xs text-muted-foreground">GW {data.gw}</div>}
+      right={data && <div className="text-xs text-muted-foreground">GW{data.gw}</div>}
     >
       {data?.first && (
         <>

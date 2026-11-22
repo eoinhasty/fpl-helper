@@ -47,7 +47,7 @@ export default function SquadStatusBar({
           LIVE
         </span>
       ) : (
-        <span className="badge shrink-0 border-0 bg-primary text-primary-foreground">GW {gw ?? "—"}</span>
+        <span className="badge shrink-0 border-0 bg-primary text-primary-foreground">GW{gw ?? "—"}</span>
       )}
       <span className={ended ? "font-medium text-destructive" : "text-muted-foreground"}>{text}</span>
       {!compact && (
