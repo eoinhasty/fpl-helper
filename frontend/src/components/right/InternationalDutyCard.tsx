@@ -38,7 +38,13 @@ function matchBadge(m: RecentMatch): { Icon: typeof CheckCircleIcon; color: stri
   return { Icon: ClockIcon, color: "text-muted-foreground", label: "Unused sub" };
 }
 
-export default function InternationalDutyCard({ players }: { players?: Player[] | null }) {
+export default function InternationalDutyCard({
+  players,
+  squadLoading,
+}: {
+  players?: Player[] | null;
+  squadLoading?: boolean;
+}) {
   const ids = (players ?? []).map((p) => p.element);
   const url = ids.length > 0 ? `/api/football/international-news?player_ids=${ids.join(",")}` : null;
   const { data, loading, error } = useFetch<Resp>(url);
@@ -50,7 +56,7 @@ export default function InternationalDutyCard({ players }: { players?: Player[] 
   return (
     <DataCard
       title="International Duty"
-      loading={loading && !!url}
+      loading={(loading && !!url) || (!!squadLoading && !players)}
       error={error}
       empty={!url || rows.length === 0}
       emptyMessage="No international squad news for your players."
