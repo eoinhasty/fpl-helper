@@ -874,7 +874,7 @@ class FPLService:
                 "id": league.get("id", league_id),
                 "name": league.get("name"),
                 "start_event": league.get("start_event"),
-                "truncated": bool(page.get("has_next")) or len(rows) >= LEAGUE_PAGE,
+                "truncated": bool(page.get("has_next")),
             },
         }
         if current is None:
