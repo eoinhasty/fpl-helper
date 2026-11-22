@@ -20,6 +20,7 @@ from app.services.gameweeks import (
     upcoming_event,
 )
 from app.services.planner import MAX_PER_CLUB
+from app.services.prices import price_outlook
 from app.services import track_record
 from app.services.scoring import (
     gain_driver,
@@ -372,6 +373,7 @@ class FPLService:
             )
             positions = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
             pos_ranks, transfer_ranks = self._cached_ranks(boot)
+            now = datetime.now(timezone.utc)
 
             players = []
             for p in boot["elements"]:
@@ -435,6 +437,7 @@ class FPLService:
                     "transfers_out_event": p.get("transfers_out_event"),
                     "cost_change_start": p.get("cost_change_start"),
                     "cost_change_event": p.get("cost_change_event"),
+                    "price_outlook": price_outlook(p, now),
                 }
                 players.append(
                     {
@@ -856,6 +859,7 @@ class FPLService:
         players = {p["id"]: p for p in boot["elements"]}
         teams = {t["id"]: t for t in boot["teams"]}
         pos_ranks, transfer_ranks = self._cached_ranks(boot)
+        now = datetime.now(timezone.utc)
 
         fdr_by_team: Dict[int, list] = {}
         for fx in fixtures:
@@ -950,6 +954,7 @@ class FPLService:
                     "multiplier": pick.get("multiplier"),  # 2 if captain, 1 otherwise
                     "shirt_url": shirt_url,
                     "cost_change_event": p.get("cost_change_event"),
+                    "price_outlook": price_outlook(p, now),
                     "transfer_rank": transfer_ranks.get(el),
                     "ranks": pos_ranks.get(el),
                 }
