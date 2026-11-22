@@ -1,7 +1,11 @@
 // lib/utils.ts
 import type { Player, PriceOutlook, XgiSignal } from "./types";
 
-export const isStarting = (p: Player): boolean => (p.multiplier ?? 0) > 0 || (p.slot ?? 99) <= 11;
+/** In the XI by slot — not by multiplier, which a Bench Boost week sets on
+ * slots 12–15 too (and stays on the finished GW's picks until the next
+ * deadline, which made all 15 "starters"). The multiplier only decides
+ * who wasn't placed in a slot. */
+export const isStarting = (p: Player): boolean => (p.slot != null ? p.slot <= 11 : (p.multiplier ?? 0) > 0);
 
 export type Tone = "success" | "warning" | "destructive";
 

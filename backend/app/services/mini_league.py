@@ -81,7 +81,7 @@ def auto_subs(
     and a bench player comes on once they've played; one who's finished on
     0 is skipped, and one whose match is still to come stops the walk, since
     FPL's choice waits on them. If the captain didn't play, the vice takes
-    their multiplier. Starters still to play are assumed to play.
+    their multiplier — unless the vice didn't play either. Starters still to play are assumed to play.
 
     Returns element → multiplier after all that, the subs made
     ([{"out", "in"}]) and whether the vice took the armband. Picks FPL has
@@ -125,7 +125,13 @@ def auto_subs(
     captain = next((p for p in picks if p.get("is_captain")), None)
     vice = next((p for p in picks if p.get("is_vice_captain")), None)
     vice_took = False
-    if captain and vice and blanked(captain["element"]):
+    # Nobody gets the armband if the vice didn't play either (FPL's rule)
+    if (
+        captain
+        and vice
+        and blanked(captain["element"])
+        and not blanked(vice["element"])
+    ):
         c_mult = captain.get("multiplier") or 0
         if c_mult > 1 and vice["element"] in xi + ([] if chip != "bboost" else bench):
             mult[vice["element"]] = c_mult

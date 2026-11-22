@@ -2,7 +2,7 @@ import DataCard from "../ui/DataCard";
 import { useFetch } from "../../hooks/useFetch";
 import type { TransferSuggestion, TransferSuggestionsResponse } from "../../lib/types";
 import { fmtPrice, pct } from "../../lib/format";
-import { fdrDotClass, TONE_CLASS } from "../../lib/utils";
+import { fdrDotClass, startProbTone, TONE_CLASS } from "../../lib/utils";
 import { isAuthenticated } from "../../lib/api";
 import PlayerOpen from "../squad/PlayerOpen";
 
@@ -92,7 +92,11 @@ function SuggestionRow({ p }: { p: TransferSuggestion }) {
             {own && <> · {own}</>}
           </div>
           <div className={bankDelta > 0 ? TONE_CLASS.success.text : undefined}>{bankLabel}</div>
-          {p.start_probability < 0.75 && <div className="text-[10px]">{pct(p.start_probability)} start</div>}
+          {startProbTone(p.start_probability) !== "success" && (
+            <div className={`text-[10px] ${TONE_CLASS[startProbTone(p.start_probability)].text}`}>
+              {pct(p.start_probability)} start
+            </div>
+          )}
         </div>
       </PlayerOpen>
     </li>

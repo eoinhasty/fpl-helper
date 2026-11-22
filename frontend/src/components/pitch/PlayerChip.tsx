@@ -4,15 +4,15 @@ import { BENCH_LABEL, CHIP } from "../../lib/constants";
 import StartMeter from "../squad/StartMeter";
 import { TONE_CLASS, gwPointsDisplay, statusTone } from "../../lib/utils";
 
-function CaptainBadge({ c, v }: { c?: boolean; v?: boolean }) {
+function CaptainBadge({ c, v, triple }: { c?: boolean; v?: boolean; triple?: boolean }) {
   if (!c && !v) return null;
 
-  const label = c ? "C" : "V";
+  const label = c ? (triple ? "TC" : "C") : "V";
 
   return (
     <div
-      className="absolute -top-2 -left-2 grid h-5 w-5 place-items-center rounded-full bg-fpl-purple text-[11px] font-bold text-fpl-purple-foreground shadow ring-1 ring-black/15"
-      title={c ? "Captain" : "Vice-captain"}
+      className="absolute -top-2 -left-2 grid h-5 min-w-5 place-items-center rounded-full bg-fpl-purple px-1 text-[11px] font-bold text-fpl-purple-foreground shadow ring-1 ring-black/15"
+      title={c ? (triple ? "Triple captain" : "Captain") : "Vice-captain"}
     >
       {label}
     </div>
@@ -157,7 +157,7 @@ export default function PlayerChip({
               isCaptain={!!p.is_captain}
               title={tooltip}
             />
-            <CaptainBadge c={p.is_captain} v={p.is_vice_captain} />
+            <CaptainBadge c={p.is_captain} v={p.is_vice_captain} triple={p.multiplier === 3} />
             <StatusTriangle status={p.status} />
             <LineupChangeBadge change={p.lineup_change} belowCaptain={p.is_captain || p.is_vice_captain} />
 

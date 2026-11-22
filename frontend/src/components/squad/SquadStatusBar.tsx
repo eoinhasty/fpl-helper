@@ -1,6 +1,7 @@
 import type { CacheMeta } from "../../lib/api";
 import CacheIndicators from "../ui/CacheIndicators";
 import { money } from "../../lib/format";
+import { CHIP_NAMES } from "../../lib/utils";
 import { useCountdown } from "../../hooks/useCountdown";
 
 export default function SquadStatusBar({
@@ -46,7 +47,7 @@ export default function SquadStatusBar({
           LIVE
         </span>
       ) : (
-        <span className="badge shrink-0 border-0 bg-primary text-primary-foreground">GW {gw ?? "—"}</span>
+        <span className="badge shrink-0 border-0 bg-primary text-primary-foreground">GW{gw ?? "—"}</span>
       )}
       <span className={ended ? "font-medium text-destructive" : "text-muted-foreground"}>{text}</span>
       {!compact && (
@@ -62,7 +63,9 @@ export default function SquadStatusBar({
           {activeChip && (
             <>
               <span className="h-4 w-px shrink-0 bg-border" />
-              <span className="badge pill-warn shrink-0 font-semibold uppercase">{activeChip.replace(/_/g, " ")}</span>
+              <span className="badge pill-warn shrink-0 font-semibold">
+                {CHIP_NAMES[activeChip]?.[1] ?? activeChip}
+              </span>
             </>
           )}
         </>

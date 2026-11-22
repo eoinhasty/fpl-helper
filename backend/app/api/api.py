@@ -30,8 +30,11 @@ from app.services.espn import (
     SWR_ESPN_FOOTBALL,
     TTL_ESPN_LINEUPS,
     SWR_ESPN_LINEUPS,
+    _EspnUnavailable,
 )
 import logging
+
+ESPN_UNAVAILABLE = "ESPN isn't responding right now — try again in a few minutes."
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -276,6 +279,7 @@ async def squad(
         "overall_rank": overall_rank,
         "favourite_team": fav_team,
         "season_status": season_status,
+        "season": season,
         "requested_gw": gw or next_gw_id,
         "used_gw": used_gw,
         "current_gw": current_gw_id,
@@ -376,7 +380,15 @@ async def live(
         "current_gw": current_gw_id,
         "used_label": "live",
         "deadline": used_event["deadline_time"],
-        "active_chip": None,
+        # Played for the next deadline ("active"), as FPL's own web app reads it
+        "active_chip": next(
+            (
+                c.get("name")
+                for c in live_data.get("chips") or []
+                if c.get("status_for_entry") == "active"
+            ),
+            None,
+        ),
         "team_value": team_value,
         "team_bank": team_bank,
         "players": enriched,
@@ -740,7 +752,11 @@ async def football_fixtures(request: Request, response: Response, competition: s
     key = f"espn:fixtures:{competition}"
 
     async def _fetch():
-        return await svc.espn.football_fixtures(competition)
+        try:
+            return await svc.espn.football_fixtures(competition)
+        except _EspnUnavailable:
+            # Not cached: a throttled ESPN mustn't read as "no matches" for hours
+            raise HTTPException(502, detail=ESPN_UNAVAILABLE)
 
     data, status, age = await svc.cache.get_or_set(
         key, _fetch, TTL_ESPN_FOOTBALL, SWR_ESPN_FOOTBALL
@@ -758,7 +774,11 @@ async def football_lineups(
     key = f"espn:lineups:{competition}:{event}"
 
     async def _fetch():
-        return await svc.espn.football_lineups(competition, event)
+        try:
+            return await svc.espn.football_lineups(competition, event)
+        except _EspnUnavailable:
+            # Not cached: a throttled ESPN mustn't read as "no matches" for hours
+            raise HTTPException(502, detail=ESPN_UNAVAILABLE)
 
     data, status, age = await svc.cache.get_or_set(
         key, _fetch, TTL_ESPN_LINEUPS, SWR_ESPN_LINEUPS

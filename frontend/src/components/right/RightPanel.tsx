@@ -53,7 +53,7 @@ export default function RightPanel({
             lockedGw={lockedGw}
           />
           <HealthCard entry={entry} players={players} loading={loading} error={error} isHistorical={isHistorical} />
-          <InternationalDutyCard players={players} />
+          <InternationalDutyCard players={players} squadLoading={loading} />
           <HotNewsCard />
         </>
       )}

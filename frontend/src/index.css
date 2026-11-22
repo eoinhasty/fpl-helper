@@ -47,6 +47,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Tailwind v4's preflight gives buttons the default cursor; anything
+   clickable gets the pointer back here so no control can miss it */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="radio"],
+[role="tab"] {
+  cursor: pointer;
+}
+
 /* Mobile: avoid double-tap zoom / 300ms tap delay on interactive elements */
 a,
 button,

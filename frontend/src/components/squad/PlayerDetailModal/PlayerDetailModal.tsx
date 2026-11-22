@@ -94,7 +94,7 @@ export default function PlayerDetailModal({
   // it; it's for fixtureGw, while ep_next is always FPL's next GW.
   const proj = player.projected_pts;
   const xPts = proj != null ? proj.toFixed(1) : player.ep_next ? Number(player.ep_next).toFixed(1) : "—";
-  const xPtsLabel = proj != null && fixtureGw ? `GW${fixtureGw} xPTS` : "xPTS NEXT";
+  const xPtsLabel = proj != null ? (fixtureGw ? `GW${fixtureGw} PROJ` : "PROJ NEXT") : "xPTS NEXT";
   const ppg = player.points_per_game ? Number(player.points_per_game).toFixed(1) : "—";
   const form = player.form ? Number(player.form).toFixed(1) : "—";
   const nextFixt = next.fixtures;
@@ -130,12 +130,7 @@ export default function PlayerDetailModal({
         </div>
 
         {/* close button */}
-        <button
-          ref={closeBtnRef}
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute top-3 right-3 z-10 min-h-9 rounded-lg border border-border/60 px-3 py-2 text-[12px] font-medium text-foreground/70"
-        >
+        <button ref={closeBtnRef} onClick={onClose} aria-label="Close" className="btn absolute top-3 right-3 z-10">
           Close
         </button>
 

@@ -14,6 +14,7 @@ import { usePreferences } from "../hooks/usePreferences";
 import { Segmented } from "../components/controls/Segmented";
 import { GwSelect } from "../components/controls/GwSelect";
 import { money } from "../lib/format";
+import { CHIP_NAMES } from "../lib/utils";
 
 import type { Player } from "../lib/types";
 import { previewLineup, suggestLineup } from "../lib/lineup";
@@ -57,6 +58,13 @@ export default function SquadDashboard() {
   const [mode, setMode] = useState<Mode>(prefs.defaultView);
   const [gw, setGw] = useState<number | undefined>(undefined); // undefined => server fallback
   const prevMode = useRef(mode);
+  // A past GW picked for one entry shouldn't carry over to the next: reset
+  // during render (not in an effect) so the new entry loads once, unpinned
+  const [gwEntry, setGwEntry] = useState(entry);
+  if (gwEntry !== entry) {
+    setGwEntry(entry);
+    setGw(undefined);
+  }
 
   const loading = mode === "live" ? liveLoading : squadLoading;
   const error = mode === "live" ? liveError : squadError;
@@ -280,9 +288,7 @@ export default function SquadDashboard() {
     <div className="flex items-end gap-4">
       <StatText label="Value" value={money(data?.team_value)} />
       <StatText label="Bank" value={money(data?.team_bank)} />
-      {data?.active_chip && (
-        <StatText label="Chip" value={<span className="uppercase">{data.active_chip.replace(/_/g, " ")}</span>} />
-      )}
+      {data?.active_chip && <StatText label="Chip" value={CHIP_NAMES[data.active_chip]?.[0] ?? data.active_chip} />}
     </div>
   );
 
