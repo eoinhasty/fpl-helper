@@ -1,4 +1,4 @@
-# Lint, build and vulnerability-audit both halves of the app. Runs on PRs (so
+# Lint, test, build and vulnerability-audit both halves of the app. Runs on PRs (so
 # Dependabot bumps get a pass/fail signal before merge), on pushes to main, and
 # weekly — new advisories get published against versions we already pin, so an
 # unchanged lockfile can still go red.
@@ -31,6 +31,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      - run: npm test
       - run: npm run build
       # Production deps only: dev tooling (nodemon → chokidar → braces) never
       # ships to users, and its advisories have no fix to move to.
@@ -53,6 +54,8 @@ jobs:
             backend/requirements-dev.txt
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest
       - name: Smoke test
         run: |
           python -c "
