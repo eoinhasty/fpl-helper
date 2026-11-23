@@ -45,10 +45,17 @@ health_router = APIRouter(prefix="/api")
 router = APIRouter(prefix="/api", dependencies=[Depends(verify_api_key)])
 
 
-def set_cache_headers(resp: Response, status: str, age: float, ttl: int):
+def set_cache_headers(
+    resp: Response, status: str, age: float, ttl: int, *, private: bool = False
+):
+    """`private` for anything built from the caller's FPL token: with `public`
+    plus stale-while-revalidate, a shared cache in front of us (a future
+    Cloudflare cache rule, a corporate proxy) may serve one manager's
+    pre-deadline team to the next caller of the same URL."""
     resp.headers["x-cache-status"] = status
     resp.headers["x-cache-age"] = f"{age:.1f}"
-    resp.headers["cache-control"] = f"public, max-age=0, stale-while-revalidate={ttl}"
+    scope = "private" if private else "public"
+    resp.headers["cache-control"] = f"{scope}, max-age=0, stale-while-revalidate={ttl}"
 
 
 _CACHE_STATUS_SEVERITY = {"hit": 0, "bypass-refresh": 1, "miss": 2, "stale-serve": 3}
@@ -366,7 +373,7 @@ async def live(
     combined_status, combined_age = combine_cache(
         (mt_status, mt_age), (ev_status, ev_age), (lfx_status, lfx_age)
     )
-    set_cache_headers(response, combined_status, combined_age, TTL_MYTEAM)
+    set_cache_headers(response, combined_status, combined_age, TTL_MYTEAM, private=True)
     return {
         "entry_id": entry_id,
         "entry_name": entry_name,
@@ -626,7 +633,9 @@ async def transfer_suggestions(
         entry_id, top_n=top_n, token=token
     )
     combined_status, combined_age = combine_cache(*readings)
-    set_cache_headers(response, combined_status, combined_age, ttl)
+    set_cache_headers(
+        response, combined_status, combined_age, ttl, private=token is not None
+    )
     return data
 
 
@@ -665,7 +674,9 @@ async def transfer_plan(
         triple_captain=chip(triple_captain),
     )
     combined_status, combined_age = combine_cache(*readings)
-    set_cache_headers(response, combined_status, combined_age, ttl)
+    set_cache_headers(
+        response, combined_status, combined_age, ttl, private=token is not None
+    )
     return data
 
 

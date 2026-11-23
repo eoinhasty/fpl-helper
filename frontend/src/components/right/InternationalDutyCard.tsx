@@ -104,7 +104,8 @@ export default function InternationalDutyCard({
                 </div>
                 {item && (
                   <>
-                    {item.link ? (
+                    {/* ESPN-supplied URL: only http(s) becomes a link */}
+                    {item.link && /^https?:\/\//i.test(item.link) ? (
                       <a
                         href={item.link}
                         target="_blank"

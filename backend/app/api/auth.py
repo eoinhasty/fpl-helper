@@ -8,7 +8,7 @@ import uuid
 
 import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.deps import get_real_ip, limiter, verify_api_key
 from app.services.service import USER_AGENT as _UA
@@ -58,7 +58,10 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
         value=refresh_token,
         httponly=True,
         secure=True,
-        samesite="none",
+        # The app and API are the same site (*.eoinhasty.dev), so Lax costs
+        # nothing and stops other sites from driving refresh/logout — that
+        # used to rest on the public X-Api-Key forcing a CORS preflight.
+        samesite="lax",
         max_age=_COOKIE_MAX_AGE,
         path="/api/auth",
     )
@@ -69,7 +72,7 @@ def _clear_refresh_cookie(response: Response) -> None:
         key=_COOKIE_NAME,
         httponly=True,
         secure=True,
-        samesite="none",
+        samesite="lax",
         path="/api/auth",
     )
 
@@ -247,8 +250,19 @@ async def _pkce_refresh(refresh_token: str) -> tuple[str, str]:
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=256)
+
+
+# FPL answering a login step with a shape the flow doesn't expect (a missing
+# key, a non-JSON page) — it means FPL changed its sign-in, not a bad password.
+_UNEXPECTED_SHAPE = (KeyError, TypeError, ValueError)
+
+
+def _sign_in_changed() -> HTTPException:
+    return HTTPException(
+        502, detail="FPL's sign-in didn't respond as expected — try again later."
+    )
 
 
 class TokenResponse(BaseModel):
@@ -257,11 +271,16 @@ class TokenResponse(BaseModel):
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
+# Across all clients: every attempt reaches FPL from this server's IP, so a
+# credential-stuffing run spread over many IPs could get it blocked for everyone.
+@limiter.limit("30/minute", key_func=lambda request: "all-clients")
 async def login(request: Request, response: Response, body: LoginRequest = Body(...)):
     try:
         access_token, refresh_token = await _pkce_login(body.email, body.password)
     except Exception as exc:
         _log_auth(request, "login", "failure", _failure_reason(exc))
+        if isinstance(exc, _UNEXPECTED_SHAPE):
+            raise _sign_in_changed() from exc
         raise
     _log_auth(request, "login", "success")
     _set_refresh_cookie(response, refresh_token)
@@ -279,6 +298,8 @@ async def refresh(request: Request, response: Response):
         access_token, new_refresh_token = await _pkce_refresh(refresh_token)
     except Exception as exc:
         _log_auth(request, "refresh", "failure", _failure_reason(exc))
+        if isinstance(exc, _UNEXPECTED_SHAPE):
+            raise _sign_in_changed() from exc
         raise
     _log_auth(request, "refresh", "success")
     _set_refresh_cookie(response, new_refresh_token)
@@ -286,6 +307,7 @@ async def refresh(request: Request, response: Response):
 
 
 @router.post("/logout")
+@limiter.limit("20/minute")
 async def logout(request: Request, response: Response):
     _log_auth(request, "logout", "success")
     _clear_refresh_cookie(response)
